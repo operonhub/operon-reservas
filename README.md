@@ -49,7 +49,7 @@ src/
     auth.ts             requireContext(): deriva la org del membership
     constants.ts        Etiquetas + máquina de estados de reservas
     supabase/           Clientes SSR/browser/middleware + tipos
-supabase/migrations/    Esquema, RLS y motor de disponibilidad (0001–0005)
+supabase/migrations/    Esquema, RLS, motor de disponibilidad y notificaciones (0001–0008)
 supabase/seed.sql       Datos demo (2 orgs)
 ```
 
@@ -62,12 +62,22 @@ Proyecto Supabase propio. Migraciones versionadas en `supabase/migrations/` (ord
 3. `0003_availability_engine` — RPCs: disponibilidad pública, alta de reserva (race-safe), bloqueos y transiciones de estado.
 4. `0004_harden_internal_functions` — revoca las funciones internas de `anon`/`authenticated`.
 5. `0005_price_in_book` — cálculo de precio + seña dentro de `_book` (toda reserva queda tarifada).
+6. `0006_reservation_email_notifications` — outbox transaccional, emails por Resend y reintentos con Cron.
+7. `0007_notification_outbox_org_index` — índice de la outbox por organización.
+8. `0008_refresh_notification_pricing_payload` — incluye precio + seña en el payload de las notificaciones.
 
 ## Conceptos clave
 
 - **Anti-overbooking**: garantizado a nivel base de datos por una restricción `EXCLUDE` (btree_gist) sobre `unit_occupancy`. Reservas y bloqueos comparten esa tabla → nunca se solapan, ni siquiera con dos reservas simultáneas.
 - **Aislamiento**: un usuario solo ve las filas de las organizaciones donde tiene `membership`. `anon` no accede a ninguna tabla; la web pública usa exclusivamente 3 RPC (`public_availability`, `public_property`, `create_public_reservation`).
 - **Estados de reserva**: `inquiry → pending → pending_payment → confirmed → completed` (+ `cancelled`). Transiciones controladas en un único lugar (`_can_transition` en la base, espejado en `lib/constants.ts`).
+
+## Notificaciones por email
+
+- Una reserva nueva que no sea de carga manual notifica al email de la propiedad. Si no está configurado, usa el primer owner/admin con email.
+- Cada cambio de estado notifica al email del huésped.
+- Los eventos se guardan primero en `notification_outbox`; la Edge Function `notify-reservations` los envía de forma idempotente y Supabase Cron reintenta errores transitorios.
+- Configurar `RESEND_API_KEY` y `RESEND_FROM` como secretos de Supabase Edge Functions. El dominio de `RESEND_FROM` debe estar verificado en Resend.
 
 ## Deploy
 
