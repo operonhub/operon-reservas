@@ -1,6 +1,12 @@
+import { Suspense } from "react"
 import { requireContext } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { ConfigForm } from "@/components/settings/config-form"
+import {
+  MercadoPagoCard,
+  type MpStatus,
+} from "@/components/settings/mercadopago-card"
+import { isMercadoPagoConfigured } from "@/lib/mercadopago"
 
 export default async function ConfiguracionPage() {
   const ctx = await requireContext()
@@ -14,6 +20,9 @@ export default async function ConfiguracionPage() {
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle()
+
+  const { data: mpRaw } = await supabase.rpc("mp_connection_status")
+  const mpStatus = (mpRaw ?? { connected: false }) as MpStatus
 
   return (
     <div className="p-6 space-y-6 max-w-2xl">
@@ -31,6 +40,10 @@ export default async function ConfiguracionPage() {
           No hay una propiedad configurada.
         </div>
       )}
+
+      <Suspense>
+        <MercadoPagoCard status={mpStatus} configured={isMercadoPagoConfigured()} />
+      </Suspense>
     </div>
   )
 }

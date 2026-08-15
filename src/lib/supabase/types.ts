@@ -6,6 +6,24 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+/**
+ * Credencial de Mercado Pago de una organización. Vive en `app_private`
+ * (schema no expuesto), sólo la devuelven las RPC `mp_service_*` al backend.
+ */
+export type MpCredential = {
+  organization_id: string
+  mp_user_id: string
+  access_token: string
+  refresh_token: string
+  public_key: string | null
+  live_mode: boolean
+  scopes: string | null
+  expires_at: string
+  connected_by: string | null
+  connected_at: string
+  updated_at: string
+}
+
 export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.15"
@@ -564,6 +582,52 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      mp_save_oauth_state: {
+        Args: { p_state: string; p_code_verifier: string }
+        Returns: string
+      }
+      mp_consume_oauth_state: {
+        Args: { p_state: string }
+        Returns: { organization_id: string; code_verifier: string }[]
+      }
+      mp_store_credential: {
+        Args: {
+          p_organization_id: string
+          p_mp_user_id: string
+          p_access_token: string
+          p_refresh_token: string
+          p_public_key: string | null
+          p_live_mode: boolean
+          p_scopes: string | null
+          p_expires_in: number
+        }
+        Returns: undefined
+      }
+      mp_connection_status: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      mp_disconnect: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      mp_service_get_credential: {
+        Args: { p_organization_id: string }
+        Returns: MpCredential | null
+      }
+      mp_service_get_credential_by_mp_user: {
+        Args: { p_mp_user_id: string }
+        Returns: MpCredential | null
+      }
+      mp_service_update_tokens: {
+        Args: {
+          p_organization_id: string
+          p_access_token: string
+          p_refresh_token: string
+          p_expires_in: number
+        }
+        Returns: undefined
+      }
       create_block: {
         Args: {
           p_end: string
