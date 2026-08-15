@@ -28,5 +28,16 @@ export default async function ReservarPage({
 
   if (error || !data) notFound()
 
-  return <PublicBooking orgSlug={slug} property={data as PublicProperty} />
+  const { data: mpRaw } = await supabase.rpc("mp_public_status", {
+    p_org_slug: slug,
+  })
+  const mpEnabled = Boolean((mpRaw as { enabled?: boolean } | null)?.enabled)
+
+  return (
+    <PublicBooking
+      orgSlug={slug}
+      property={data as PublicProperty}
+      mpEnabled={mpEnabled}
+    />
+  )
 }

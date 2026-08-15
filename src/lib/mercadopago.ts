@@ -35,13 +35,18 @@ function clientSecret(): string {
   return v
 }
 
+/** URL pública del sitio (sin barra final). */
+export function siteUrl(): string {
+  const site = process.env.NEXT_PUBLIC_SITE_URL
+  if (!site) throw new Error("NEXT_PUBLIC_SITE_URL no configurada")
+  return site.replace(/\/$/, "")
+}
+
 /** URI de retorno del OAuth. Debe coincidir EXACTO con la registrada en MP. */
 export function redirectUri(): string {
   const explicit = process.env.MP_REDIRECT_URI
   if (explicit) return explicit
-  const site = process.env.NEXT_PUBLIC_SITE_URL
-  if (!site) throw new Error("MP_REDIRECT_URI o NEXT_PUBLIC_SITE_URL no configuradas")
-  return `${site.replace(/\/$/, "")}/api/mp/callback`
+  return `${siteUrl()}/api/mp/callback`
 }
 
 /** Está configurada la app de MP (client id/secret)? Para gatear la UI. */
@@ -107,4 +112,68 @@ export function refreshAccessToken(refreshToken: string): Promise<MpTokenRespons
     grant_type: "refresh_token",
     refresh_token: refreshToken,
   })
+}
+
+// ============================================================
+// Checkout Pro (preferencias) + consulta de pagos
+// Se operan con el access_token de la ORG (no el de Operon).
+// ============================================================
+
+const API_BASE = "https://api.mercadopago.com"
+
+export type MpPreference = {
+  id: string
+  init_point: string
+  sandbox_init_point: string
+}
+
+export type MpPayment = {
+  id: number
+  status: string // approved | pending | in_process | rejected | cancelled | refunded ...
+  status_detail?: string
+  transaction_amount?: number
+  external_reference?: string
+  currency_id?: string
+}
+
+async function mpFetch<T>(
+  accessToken: string,
+  path: string,
+  init?: RequestInit
+): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...(init?.headers ?? {}),
+    },
+  })
+  const data = (await res.json().catch(() => ({}))) as T & {
+    message?: string
+    error?: string
+  }
+  if (!res.ok) {
+    throw new Error(`MP_${res.status}: ${data.message ?? data.error ?? "error"}`)
+  }
+  return data as T
+}
+
+/** Crea una preferencia de Checkout Pro en la cuenta de la organización. */
+export function createPreference(
+  accessToken: string,
+  body: Record<string, unknown>,
+  idempotencyKey?: string
+): Promise<MpPreference> {
+  return mpFetch<MpPreference>(accessToken, "/checkout/preferences", {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: idempotencyKey ? { "X-Idempotency-Key": idempotencyKey } : {},
+  })
+}
+
+/** Consulta un pago por id usando el token de la organización (fuente de verdad). */
+export function getPayment(accessToken: string, paymentId: string): Promise<MpPayment> {
+  return mpFetch<MpPayment>(accessToken, `/v1/payments/${paymentId}`)
 }

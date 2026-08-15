@@ -139,6 +139,8 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["payment_kind"]
           method: string | null
+          mp_init_point: string | null
+          mp_preference_id: string | null
           organization_id: string
           paid_at: string | null
           reservation_id: string
@@ -153,6 +155,8 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["payment_kind"]
           method?: string | null
+          mp_init_point?: string | null
+          mp_preference_id?: string | null
           organization_id: string
           paid_at?: string | null
           reservation_id: string
@@ -167,6 +171,8 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["payment_kind"]
           method?: string | null
+          mp_init_point?: string | null
+          mp_preference_id?: string | null
           organization_id?: string
           paid_at?: string | null
           reservation_id?: string
@@ -627,6 +633,10 @@ export type Database = {
           p_expires_in: number
         }
         Returns: undefined
+      }
+      mp_public_status: {
+        Args: { p_org_slug: string }
+        Returns: Json
       }
       create_block: {
         Args: {
