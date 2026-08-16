@@ -65,6 +65,8 @@ Proyecto Supabase propio. Migraciones versionadas en `supabase/migrations/` (ord
 6. `0006_reservation_email_notifications` — outbox transaccional, emails por Resend y reintentos con Cron.
 7. `0007_notification_outbox_org_index` — índice de la outbox por organización.
 8. `0008_refresh_notification_pricing_payload` — incluye precio + seña en el payload de las notificaciones.
+9. `0009_mercadopago_integration` — credenciales MP por organización (OAuth) en `app_private`, con RPCs `SECURITY DEFINER`.
+10. `0010_mercadopago_payments` — tracking de preferencias en `payments` + flag público de cobros.
 
 ## Conceptos clave
 

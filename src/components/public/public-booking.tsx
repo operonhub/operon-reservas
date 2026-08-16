@@ -28,12 +28,15 @@ type Step = "search" | "results" | "form" | "done"
 export function PublicBooking({
   orgSlug,
   property,
+  mpEnabled = false,
 }: {
   orgSlug: string
   property: PublicProperty
+  mpEnabled?: boolean
 }) {
   const [step, setStep] = React.useState<Step>("search")
   const [pending, setPending] = React.useState(false)
+  const [paying, setPaying] = React.useState(false)
 
   const [checkIn, setCheckIn] = React.useState(addDays(todayISO(), 7))
   const [checkOut, setCheckOut] = React.useState(addDays(todayISO(), 10))
@@ -84,6 +87,31 @@ export function PublicBooking({
     }
     setCode(res.code ?? null)
     setStep("done")
+  }
+
+  async function onPay() {
+    if (!code) return
+    setPaying(true)
+    try {
+      const res = await fetch("/api/mp/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, orgSlug }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        init_point?: string
+      }
+      if (!res.ok || !data.init_point) {
+        toast.error("No se pudo iniciar el pago. Probá de nuevo.")
+        setPaying(false)
+        return
+      }
+      window.location.href = data.init_point
+    } catch {
+      toast.error("No se pudo iniciar el pago. Probá de nuevo.")
+      setPaying(false)
+    }
   }
 
   return (
@@ -264,18 +292,32 @@ export function PublicBooking({
                 {selected.name} · {checkIn} → {checkOut}
               </p>
             )}
-            <Button
-              variant="outline"
-              className="mt-6"
-              onClick={() => {
-                setStep("search")
-                setSelected(null)
-                setUnits([])
-                setCode(null)
-              }}
-            >
-              Hacer otra reserva
-            </Button>
+
+            {mpEnabled && (
+              <div className="mt-6">
+                <Button onClick={onPay} disabled={paying} className="w-full sm:w-auto">
+                  {paying ? "Redirigiendo a Mercado Pago…" : "Pagar seña con Mercado Pago"}
+                </Button>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Pagá la seña para confirmar tu reserva al instante.
+                </p>
+              </div>
+            )}
+
+            <div>
+              <Button
+                variant="outline"
+                className="mt-6"
+                onClick={() => {
+                  setStep("search")
+                  setSelected(null)
+                  setUnits([])
+                  setCode(null)
+                }}
+              >
+                Hacer otra reserva
+              </Button>
+            </div>
           </div>
         )}
       </div>

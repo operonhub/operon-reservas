@@ -36,10 +36,15 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl
   // Rutas sin sesión: login, API pública y la web pública de reservas de cada cabaña.
+  // Cobros MP: checkout (huésped anónimo / landing externa), webhook (servidores
+  // de MP) y la página de retorno del pago. connect/callback SÍ requieren sesión.
   const isPublic =
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/public") ||
-    pathname.startsWith("/reservar")
+    pathname.startsWith("/reservar") ||
+    pathname.startsWith("/api/mp/checkout") ||
+    pathname.startsWith("/api/mp/webhook") ||
+    pathname.startsWith("/pago")
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone()

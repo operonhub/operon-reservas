@@ -46,3 +46,15 @@ export async function updateProperty(formData: FormData): Promise<ActionResult> 
   revalidatePath("/")
   return { ok: true }
 }
+
+/** Desconecta la cuenta de Mercado Pago de la organización (borra credenciales). */
+export async function disconnectMercadoPago(): Promise<ActionResult> {
+  await requireContext()
+  const supabase = await createClient()
+
+  const { error } = await supabase.rpc("mp_disconnect")
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/configuracion")
+  return { ok: true }
+}
