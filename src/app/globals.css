@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-heading: var(--font-space-grotesk);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -27,6 +27,10 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success-foreground: var(--success-foreground);
+  --color-success: var(--success);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning: var(--warning);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -48,73 +52,133 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ============================================================
+   Operon — Identidad de marca v1.0 "papel · tinta · azul · sol"
+   Los valores OKLCH son los mismos que ya están en producción en
+   el CRM (operon-crm/src/app/globals.css), para que los dos
+   productos Operon se vean como la misma familia.
+   ============================================================ */
+
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Operon — paleta de marca (claro) */
+  --background: oklch(0.982 0.007 88.6); /* papel */
+  --foreground: oklch(0.186 0.008 95.5); /* tinta */
+  --card: oklch(0.982 0.007 88.6); /* papel */
+  --card-foreground: oklch(0.186 0.008 95.5); /* tinta */
+  --popover: oklch(0.982 0.007 88.6); /* papel */
+  --popover-foreground: oklch(0.186 0.008 95.5); /* tinta */
+  --primary: oklch(0.443 0.205 266.2); /* azul */
+  --primary-foreground: oklch(0.982 0.007 88.6); /* papel */
+  --secondary: oklch(0.952 0.012 91.5); /* papel cream */
+  --secondary-foreground: oklch(0.186 0.008 95.5); /* tinta */
+  --muted: oklch(0.952 0.012 91.5); /* papel cream */
+  --muted-foreground: oklch(0.509 0.017 80.6); /* mute */
+  --accent: oklch(0.93 0.023 275.4); /* azul soft */
+  --accent-foreground: oklch(0.363 0.172 266.1); /* azul deep */
+  --destructive: oklch(0.555 0.171 16.3); /* rose armonizado */
+  --success: oklch(0.559 0.133 153.6); /* ok */
+  --success-foreground: oklch(0.982 0.007 88.6); /* papel */
+  --warning: oklch(0.85 0.146 90.5); /* sol */
+  --warning-foreground: oklch(0.186 0.008 95.5); /* tinta */
+  --border: oklch(0.864 0.026 89.2); /* line */
+  --input: oklch(0.864 0.026 89.2); /* line */
+  --ring: oklch(0.443 0.205 266.2); /* azul */
+  --chart-1: oklch(0.443 0.205 266.2); /* azul */
+  --chart-2: oklch(0.85 0.146 90.5); /* sol */
+  --chart-3: oklch(0.559 0.133 153.6); /* ok */
+  --chart-4: oklch(0.363 0.172 266.1); /* azul deep */
+  --chart-5: oklch(0.509 0.017 80.6); /* mute */
+  --radius: 0.75rem;
+  --sidebar: oklch(0.952 0.012 91.5); /* papel cream */
+  --sidebar-foreground: oklch(0.186 0.008 95.5); /* tinta */
+  --sidebar-primary: oklch(0.443 0.205 266.2); /* azul */
+  --sidebar-primary-foreground: oklch(0.982 0.007 88.6); /* papel */
+  --sidebar-accent: oklch(0.892 0.021 88.7); /* sand */
+  --sidebar-accent-foreground: oklch(0.186 0.008 95.5); /* tinta */
+  --sidebar-border: oklch(0.864 0.026 89.2); /* line */
+  --sidebar-ring: oklch(0.443 0.205 266.2); /* azul */
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  /* Operon — paleta de marca (oscuro) */
+  --background: oklch(0.186 0.008 95.5); /* tinta */
+  --foreground: oklch(0.982 0.007 88.6); /* papel */
+  --card: oklch(0.24 0.01 88.8);
+  --card-foreground: oklch(0.982 0.007 88.6); /* papel */
+  --popover: oklch(0.261 0.008 84.6);
+  --popover-foreground: oklch(0.982 0.007 88.6); /* papel */
+  --primary: oklch(0.617 0.152 266.6); /* azul aclarado */
+  --primary-foreground: oklch(0.186 0.008 95.5); /* tinta */
+  --secondary: oklch(0.285 0.011 91.7);
+  --secondary-foreground: oklch(0.982 0.007 88.6); /* papel */
+  --muted: oklch(0.285 0.011 91.7);
+  --muted-foreground: oklch(0.75 0.023 83.3); /* soft aclarado */
+  --accent: oklch(0.293 0.054 272.4); /* azul soft oscuro */
+  --accent-foreground: oklch(0.982 0.007 88.6); /* papel */
+  --destructive: oklch(0.667 0.162 11.7); /* rose aclarado */
+  --success: oklch(0.666 0.15 154.2); /* ok aclarado */
+  --success-foreground: oklch(0.186 0.008 95.5); /* tinta */
+  --warning: oklch(0.85 0.146 90.5); /* sol — sobre tinta, su contexto de marca */
+  --warning-foreground: oklch(0.186 0.008 95.5); /* tinta */
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.617 0.152 266.6); /* azul aclarado */
+  --chart-1: oklch(0.617 0.152 266.6); /* azul aclarado */
+  --chart-2: oklch(0.85 0.146 90.5); /* sol */
+  --chart-3: oklch(0.666 0.15 154.2); /* ok aclarado */
+  --chart-4: oklch(0.694 0.121 270.3); /* azul deep aclarado */
+  --chart-5: oklch(0.75 0.023 83.3); /* soft aclarado */
+  --sidebar: oklch(0.24 0.01 88.8);
+  --sidebar-foreground: oklch(0.982 0.007 88.6); /* papel */
+  --sidebar-primary: oklch(0.617 0.152 266.6); /* azul aclarado */
+  --sidebar-primary-foreground: oklch(0.186 0.008 95.5); /* tinta */
+  --sidebar-accent: oklch(0.285 0.011 91.7);
+  --sidebar-accent-foreground: oklch(0.982 0.007 88.6); /* papel */
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.617 0.152 266.6); /* azul aclarado */
+}
+
+/* ------------------------------------------------------------
+   Web pública del huésped: SIEMPRE clara.
+   El panel puede estar en oscuro (next-themes pone .dark en <html>)
+   y la vidriera de reservas lo heredaría. Redeclarar los tokens
+   claros acá lo evita sin JS ni flash.
+   Regla al escribir markup bajo (public)/: no usar utilidades
+   `dark:` (siguen resolviendo por ser descendientes de .dark) —
+   para el logo, usar las variantes fijas (OperonMarkTinta).
+   ------------------------------------------------------------ */
+/* El <body> vive fuera del wrapper y seguiría en Tinta si el dueño tiene el
+   panel en oscuro: asomaría negro al hacer scroll o en el rebote táctil del
+   celular. Se pinta el documento entero cuando hay una página pública. */
+body:has(.operon-light) {
+  background-color: oklch(0.982 0.007 88.6); /* papel */
+  color: oklch(0.186 0.008 95.5); /* tinta */
+  color-scheme: light;
+}
+
+.operon-light {
+  --background: oklch(0.982 0.007 88.6);
+  --foreground: oklch(0.186 0.008 95.5);
+  --card: oklch(0.982 0.007 88.6);
+  --card-foreground: oklch(0.186 0.008 95.5);
+  --popover: oklch(0.982 0.007 88.6);
+  --popover-foreground: oklch(0.186 0.008 95.5);
+  --primary: oklch(0.443 0.205 266.2);
+  --primary-foreground: oklch(0.982 0.007 88.6);
+  --secondary: oklch(0.952 0.012 91.5);
+  --secondary-foreground: oklch(0.186 0.008 95.5);
+  --muted: oklch(0.952 0.012 91.5);
+  --muted-foreground: oklch(0.509 0.017 80.6);
+  --accent: oklch(0.93 0.023 275.4);
+  --accent-foreground: oklch(0.363 0.172 266.1);
+  --destructive: oklch(0.555 0.171 16.3);
+  --success: oklch(0.559 0.133 153.6);
+  --success-foreground: oklch(0.982 0.007 88.6);
+  --warning: oklch(0.85 0.146 90.5);
+  --warning-foreground: oklch(0.186 0.008 95.5);
+  --border: oklch(0.864 0.026 89.2);
+  --input: oklch(0.864 0.026 89.2);
+  --ring: oklch(0.443 0.205 266.2);
 }
 
 @layer base {
@@ -126,5 +190,18 @@
   }
   html {
     @apply font-sans;
+  }
+  /* Marca: los títulos llevan Space Grotesk con tracking apretado. */
+  h1,
+  h2,
+  h3 {
+    @apply font-heading tracking-tight;
+  }
+}
+
+@layer utilities {
+  /* Eyebrow/label de marca: JetBrains Mono, siempre en mayúsculas. */
+  .label-mono {
+    @apply font-mono text-[10px] uppercase tracking-wider;
   }
 }
