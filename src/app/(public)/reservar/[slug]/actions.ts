@@ -39,7 +39,15 @@ export async function searchAvailability(
   return { ok: true, units: (data ?? []) as AvailUnit[] }
 }
 
-export type BookResult = { ok: boolean; error?: string; code?: string }
+export type BookResult = {
+  ok: boolean
+  error?: string
+  code?: string
+  total_amount?: number | null
+  deposit_amount?: number | null
+  currency?: string
+  hold_expires_at?: string | null
+}
 
 export async function bookPublic(input: {
   orgSlug: string
@@ -75,6 +83,19 @@ export async function bookPublic(input: {
     return { ok: false, error: msg }
   }
 
-  const res = data as { code?: string } | null
-  return { ok: true, code: res?.code }
+  const res = data as {
+    code?: string
+    total_amount?: number | null
+    deposit_amount?: number | null
+    currency?: string
+    hold_expires_at?: string | null
+  } | null
+  return {
+    ok: true,
+    code: res?.code,
+    total_amount: res?.total_amount ?? null,
+    deposit_amount: res?.deposit_amount ?? null,
+    currency: res?.currency,
+    hold_expires_at: res?.hold_expires_at ?? null,
+  }
 }

@@ -21,6 +21,9 @@ type PublicProperty = {
   currency: string
   checkin_time: string
   checkout_time: string
+  deposit_pct: number
+  whatsapp: string | null
+  phone: string | null
 }
 
 type Step = "search" | "results" | "form" | "done"
@@ -45,6 +48,10 @@ export function PublicBooking({
   const [units, setUnits] = React.useState<AvailUnit[]>([])
   const [selected, setSelected] = React.useState<AvailUnit | null>(null)
   const [code, setCode] = React.useState<string | null>(null)
+  const [booked, setBooked] = React.useState<{
+    total: number | null
+    deposit: number | null
+  } | null>(null)
 
   const nights = React.useMemo(
     () => (checkIn && checkOut && checkOut > checkIn ? nightsBetween(checkIn, checkOut) : 0),
@@ -86,6 +93,7 @@ export function PublicBooking({
       return
     }
     setCode(res.code ?? null)
+    setBooked({ total: res.total_amount ?? null, deposit: res.deposit_amount ?? null })
     setStep("done")
   }
 
@@ -189,6 +197,8 @@ export function PublicBooking({
               <ul className="space-y-3">
                 {units.map((u) => {
                   const total = Number(u.price_per_night) * nights
+                  const depositPct = Number(property.deposit_pct) || 0
+                  const deposit = depositPct > 0 ? Math.round((total * depositPct) / 100) : null
                   return (
                     <li
                       key={u.unit_id}
@@ -209,6 +219,11 @@ export function PublicBooking({
                           {formatCurrency(total, u.currency)}
                         </p>
                         <p className="text-xs text-muted-foreground">{nights} noches</p>
+                        {deposit != null && (
+                          <p className="text-xs text-muted-foreground">
+                            Seña ({depositPct}%): {formatCurrency(deposit, u.currency)}
+                          </p>
+                        )}
                         <Button
                           size="sm"
                           className="mt-2"
@@ -238,11 +253,19 @@ export function PublicBooking({
             </div>
 
             <div className="rounded-xl bg-muted/50 p-3 text-sm">
-              <span className="font-medium">{selected.name}</span> · {checkIn} → {checkOut} ·{" "}
-              {nights} noche{nights > 1 ? "s" : ""} ·{" "}
-              <span className="font-medium">
-                {formatCurrency(Number(selected.price_per_night) * nights, selected.currency)}
-              </span>
+              <p>
+                <span className="font-medium">{selected.name}</span> · {checkIn} → {checkOut} ·{" "}
+                {nights} noche{nights > 1 ? "s" : ""} ·{" "}
+                <span className="font-medium">
+                  {formatCurrency(Number(selected.price_per_night) * nights, selected.currency)}
+                </span>
+              </p>
+              {Number(property.deposit_pct) > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Para confirmar se paga una seña del {property.deposit_pct}% — el resto se
+                  abona en el alojamiento.
+                </p>
+              )}
             </div>
 
             <div className="grid gap-1.5">
@@ -280,7 +303,9 @@ export function PublicBooking({
             <CheckCircle2 className="mx-auto size-12 text-emerald-500" />
             <h2 className="mt-3 text-xl font-semibold">¡Reserva generada!</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Guardá tu código de reserva. El alojamiento se pondrá en contacto para confirmar.
+              {mpEnabled
+                ? "Pagá la seña para confirmarla — el resto queda pendiente hasta el check-in."
+                : "Guardá tu código de reserva. El alojamiento se pondrá en contacto para confirmar."}
             </p>
             {code && (
               <p className="mx-auto mt-4 w-fit rounded-lg bg-muted px-4 py-2 font-mono text-lg font-semibold">
@@ -291,6 +316,35 @@ export function PublicBooking({
               <p className="mt-4 text-sm text-muted-foreground">
                 {selected.name} · {checkIn} → {checkOut}
               </p>
+            )}
+
+            {booked && (booked.total != null || booked.deposit != null) && (
+              <dl className="mx-auto mt-4 w-fit space-y-1 rounded-xl border bg-muted/40 p-3 text-left text-sm">
+                {booked.total != null && (
+                  <div className="flex justify-between gap-6">
+                    <dt className="text-muted-foreground">Total</dt>
+                    <dd className="font-medium tabular-nums">
+                      {formatCurrency(booked.total, property.currency)}
+                    </dd>
+                  </div>
+                )}
+                {booked.deposit != null && (
+                  <div className="flex justify-between gap-6">
+                    <dt className="text-muted-foreground">Seña a pagar ahora</dt>
+                    <dd className="font-medium tabular-nums">
+                      {formatCurrency(booked.deposit, property.currency)}
+                    </dd>
+                  </div>
+                )}
+                {booked.total != null && booked.deposit != null && (
+                  <div className="flex justify-between gap-6">
+                    <dt className="text-muted-foreground">Saldo (en el alojamiento)</dt>
+                    <dd className="font-medium tabular-nums">
+                      {formatCurrency(booked.total - booked.deposit, property.currency)}
+                    </dd>
+                  </div>
+                )}
+              </dl>
             )}
 
             {mpEnabled && (
@@ -304,6 +358,21 @@ export function PublicBooking({
               </div>
             )}
 
+            {property.whatsapp && (
+              <div className="mt-4">
+                <a
+                  href={`https://wa.me/${property.whatsapp}?text=${encodeURIComponent(
+                    `¡Hola! Acabo de reservar${code ? ` (código ${code})` : ""} y quería confirmar los detalles.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground underline underline-offset-4"
+                >
+                  Hablar con el alojamiento por WhatsApp
+                </a>
+              </div>
+            )}
+
             <div>
               <Button
                 variant="outline"
@@ -313,6 +382,7 @@ export function PublicBooking({
                   setSelected(null)
                   setUnits([])
                   setCode(null)
+                  setBooked(null)
                 }}
               >
                 Hacer otra reserva

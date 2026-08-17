@@ -13,6 +13,7 @@ const STATUS_CLASS: Record<Enums<"reservation_status">, string> = {
   confirmed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
   completed: "bg-sky-500/15 text-sky-700 dark:text-sky-400",
   cancelled: "bg-destructive/10 text-destructive line-through",
+  expired: "bg-muted text-muted-foreground line-through",
 }
 
 export function StatusBadge({ status }: { status: Enums<"reservation_status"> }) {

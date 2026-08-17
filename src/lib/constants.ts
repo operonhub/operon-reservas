@@ -8,20 +8,23 @@ export const RESERVATION_STATUS_LABELS: Record<Enums<"reservation_status">, stri
   confirmed: "Confirmada",
   completed: "Completada",
   cancelled: "Cancelada",
+  expired: "Expirada",
 }
 
-// Transiciones permitidas — ESPEJO de _can_transition() en la base (0003).
-// Fuente única de verdad de estados también en el cliente.
+// Transiciones permitidas — ESPEJO de _can_transition() en la base (0003,
+// extendido en 0012/0014 con el camino a 'expired'). Fuente única de verdad
+// de estados también en el cliente.
 export const RESERVATION_TRANSITIONS: Record<
   Enums<"reservation_status">,
   Enums<"reservation_status">[]
 > = {
   inquiry: ["pending", "pending_payment", "cancelled"],
-  pending: ["pending_payment", "confirmed", "cancelled"],
-  pending_payment: ["confirmed", "cancelled"],
+  pending: ["pending_payment", "confirmed", "cancelled", "expired"],
+  pending_payment: ["confirmed", "cancelled", "expired"],
   confirmed: ["completed", "cancelled"],
   completed: [],
   cancelled: [],
+  expired: [],
 }
 
 /** Estados que retienen inventario (ocupan la unidad). Espejo de holds_inventory(). */

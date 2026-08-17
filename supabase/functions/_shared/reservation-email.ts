@@ -1,6 +1,9 @@
 export type NotificationEvent = {
   id: string
-  event_type: "reservation_created_admin" | "reservation_status_guest"
+  event_type:
+    | "reservation_created_admin"
+    | "reservation_status_guest"
+    | "reservation_confirmed_admin"
   reservation_status: string | null
   recipient_email: string | null
   idempotency_key: string
@@ -19,6 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
   confirmed: "Reserva confirmada",
   completed: "Estadía completada",
   cancelled: "Reserva cancelada",
+  expired: "Reserva expirada",
 }
 
 function stringValue(value: unknown, fallback = "—"): string {
@@ -111,6 +115,26 @@ export function renderReservationEmail(event: NotificationEvent): RenderedEmail 
         `Nueva reserva ${code}`,
         "Ingresó una nueva reserva",
         `Revisá los datos de la solicitud recibida para ${property}.`,
+        rows
+      ),
+    }
+  }
+
+  if (event.event_type === "reservation_confirmed_admin") {
+    const guest = stringValue(payload.guest_name, "Un huésped")
+    const rows = [
+      ...commonRows,
+      row("Huésped", guest),
+      row("Total", formatMoney(payload.total_amount, payload.currency)),
+      row("Seña acreditada", formatMoney(payload.deposit_amount, payload.currency)),
+    ].join("")
+
+    return {
+      subject: `✅ Seña acreditada · reserva ${code}`,
+      html: layout(
+        `Seña acreditada · ${code}`,
+        "¡Se cobró la seña! Reserva confirmada",
+        `${guest} pagó la seña de su estadía en ${property}. La reserva quedó confirmada automáticamente — no hace falta que hagas nada.`,
         rows
       ),
     }

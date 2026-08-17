@@ -46,7 +46,10 @@ export default async function ReservasPage({
     case "todas":
       break
     default: // proximas
-      query = query.gte("check_in", today).neq("status", "cancelled")
+      query = query
+        .gte("check_in", today)
+        .neq("status", "cancelled")
+        .neq("status", "expired")
   }
 
   const [{ data: reservations }, { data: units }] = await Promise.all([

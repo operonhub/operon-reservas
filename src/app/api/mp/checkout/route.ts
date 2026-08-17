@@ -115,7 +115,8 @@ export async function POST(request: Request) {
   try {
     const site = siteUrl()
     const back =
-      body.returnUrl?.trim() || `${site}/pago?code=${encodeURIComponent(code)}`
+      body.returnUrl?.trim() ||
+      `${site}/pago?code=${encodeURIComponent(code)}&org=${encodeURIComponent(orgSlug)}`
 
     const pref = await createPreference(
       cred.access_token,
