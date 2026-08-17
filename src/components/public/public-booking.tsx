@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { formatCurrency, nightsBetween, todayISO, addDays } from "@/lib/format"
+import { formatCurrency, formatDay, nightsBetween, todayISO, addDays } from "@/lib/format"
 import { ENTER, ENTER_UP, ENTER_SIDE, ENTER_POP, stagger } from "@/lib/motion"
 import { OperonFooter } from "@/components/public/operon-footer"
 import {
@@ -50,6 +50,7 @@ export function PublicBooking({
   const [units, setUnits] = React.useState<AvailUnit[]>([])
   const [selected, setSelected] = React.useState<AvailUnit | null>(null)
   const [code, setCode] = React.useState<string | null>(null)
+  const [guestName, setGuestName] = React.useState("")
   const [booked, setBooked] = React.useState<{
     total: number | null
     deposit: number | null
@@ -79,6 +80,7 @@ export function PublicBooking({
     e.preventDefault()
     if (!selected) return
     const fd = new FormData(e.currentTarget)
+    const name = String(fd.get("full_name") ?? "").trim()
     setPending(true)
     const res = await bookPublic({
       orgSlug,
@@ -86,7 +88,7 @@ export function PublicBooking({
       checkIn,
       checkOut,
       guests,
-      fullName: String(fd.get("full_name") ?? ""),
+      fullName: name,
       email: String(fd.get("email") ?? ""),
       phone: String(fd.get("phone") ?? ""),
       notes: String(fd.get("notes") ?? ""),
@@ -96,6 +98,7 @@ export function PublicBooking({
       toast.error(res.error ?? "No se pudo reservar.")
       return
     }
+    setGuestName(name)
     setCode(res.code ?? null)
     setBooked({ total: res.total_amount ?? null, deposit: res.deposit_amount ?? null })
     setStep("done")
@@ -395,7 +398,9 @@ export function PublicBooking({
               <div className="mt-4">
                 <a
                   href={`https://wa.me/${property.whatsapp}?text=${encodeURIComponent(
-                    `¡Hola! Acabo de reservar${code ? ` (código ${code})` : ""} y quería confirmar los detalles.`
+                    `¡Hola!${guestName ? ` Soy ${guestName},` : ""} ya hice la reserva del ${formatDay(
+                      checkIn
+                    )} al ${formatDay(checkOut)}${code ? ` (código ${code})` : ""}.`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
