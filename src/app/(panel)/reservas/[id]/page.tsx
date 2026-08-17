@@ -110,7 +110,7 @@ export default async function ReservaDetailPage({
             </dl>
             {payments.length === 0 && (
               <p className="mt-3 text-xs text-muted-foreground">
-                Sin pagos registrados. (La conexión con Mercado Pago llega en una etapa futura.)
+                Sin pagos registrados todavía.
               </p>
             )}
           </CardContent>

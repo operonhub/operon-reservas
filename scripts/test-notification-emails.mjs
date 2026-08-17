@@ -8,6 +8,7 @@ const payload = {
   reservation_code: "R-ABC123",
   unit_name: "Loft",
   property_name: "Cabañas <script>",
+  guest_name: "Tomás <script>",
   check_in: "2026-09-10",
   check_out: "2026-09-13",
   guests_count: 2,
@@ -39,6 +40,20 @@ const guest = renderReservationEmail({
 })
 assert.equal(guest.subject, "Reserva confirmada: reserva R-ABC123")
 assert.match(guest.html, /54\.000/)
+
+const confirmedAdmin = renderReservationEmail({
+  id: "event-3",
+  event_type: "reservation_confirmed_admin",
+  reservation_status: "confirmed",
+  recipient_email: "admin@example.com",
+  idempotency_key: "reservation-confirmed-admin:1",
+  payload,
+})
+assert.match(confirmedAdmin.subject, /R-ABC123/)
+assert.match(confirmedAdmin.html, /Nueva reserva confirmada/)
+assert.match(confirmedAdmin.html, /126\.000/) // saldo: 180000 - 54000
+assert.doesNotMatch(confirmedAdmin.html, /<script>/)
+
 assert.equal(escapeHtml('<a href="x">'), "&lt;a href=&quot;x&quot;&gt;")
 
 console.log("notification email templates: ok")

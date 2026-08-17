@@ -14,6 +14,19 @@ import { NewReservationDialog } from "@/components/reservations/new-reservation-
 import { FilterBar } from "@/components/reservations/filter-bar"
 import { formatCurrency, todayISO } from "@/lib/format"
 
+type PaymentRow = { amount: number; status: string }
+
+/** Etiqueta de estado de pago derivada de los pagos de la reserva (no hay
+ *  columna propia: se calcula igual que en el detalle de la reserva). */
+function paymentStatusLabel(payments: PaymentRow[]): { label: string; className: string } {
+  if (payments.length === 0) return { label: "—", className: "text-muted-foreground" }
+  if (payments.some((p) => p.status === "paid"))
+    return { label: "Pagado", className: "text-emerald-700 dark:text-emerald-400" }
+  if (payments.some((p) => p.status === "pending"))
+    return { label: "Pendiente", className: "text-amber-700 dark:text-amber-400" }
+  return { label: "Rechazado", className: "text-destructive" }
+}
+
 export default async function ReservasPage({
   searchParams,
 }: {
@@ -27,7 +40,7 @@ export default async function ReservasPage({
   let query = supabase
     .from("reservations")
     .select(
-      "id, code, check_in, check_out, guests_count, status, source, total_amount, currency, guests(full_name), units(name)"
+      "id, code, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, currency, guests(full_name), units(name), payments(amount, status)"
     )
 
   switch (f) {
@@ -40,13 +53,16 @@ export default async function ReservasPage({
     case "canceladas":
       query = query.eq("status", "cancelled")
       break
+    case "expiradas":
+      query = query.eq("status", "expired")
+      break
     case "finalizadas":
       query = query.eq("status", "completed")
       break
     case "todas":
       break
     default: // proximas
-      query = query.gte("check_in", today).neq("status", "cancelled")
+      query = query.gte("check_in", today).not("status", "in", "(cancelled,expired)")
   }
 
   const [{ data: reservations }, { data: units }] = await Promise.all([
@@ -81,14 +97,18 @@ export default async function ReservasPage({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Código</TableHead>
-                <TableHead>Huésped</TableHead>
-                <TableHead>Unidad</TableHead>
-                <TableHead>Fechas</TableHead>
-                <TableHead className="text-center">Pers.</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Origen</TableHead>
-                <TableHead>Estado</TableHead>
+                <TableHead className="label-mono text-muted-foreground">Código</TableHead>
+                <TableHead className="label-mono text-muted-foreground">Huésped</TableHead>
+                <TableHead className="label-mono text-muted-foreground">Unidad</TableHead>
+                <TableHead className="label-mono text-muted-foreground">Fechas</TableHead>
+                <TableHead className="label-mono text-center text-muted-foreground">Pers.</TableHead>
+                <TableHead className="label-mono text-right text-muted-foreground">Total</TableHead>
+                <TableHead className="label-mono text-right text-muted-foreground">Seña</TableHead>
+                <TableHead className="label-mono text-right text-muted-foreground">Pagado</TableHead>
+                <TableHead className="label-mono text-right text-muted-foreground">Saldo</TableHead>
+                <TableHead className="label-mono text-muted-foreground">Pago</TableHead>
+                <TableHead className="label-mono text-muted-foreground">Origen</TableHead>
+                <TableHead className="label-mono text-muted-foreground">Estado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -97,6 +117,12 @@ export default async function ReservasPage({
                 const guestName = Array.isArray(guest) ? guest[0]?.full_name : guest?.full_name
                 const unit = r.units as { name: string } | { name: string }[] | null
                 const unitName = Array.isArray(unit) ? unit[0]?.name : unit?.name
+                const payments = (r.payments as PaymentRow[] | null) ?? []
+                const paid = payments
+                  .filter((p) => p.status === "paid")
+                  .reduce((s, p) => s + Number(p.amount), 0)
+                const balance = r.total_amount != null ? Number(r.total_amount) - paid : null
+                const payStatus = paymentStatusLabel(payments)
                 return (
                   <TableRow key={r.id} className="cursor-pointer">
                     <TableCell className="font-medium">
@@ -113,6 +139,16 @@ export default async function ReservasPage({
                     <TableCell className="text-right tabular-nums">
                       {formatCurrency(r.total_amount, r.currency)}
                     </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {formatCurrency(r.deposit_amount, r.currency)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrency(paid, r.currency)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrency(balance, r.currency)}
+                    </TableCell>
+                    <TableCell className={payStatus.className}>{payStatus.label}</TableCell>
                     <TableCell>
                       <SourceBadge source={r.source} />
                     </TableCell>
