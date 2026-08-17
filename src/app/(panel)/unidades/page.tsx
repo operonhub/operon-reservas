@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table"
 import { UnitDialog } from "@/components/units/unit-dialog"
 import { UnitActiveToggle } from "@/components/units/unit-active-toggle"
+import { CopyIcalLink } from "@/components/units/copy-ical-link"
 import { Plus } from "lucide-react"
 
 export default async function UnidadesPage() {
@@ -100,6 +101,7 @@ export default async function UnidadesPage() {
                           triggerSize="sm"
                         />
                         <UnitActiveToggle id={u.id} isActive={u.is_active} />
+                        <CopyIcalLink unitId={u.id} />
                       </div>
                     </TableCell>
                   </TableRow>
