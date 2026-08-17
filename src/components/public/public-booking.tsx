@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { formatCurrency, nightsBetween, todayISO, addDays } from "@/lib/format"
+import { ENTER, ENTER_UP, ENTER_SIDE, ENTER_POP, stagger } from "@/lib/motion"
+import { OperonFooter } from "@/components/public/operon-footer"
 import {
   searchAvailability,
   bookPublic,
@@ -116,30 +118,44 @@ export function PublicBooking({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      {/* Hero */}
+      {/* Hero — el 80% de la venta se decide acá */}
       <header className="mb-8">
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">
+        <h1
+          className={`${ENTER_UP} text-4xl font-semibold text-balance sm:text-5xl`}
+          style={stagger(0)}
+        >
           {property.name}
         </h1>
         {property.description && (
-          <p className="mt-2 text-muted-foreground">{property.description}</p>
+          <p
+            className={`${ENTER_UP} mt-3 max-w-xl text-lg text-pretty text-muted-foreground`}
+            style={stagger(1)}
+          >
+            {property.description}
+          </p>
         )}
-        <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
+        <div
+          className={`${ENTER} label-mono mt-4 flex flex-wrap gap-4 text-muted-foreground`}
+          style={stagger(2)}
+        >
           {property.city && (
-            <span className="inline-flex items-center gap-1">
-              <MapPin className="size-4" /> {property.city}
+            <span className="inline-flex items-center gap-1.5">
+              <MapPin className="size-3.5" /> {property.city}
             </span>
           )}
-          <span className="inline-flex items-center gap-1">
-            <Clock className="size-4" /> Check-in {property.checkin_time.slice(0, 5)} · Check-out{" "}
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="size-3.5" /> Check-in {property.checkin_time.slice(0, 5)} · Check-out{" "}
             {property.checkout_time.slice(0, 5)}
           </span>
         </div>
       </header>
 
-      <div className="rounded-2xl border bg-card p-6 shadow-sm">
+      <div
+        className={`${ENTER_UP} rounded-2xl border bg-card p-6 shadow-sm`}
+        style={stagger(3)}
+      >
         {step === "search" && (
-          <form onSubmit={onSearch} className="space-y-4">
+          <form onSubmit={onSearch} className={`${ENTER} space-y-4`}>
             <h2 className="text-lg font-medium">Reservá tu estadía</h2>
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="grid gap-1.5">
@@ -167,7 +183,7 @@ export function PublicBooking({
         )}
 
         {step === "results" && (
-          <div className="space-y-4">
+          <div className={`${ENTER_SIDE} space-y-4`}>
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-medium">Unidades disponibles</h2>
@@ -187,28 +203,33 @@ export function PublicBooking({
               </div>
             ) : (
               <ul className="space-y-3">
-                {units.map((u) => {
+                {units.map((u, i) => {
                   const total = Number(u.price_per_night) * nights
                   return (
                     <li
                       key={u.unit_id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
+                      className={`${ENTER_UP} flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 transition-all hover:border-primary/40 hover:shadow-md`}
+                      style={stagger(i, 80)}
                     >
                       <div>
-                        <p className="font-medium">{u.name}</p>
+                        <p className="font-heading font-medium tracking-tight">
+                          {u.name}
+                        </p>
                         {u.description && (
                           <p className="text-sm text-muted-foreground">{u.description}</p>
                         )}
-                        <p className="mt-1 text-xs text-muted-foreground">
+                        <p className="label-mono mt-1.5 text-muted-foreground">
                           Hasta {u.capacity} huéspedes ·{" "}
                           {formatCurrency(u.price_per_night, u.currency)}/noche
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-semibold tabular-nums">
+                        <p className="font-mono text-xl font-medium tabular-nums">
                           {formatCurrency(total, u.currency)}
                         </p>
-                        <p className="text-xs text-muted-foreground">{nights} noches</p>
+                        <p className="label-mono text-muted-foreground">
+                          {nights} noche{nights > 1 ? "s" : ""} en total
+                        </p>
                         <Button
                           size="sm"
                           className="mt-2"
@@ -229,7 +250,7 @@ export function PublicBooking({
         )}
 
         {step === "form" && selected && (
-          <form onSubmit={onBook} className="space-y-4">
+          <form onSubmit={onBook} className={`${ENTER_SIDE} space-y-4`}>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-medium">Tus datos</h2>
               <Button type="button" variant="ghost" size="sm" onClick={() => setStep("results")}>
@@ -276,38 +297,49 @@ export function PublicBooking({
         )}
 
         {step === "done" && (
-          <div className="py-6 text-center">
-            <CheckCircle2 className="mx-auto size-12 text-emerald-500" />
+          <div className={`${ENTER_POP} py-6 text-center`}>
+            <CheckCircle2 className="mx-auto size-12 text-success" />
             <h2 className="mt-3 text-xl font-semibold">¡Reserva generada!</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Guardá tu código de reserva. El alojamiento se pondrá en contacto para confirmar.
+              {mpEnabled
+                ? "Pagá la seña para confirmarla al instante."
+                : "Guardá tu código. El alojamiento se pondrá en contacto para confirmar."}
             </p>
             {code && (
-              <p className="mx-auto mt-4 w-fit rounded-lg bg-muted px-4 py-2 font-mono text-lg font-semibold">
+              <p
+                className={`${ENTER_UP} mx-auto mt-4 w-fit rounded-lg bg-muted px-4 py-2 font-mono text-lg font-semibold`}
+                style={stagger(1)}
+              >
                 {code}
               </p>
             )}
             {selected && (
               <p className="mt-4 text-sm text-muted-foreground">
-                {selected.name} · {checkIn} → {checkOut}
+                {selected.name} ·{" "}
+                <span className="font-mono tabular-nums">
+                  {checkIn} → {checkOut}
+                </span>
               </p>
             )}
 
             {mpEnabled && (
-              <div className="mt-6">
-                <Button onClick={onPay} disabled={paying} className="w-full sm:w-auto">
+              <div className={ENTER_UP} style={stagger(2)}>
+                <Button
+                  onClick={onPay}
+                  disabled={paying}
+                  size="lg"
+                  className="mt-6 w-full sm:w-auto"
+                >
                   {paying ? "Redirigiendo a Mercado Pago…" : "Pagar seña con Mercado Pago"}
                 </Button>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Pagá la seña para confirmar tu reserva al instante.
-                </p>
               </div>
             )}
 
             <div>
               <Button
-                variant="outline"
-                className="mt-6"
+                variant="ghost"
+                size="sm"
+                className="mt-4 text-muted-foreground"
                 onClick={() => {
                   setStep("search")
                   setSelected(null)
@@ -322,9 +354,7 @@ export function PublicBooking({
         )}
       </div>
 
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        Reservas gestionadas con Operon Reservas
-      </p>
+      <OperonFooter />
     </div>
   )
 }

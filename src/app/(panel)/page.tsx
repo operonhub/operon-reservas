@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatusBadge } from "@/components/reservations/reservation-badges"
 import { formatCurrency, todayISO, addDays } from "@/lib/format"
-import { CalendarCheck, CalendarX, Clock, TrendingUp } from "lucide-react"
+import { CalendarCheck, Clock, TrendingUp } from "lucide-react"
+import { ENTER, ENTER_UP, stagger } from "@/lib/motion"
 import type { Enums } from "@/lib/supabase/types"
 
 const HORIZON = 14
@@ -83,36 +84,63 @@ export default async function InicioPage() {
   const occupiedToday = new Set((occToday ?? []).map((o) => o.unit_id)).size
   const revenue = (revenueRows ?? []).reduce((s, r) => s + Number(r.total_amount ?? 0), 0)
 
-  const stats = [
-    { label: "Reservas pendientes", value: String(pendientes ?? 0), icon: Clock },
-    { label: "Check-ins (14 días)", value: String((checkins ?? []).length), icon: CalendarCheck },
-    { label: "Ocupación hoy", value: `${occupiedToday}/${totalUnits}`, icon: CalendarX },
-    { label: "Ingresos confirmados (mes)", value: formatCurrency(revenue), icon: TrendingUp },
+  // Jerarquía deliberada: la ocupación de hoy es LA pregunta operativa del
+  // día, así que va en un tile dominante. El resto son de apoyo y pesan menos.
+  const occupancyPct = totalUnits > 0 ? Math.round((occupiedToday / totalUnits) * 100) : 0
+
+  const secondary = [
+    { label: "Pendientes", value: String(pendientes ?? 0), icon: Clock },
+    { label: "Check-ins · 14 días", value: String((checkins ?? []).length), icon: CalendarCheck },
+    { label: "Ingresos del mes", value: formatCurrency(revenue), icon: TrendingUp },
   ]
 
   return (
     <div className="p-6 space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Inicio</h1>
-        <p className="text-sm text-muted-foreground">
-          {ctx.organizationName} — resumen operativo
-        </p>
+      <header className={ENTER} style={stagger(0)}>
+        <p className="label-mono text-muted-foreground">{ctx.organizationName}</p>
+        <h1 className="mt-1 text-2xl font-semibold">Inicio</h1>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s) => (
-          <Card key={s.label}>
-            <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {s.label}
-              </CardTitle>
-              <s.icon className="size-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold tabular-nums">{s.value}</p>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Héroe */}
+        <Card
+          className={`${ENTER_UP} bg-primary text-primary-foreground lg:col-span-1 lg:row-span-1`}
+          style={stagger(1)}
+        >
+          <CardContent className="pt-6">
+            <p className="label-mono opacity-80">Ocupación hoy</p>
+            <p className="mt-2 font-mono text-5xl font-medium tabular-nums">
+              {occupiedToday}
+              <span className="text-2xl opacity-60">/{totalUnits}</span>
+            </p>
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-primary-foreground/20">
+              <div
+                className="h-full rounded-full bg-primary-foreground/80 transition-[width] duration-700 motion-reduce:transition-none"
+                style={{ width: `${occupancyPct}%` }}
+              />
+            </div>
+            <p className="mt-2 text-xs opacity-70">
+              {occupancyPct}% de las unidades activas
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Apoyo */}
+        <div className="grid gap-4 sm:grid-cols-3 lg:col-span-2">
+          {secondary.map((s, i) => (
+            <Card key={s.label} className={ENTER_UP} style={stagger(i + 2)}>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <p className="label-mono text-muted-foreground">{s.label}</p>
+                  <s.icon className="size-3.5 text-muted-foreground" />
+                </div>
+                <p className="mt-2 font-mono text-2xl font-medium tabular-nums">
+                  {s.value}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -121,12 +149,14 @@ export default async function InicioPage() {
           rows={(checkins ?? []) as ResRow[]}
           dateKey="check_in"
           empty="No hay ingresos en los próximos 14 días."
+          delayIndex={5}
         />
         <UpcomingCard
           title="Próximos check-outs"
           rows={(checkouts ?? []) as ResRow[]}
           dateKey="check_out"
           empty="No hay salidas en los próximos 14 días."
+          delayIndex={6}
         />
       </div>
     </div>
@@ -138,14 +168,16 @@ function UpcomingCard({
   rows,
   dateKey,
   empty,
+  delayIndex,
 }: {
   title: string
   rows: ResRow[]
   dateKey: "check_in" | "check_out"
   empty: string
+  delayIndex: number
 }) {
   return (
-    <Card>
+    <Card className={ENTER_UP} style={stagger(delayIndex)}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
@@ -155,12 +187,19 @@ function UpcomingCard({
         ) : (
           <ul className="divide-y">
             {rows.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                <Link href={`/reservas/${r.id}`} className="font-medium hover:underline">
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-3 py-2 text-sm"
+              >
+                <Link
+                  href={`/reservas/${r.id}`}
+                  className="font-medium transition-colors hover:text-primary"
+                >
                   {name(r.guests)}
                 </Link>
                 <span className="text-muted-foreground">
-                  {unitName(r.units)} · {r[dateKey]}
+                  {unitName(r.units)} ·{" "}
+                  <span className="font-mono tabular-nums">{r[dateKey]}</span>
                 </span>
                 <StatusBadge status={r.status} />
               </li>
