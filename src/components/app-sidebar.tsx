@@ -14,6 +14,8 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { OperonMark } from "@/components/brand/operon-mark"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { logout } from "@/app/login/actions"
 
 const NAV = [
@@ -39,13 +41,13 @@ export function AppSidebar({
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
-      <div className="flex h-14 items-center gap-2 border-b px-4">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold">
-          O
-        </div>
-        <div className="flex flex-col leading-tight">
-          <span className="text-sm font-semibold">{orgName}</span>
-          <span className="text-[11px] text-muted-foreground">Operon Reservas</span>
+      <div className="flex h-14 items-center gap-2.5 border-b px-4">
+        <OperonMark className="h-7 w-5 shrink-0" />
+        <div className="flex min-w-0 flex-col leading-tight">
+          <span className="truncate font-heading text-sm font-semibold tracking-tight">
+            {orgName}
+          </span>
+          <span className="label-mono text-muted-foreground">Operon Reservas</span>
         </div>
       </div>
 
@@ -58,13 +60,18 @@ export function AppSidebar({
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                 active
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
               )}
             >
-              <Icon className="h-4 w-4" />
+              <Icon
+                className={cn(
+                  "h-4 w-4 transition-transform",
+                  !active && "group-hover:scale-110"
+                )}
+              />
               {label}
             </Link>
           )
@@ -72,9 +79,12 @@ export function AppSidebar({
       </nav>
 
       <div className="border-t p-3">
-        <div className="mb-2 px-1">
-          <p className="truncate text-sm font-medium">{userName}</p>
-          <p className="text-xs text-muted-foreground capitalize">{role}</p>
+        <div className="mb-2 flex items-start justify-between gap-2 px-1">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{userName}</p>
+            <p className="label-mono text-muted-foreground">{role}</p>
+          </div>
+          <ThemeToggle />
         </div>
         <form action={logout}>
           <Button

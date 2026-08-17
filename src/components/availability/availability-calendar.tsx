@@ -17,8 +17,9 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-import { addDays, formatDay } from "@/lib/format"
-import { OCCUPANCY_LEGEND, type CellState } from "@/lib/constants"
+import { addDays, todayISO } from "@/lib/format"
+import { OCCUPANCY_FILL, OCCUPANCY_LEGEND, type CellState } from "@/lib/constants"
+import { ENTER, ENTER_UP, stagger } from "@/lib/motion"
 import { createBlock, deleteBlock } from "@/app/(panel)/calendario/actions"
 import { Ban, Plus } from "lucide-react"
 import type { CalendarSegment } from "@/app/(panel)/calendario/page"
@@ -40,6 +41,7 @@ export function AvailabilityCalendar({
     () => Array.from({ length: days }, (_, i) => addDays(startDate, i)),
     [startDate, days]
   )
+  const today = todayISO()
 
   // índice: unitId -> día -> segmento que lo cubre
   const index = React.useMemo(() => {
@@ -62,10 +64,15 @@ export function AvailabilityCalendar({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div
+        className={cn(ENTER, "flex flex-wrap items-center justify-between gap-3")}
+      >
         <div className="flex items-center gap-4">
           {OCCUPANCY_LEGEND.map((l) => (
-            <span key={l.state} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span
+              key={l.state}
+              className="label-mono flex items-center gap-1.5 text-muted-foreground"
+            >
               <span className={cn("size-3 rounded-sm", l.swatch)} />
               {l.label}
             </span>
@@ -74,24 +81,30 @@ export function AvailabilityCalendar({
         <BlockDialog units={units} startDate={startDate} />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border">
+      <div className={cn(ENTER_UP, "overflow-x-auto rounded-xl border")}>
         <table className="border-separate border-spacing-0 text-xs">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 border-b bg-card px-3 py-2 text-left font-medium">
+              <th className="label-mono sticky left-0 z-10 border-b bg-card px-3 py-2 text-left text-muted-foreground">
                 Unidad
               </th>
               {dayList.map((d) => {
                 const wd = new Date(d + "T00:00:00").toLocaleDateString("es-AR", {
                   weekday: "narrow",
                 })
+                const isToday = d === today
                 return (
                   <th
                     key={d}
-                    className="border-b border-l px-1 py-1 text-center font-normal text-muted-foreground"
-                    title={d}
+                    className={cn(
+                      "border-b border-l px-1 py-1 text-center font-normal",
+                      isToday
+                        ? "bg-accent font-medium text-accent-foreground"
+                        : "text-muted-foreground"
+                    )}
+                    title={isToday ? `${d} · hoy` : d}
                   >
-                    <div className="tabular-nums">{d.slice(8, 10)}</div>
+                    <div className="font-mono tabular-nums">{d.slice(8, 10)}</div>
                     <div className="text-[10px] uppercase">{wd}</div>
                   </th>
                 )
@@ -99,11 +112,11 @@ export function AvailabilityCalendar({
             </tr>
           </thead>
           <tbody>
-            {units.map((u) => (
-              <tr key={u.id}>
+            {units.map((u, i) => (
+              <tr key={u.id} className={ENTER} style={stagger(i, 40)}>
                 <td className="sticky left-0 z-10 border-b bg-card px-3 py-2 font-medium whitespace-nowrap">
                   {u.name}
-                  <span className="ml-1 text-[10px] text-muted-foreground">
+                  <span className="ml-1 font-mono text-[10px] text-muted-foreground">
                     ·{u.capacity}p
                   </span>
                 </td>
@@ -141,12 +154,11 @@ function DayCell({
   const router = useRouter()
   const [pending, setPending] = React.useState(false)
 
-  const bg =
-    state === "reserved"
-      ? "bg-primary/70"
-      : state === "blocked"
-        ? "bg-amber-500/70 cursor-pointer hover:bg-amber-500/90"
-        : "bg-muted/40"
+  const bg = cn(
+    OCCUPANCY_FILL[state],
+    "transition-colors",
+    state === "blocked" && "cursor-pointer hover:bg-warning"
+  )
 
   async function onUnblock() {
     if (state !== "blocked" || !segment) return

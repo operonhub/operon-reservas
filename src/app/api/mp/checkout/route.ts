@@ -2,8 +2,24 @@ import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getValidCredential } from "@/lib/mp-credential"
 import { createPreference, siteUrl } from "@/lib/mercadopago"
+import type { Database } from "@/lib/supabase/types"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 export const runtime = "nodejs"
+
+const HOLD_MINUTES_ON_CHECKOUT = 15
+
+/** Reinicia la retención de la unidad al iniciar (o reintentar) el pago. */
+function bumpHold(admin: SupabaseClient<Database>, reservationId: string) {
+  return admin
+    .from("reservations")
+    .update({
+      hold_expires_at: new Date(
+        Date.now() + HOLD_MINUTES_ON_CHECKOUT * 60_000
+      ).toISOString(),
+    })
+    .eq("id", reservationId)
+}
 
 // La landing de cada cabaña (otro dominio) llama a este endpoint → CORS abierto.
 // Sólo devuelve un link de pago a partir de un código de reserva; no hay datos
@@ -77,6 +93,7 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (existing?.mp_init_point) {
+    await bumpHold(admin, r.id)
     return NextResponse.json(
       { ok: true, init_point: existing.mp_init_point },
       { headers: CORS }
@@ -114,6 +131,9 @@ export async function POST(request: Request) {
 
   try {
     const site = siteUrl()
+    // El código es único solo DENTRO de cada org (unique (organization_id,
+    // code)), no globalmente — /pago necesita el slug para no ambigüar
+    // reservas de distintos alojamientos con el mismo código.
     const back =
       body.returnUrl?.trim() ||
       `${site}/pago?code=${encodeURIComponent(code)}&org=${encodeURIComponent(orgSlug)}`
@@ -153,6 +173,12 @@ export async function POST(request: Request) {
         p_to: "pending_payment",
       })
     }
+
+    // Reloj de retención fresco: el huésped recién ahora va a pagar de
+    // verdad, no debería heredar el tiempo que ya gastó llenando el
+    // formulario. expire_stale_holds (0012) libera la unidad si lo deja
+    // vencer acá también.
+    await bumpHold(admin, r.id)
 
     return NextResponse.json({ ok: true, init_point: initPoint }, { headers: CORS })
   } catch {

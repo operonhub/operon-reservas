@@ -6,24 +6,47 @@ import {
 } from "@/lib/constants"
 import type { Enums } from "@/lib/supabase/types"
 
+// Semántica de color sobre la paleta de marca:
+//   confirmed/completed → OK (success)   · el estado "bueno"
+//   pending_payment     → Sol (warning)  · esperando plata, acento cálido
+//   cancelled/expired   → apagados       · ya no ocupan inventario
+// El Azul (primary) NO se usa acá: está reservado para acciones/CTAs, y si lo
+// gastáramos en un badge dejaría de leerse como "esto es clickeable".
+// Regla del sistema: el FONDO lleva la señal semántica (Sol = esperando plata,
+// OK = confirmada, rose = cancelada) y el TEXTO usa siempre un token legible.
+//
+// El motivo es concreto: los acentos de marca no sirven como color de texto en
+// los dos temas. El Sol es muy claro (solo contrasta sobre Tinta) y el verde OK
+// sobre Papel da 3.5:1, por debajo de AA. Tiñendo el fondo y dejando el texto
+// en foreground/muted, los siete estados pasan 4.5:1 en claro Y en oscuro,
+// sin perder la lectura de color de un vistazo.
 const STATUS_CLASS: Record<Enums<"reservation_status">, string> = {
   inquiry: "bg-muted text-muted-foreground",
-  pending: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-  pending_payment: "bg-orange-500/15 text-orange-700 dark:text-orange-400",
-  confirmed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  completed: "bg-sky-500/15 text-sky-700 dark:text-sky-400",
-  cancelled: "bg-destructive/10 text-destructive line-through",
+  pending: "bg-secondary text-secondary-foreground",
+  pending_payment: "bg-warning/30 text-foreground",
+  confirmed: "bg-success/25 text-foreground",
+  completed: "bg-success/10 text-muted-foreground",
+  cancelled: "bg-destructive/15 text-foreground line-through",
   expired: "bg-muted text-muted-foreground line-through",
 }
 
 export function StatusBadge({ status }: { status: Enums<"reservation_status"> }) {
   return (
-    <Badge className={cn("border-transparent", STATUS_CLASS[status])}>
+    <Badge
+      className={cn(
+        "label-mono border-transparent font-medium",
+        STATUS_CLASS[status]
+      )}
+    >
       {RESERVATION_STATUS_LABELS[status]}
     </Badge>
   )
 }
 
 export function SourceBadge({ source }: { source: Enums<"reservation_source"> }) {
-  return <Badge variant="outline">{RESERVATION_SOURCE_LABELS[source]}</Badge>
+  return (
+    <Badge variant="outline" className="label-mono text-muted-foreground">
+      {RESERVATION_SOURCE_LABELS[source]}
+    </Badge>
+  )
 }

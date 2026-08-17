@@ -121,20 +121,23 @@ export function renderReservationEmail(event: NotificationEvent): RenderedEmail 
   }
 
   if (event.event_type === "reservation_confirmed_admin") {
-    const guest = stringValue(payload.guest_name, "Un huésped")
+    const total = Number(payload.total_amount)
+    const deposit = Number(payload.deposit_amount)
+    const balance = Number.isFinite(total) && Number.isFinite(deposit) ? total - deposit : null
+
     const rows = [
+      row("Huésped", stringValue(payload.guest_name)),
       ...commonRows,
-      row("Huésped", guest),
-      row("Total", formatMoney(payload.total_amount, payload.currency)),
       row("Seña acreditada", formatMoney(payload.deposit_amount, payload.currency)),
+      row("Saldo pendiente", formatMoney(balance, payload.currency)),
     ].join("")
 
     return {
-      subject: `✅ Seña acreditada · reserva ${code}`,
+      subject: `Nueva reserva confirmada ${code} · ${property}`,
       html: layout(
-        `Seña acreditada · ${code}`,
-        "¡Se cobró la seña! Reserva confirmada",
-        `${guest} pagó la seña de su estadía en ${property}. La reserva quedó confirmada automáticamente — no hace falta que hagas nada.`,
+        `Reserva confirmada ${code}`,
+        "Nueva reserva confirmada",
+        `Se acreditó la seña y la reserva de ${property} quedó confirmada automáticamente.`,
         rows
       ),
     }

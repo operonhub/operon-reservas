@@ -11,19 +11,20 @@ export const RESERVATION_STATUS_LABELS: Record<Enums<"reservation_status">, stri
   expired: "Expirada",
 }
 
-// Transiciones permitidas — ESPEJO de _can_transition() en la base (0003,
-// extendido en 0012/0014 con el camino a 'expired'). Fuente única de verdad
-// de estados también en el cliente.
+// Transiciones permitidas — ESPEJO de _can_transition() en la base (0003).
+// Fuente única de verdad de estados también en el cliente.
 export const RESERVATION_TRANSITIONS: Record<
   Enums<"reservation_status">,
   Enums<"reservation_status">[]
 > = {
   inquiry: ["pending", "pending_payment", "cancelled"],
-  pending: ["pending_payment", "confirmed", "cancelled", "expired"],
-  pending_payment: ["confirmed", "cancelled", "expired"],
+  pending: ["pending_payment", "confirmed", "cancelled"],
+  pending_payment: ["confirmed", "cancelled"],
   confirmed: ["completed", "cancelled"],
   completed: [],
   cancelled: [],
+  // Solo el barrido automático (expire_stale_holds, 0012) puede llegar acá;
+  // no es un target válido desde el panel.
   expired: [],
 }
 
@@ -55,8 +56,17 @@ export const RATE_KIND_LABELS: Record<Enums<"rate_kind">, string> = {
 // ---------- Ocupación (para el calendario) ----------
 export type CellState = "available" | "reserved" | "blocked"
 
+// Colores de marca: Azul = reservado (acento funcional), Sol = bloqueado
+// (acento cálido). El swatch de la leyenda y la celda del calendario usan
+// las MISMAS clases, para que no se desincronicen.
+export const OCCUPANCY_FILL: Record<CellState, string> = {
+  available: "bg-muted/40",
+  reserved: "bg-primary/70",
+  blocked: "bg-warning/70",
+}
+
 export const OCCUPANCY_LEGEND: { state: CellState; label: string; swatch: string }[] = [
-  { state: "available", label: "Disponible", swatch: "bg-muted" },
-  { state: "reserved", label: "Reservado", swatch: "bg-primary/70" },
-  { state: "blocked", label: "Bloqueado", swatch: "bg-amber-500/70" },
+  { state: "available", label: "Disponible", swatch: OCCUPANCY_FILL.available },
+  { state: "reserved", label: "Reservado", swatch: OCCUPANCY_FILL.reserved },
+  { state: "blocked", label: "Bloqueado", swatch: OCCUPANCY_FILL.blocked },
 ]
