@@ -706,6 +706,16 @@ export type Database = {
         Args: { p_org_slug: string; p_property_slug: string | null }
         Returns: Json
       }
+      // TODO: parchado a mano (0013/0012) — reemplazar por la regeneración
+      // real (`generate_typescript_types`) apenas haya acceso al proyecto.
+      public_reservation_status: {
+        Args: { p_code: string; p_org_slug: string }
+        Returns: Json
+      }
+      expire_stale_holds: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       shares_org: { Args: { target_user: string }; Returns: boolean }
       transition_reservation: {
         Args: {
@@ -735,6 +745,7 @@ export type Database = {
         | "confirmed"
         | "completed"
         | "cancelled"
+        | "expired" // parchado a mano (0011) — ver TODO arriba
     }
     CompositeTypes: {
       [_ in never]: never

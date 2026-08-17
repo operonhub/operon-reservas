@@ -1,6 +1,9 @@
 export type NotificationEvent = {
   id: string
-  event_type: "reservation_created_admin" | "reservation_status_guest"
+  event_type:
+    | "reservation_created_admin"
+    | "reservation_status_guest"
+    | "reservation_confirmed_admin"
   reservation_status: string | null
   recipient_email: string | null
   idempotency_key: string
@@ -111,6 +114,29 @@ export function renderReservationEmail(event: NotificationEvent): RenderedEmail 
         `Nueva reserva ${code}`,
         "Ingresó una nueva reserva",
         `Revisá los datos de la solicitud recibida para ${property}.`,
+        rows
+      ),
+    }
+  }
+
+  if (event.event_type === "reservation_confirmed_admin") {
+    const total = Number(payload.total_amount)
+    const deposit = Number(payload.deposit_amount)
+    const balance = Number.isFinite(total) && Number.isFinite(deposit) ? total - deposit : null
+
+    const rows = [
+      row("Huésped", stringValue(payload.guest_name)),
+      ...commonRows,
+      row("Seña acreditada", formatMoney(payload.deposit_amount, payload.currency)),
+      row("Saldo pendiente", formatMoney(balance, payload.currency)),
+    ].join("")
+
+    return {
+      subject: `Nueva reserva confirmada ${code} · ${property}`,
+      html: layout(
+        `Reserva confirmada ${code}`,
+        "Nueva reserva confirmada",
+        `Se acreditó la seña y la reserva de ${property} quedó confirmada automáticamente.`,
         rows
       ),
     }

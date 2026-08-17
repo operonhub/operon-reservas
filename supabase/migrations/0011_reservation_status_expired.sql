@@ -1,0 +1,13 @@
+-- ============================================================
+-- Operon Reservas — Nuevo estado 'expired' para reservas
+-- ============================================================
+-- Distingue una retención vencida sin pago (expired, automática) de una
+-- cancelación explícita (cancelled, manual). Va SOLA en esta migración:
+-- Postgres no permite usar un valor de enum nuevo en la misma transacción
+-- en que se agregó, y cada archivo de migración corre como una transacción.
+--
+-- Deliberadamente NO se agrega como target válido en _can_transition (0003)
+-- ni en RESERVATION_TRANSITIONS (lib/constants.ts): solo el barrido
+-- automático (0012) puede poner este estado, nunca un admin desde el panel.
+-- ============================================================
+alter type reservation_status add value if not exists 'expired';

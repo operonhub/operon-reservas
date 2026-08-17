@@ -68,29 +68,58 @@ export async function POST(request: Request) {
 
     const newStatus = mapStatus(payment.status)
 
-    // Actualiza el pago pendiente de esa reserva (idempotente).
     const { data: payRow } = await admin
       .from("payments")
-      .select("id, status")
+      .select("id, status, amount, currency, paid_at")
       .eq("reservation_id", reservationId)
       .eq("kind", "deposit")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
+    if (!payRow) return ok()
 
-    if (payRow) {
+    // Nunca confiamos en el body del webhook para confirmar: además del
+    // status, el monto y la moneda tienen que coincidir con lo que ya
+    // esperábamos cobrar. Si MP dice "approved" pero el importe no cierra,
+    // dejamos rastro sin marcar el pago como acreditado ni tocar la reserva.
+    let verifiedPaid = false
+    if (newStatus === "paid") {
+      const expected = Number(payRow.amount)
+      const received = Number(payment.transaction_amount)
+      const amountMatches =
+        Number.isFinite(received) && Math.abs(received - expected) < 0.01
+      const currencyMatches =
+        !payment.currency_id ||
+        payment.currency_id.toUpperCase() === String(payRow.currency).toUpperCase()
+      verifiedPaid = amountMatches && currencyMatches
+      if (!verifiedPaid) {
+        console.error(
+          `MP webhook: monto/moneda no coinciden para reserva ${reservationId} ` +
+            `(payment ${paymentId}). Esperado ${expected} ${payRow.currency}, ` +
+            `recibido ${received} ${payment.currency_id}.`
+        )
+      }
+    }
+
+    if (newStatus !== "paid" || verifiedPaid) {
       await admin
         .from("payments")
         .update({
           status: newStatus,
           external_ref: paymentId,
-          paid_at: newStatus === "paid" ? new Date().toISOString() : null,
+          // No pisar paid_at en reintentos: MP puede reenviar la misma
+          // notificación horas después y no queremos correr la fecha real.
+          ...(newStatus === "paid" && !payRow.paid_at
+            ? { paid_at: new Date().toISOString() }
+            : {}),
         })
         .eq("id", payRow.id)
+    } else {
+      await admin.from("payments").update({ external_ref: paymentId }).eq("id", payRow.id)
     }
 
-    // Pago aprobado → confirma la reserva (si todavía está esperando).
-    if (newStatus === "paid") {
+    // Pago verificado → confirma la reserva (si todavía está esperando).
+    if (verifiedPaid) {
       const { data: res } = await admin
         .from("reservations")
         .select("status")
