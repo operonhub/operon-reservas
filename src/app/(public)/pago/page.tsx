@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Loader2, CheckCircle2, XCircle, Clock, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { formatCurrency } from "@/lib/format"
+import { formatCurrency, whatsappHref } from "@/lib/format"
 import { ENTER, ENTER_UP, ENTER_POP, stagger } from "@/lib/motion"
 import { OperonFooter } from "@/components/public/operon-footer"
 import {
@@ -23,11 +23,6 @@ function phaseOf(status: string | undefined): Phase {
   if (status === "confirmed" || status === "completed") return "confirmed"
   if (status === "expired" || status === "cancelled") return "gone"
   return "waiting" // pending / pending_payment / inquiry
-}
-
-function whatsappHref(rawPhone: string): string {
-  const digits = rawPhone.replace(/[^\d]/g, "")
-  return `https://wa.me/${digits}`
 }
 
 export default function PagoPage() {
