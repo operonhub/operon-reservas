@@ -39,8 +39,10 @@ export function AppSidebar({
 }) {
   const pathname = usePathname()
 
+  // `print:hidden`: el comprobante de reserva se imprime solo, sin el chrome
+  // de la aplicación alrededor.
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
+    <aside className="flex w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground print:hidden">
       <div className="flex h-14 items-center gap-2.5 border-b px-4">
         <OperonMark className="h-7 w-5 shrink-0" />
         <div className="flex min-w-0 flex-col leading-tight">

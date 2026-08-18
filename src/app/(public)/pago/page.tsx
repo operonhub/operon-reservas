@@ -25,6 +25,11 @@ function phaseOf(status: string | undefined): Phase {
   return "waiting" // pending / pending_payment / inquiry
 }
 
+/**
+ * Link de WhatsApp con el mensaje ya escrito: el huésped no tiene que
+ * explicar quién es ni qué reservó. Es local a esta pantalla porque necesita
+ * los datos de la reserva; el helper genérico vive en lib/format.
+ */
 function whatsappHref(rawPhone: string, r: PublicReservationStatus): string {
   const digits = rawPhone.replace(/[^\d]/g, "")
   const who = r.guest_name ? `soy ${r.guest_name}, ` : ""

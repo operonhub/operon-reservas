@@ -3,12 +3,32 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { requireContext } from "@/lib/auth"
+import { sanitizeAmenities } from "@/lib/amenities"
 
 export type ActionResult = { ok: boolean; error?: string }
 
 function parseCapacity(raw: FormDataEntryValue | null): number {
   const n = Number(raw ?? 1)
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1
+}
+
+/** Sólo claves del catálogo: lo que llega del form no se guarda a ciegas. */
+function parseAmenities(raw: FormDataEntryValue | null): string[] {
+  return sanitizeAmenities(String(raw ?? "").split(",").map((s) => s.trim()))
+}
+
+/**
+ * La foto se sube desde el browser (las policies del bucket la acotan a la
+ * org); acá sólo se valida que la ruta guardada empiece por la organización
+ * del usuario, para que nadie apunte una unidad a la carpeta de otro tenant.
+ */
+function parsePhotoPath(
+  raw: FormDataEntryValue | null,
+  organizationId: string
+): string | null {
+  const path = String(raw ?? "").trim()
+  if (!path) return null
+  return path.startsWith(`${organizationId}/`) ? path : null
 }
 
 /** Verifica que la property pertenezca a la org del usuario (defensa en profundidad). */
@@ -43,6 +63,8 @@ export async function createUnit(formData: FormData): Promise<ActionResult> {
     name,
     description,
     capacity,
+    photo_path: parsePhotoPath(formData.get("photo_path"), ctx.organizationId),
+    amenities: parseAmenities(formData.get("amenities")),
   })
   if (error) return { ok: false, error: error.message }
 
@@ -51,7 +73,7 @@ export async function createUnit(formData: FormData): Promise<ActionResult> {
 }
 
 export async function updateUnit(formData: FormData): Promise<ActionResult> {
-  await requireContext()
+  const ctx = await requireContext()
   const supabase = await createClient()
 
   const id = String(formData.get("id") ?? "")
@@ -66,7 +88,14 @@ export async function updateUnit(formData: FormData): Promise<ActionResult> {
   // RLS acota el update a la org del usuario.
   const { error } = await supabase
     .from("units")
-    .update({ name, description, capacity, is_active })
+    .update({
+      name,
+      description,
+      capacity,
+      is_active,
+      photo_path: parsePhotoPath(formData.get("photo_path"), ctx.organizationId),
+      amenities: parseAmenities(formData.get("amenities")),
+    })
     .eq("id", id)
   if (error) return { ok: false, error: error.message }
 

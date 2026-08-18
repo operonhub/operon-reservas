@@ -391,50 +391,73 @@ export type Database = {
         ]
       }
       rates: {
+        // TODO: columnas de 0017 parchadas a mano — reemplazar por la
+        // regeneración real (`supabase gen types`).
         Row: {
           created_at: string
           currency: string
+          discount_pct: number | null
           end_date: string | null
           id: string
+          is_active: boolean
           kind: Database["public"]["Enums"]["rate_kind"]
+          label: string | null
+          max_guests: number | null
+          min_guests: number | null
           min_nights: number
+          min_nights_rule: number | null
           organization_id: string
-          price_per_night: number
+          price_per_night: number | null
           priority: number
           property_id: string
           start_date: string | null
           unit_id: string | null
           updated_at: string
+          weekdays: number[] | null
         }
         Insert: {
           created_at?: string
           currency?: string
+          discount_pct?: number | null
           end_date?: string | null
           id?: string
+          is_active?: boolean
           kind?: Database["public"]["Enums"]["rate_kind"]
+          label?: string | null
+          max_guests?: number | null
+          min_guests?: number | null
           min_nights?: number
+          min_nights_rule?: number | null
           organization_id: string
-          price_per_night: number
+          price_per_night?: number | null
           priority?: number
           property_id: string
           start_date?: string | null
           unit_id?: string | null
           updated_at?: string
+          weekdays?: number[] | null
         }
         Update: {
           created_at?: string
           currency?: string
+          discount_pct?: number | null
           end_date?: string | null
           id?: string
+          is_active?: boolean
           kind?: Database["public"]["Enums"]["rate_kind"]
+          label?: string | null
+          max_guests?: number | null
+          min_guests?: number | null
           min_nights?: number
+          min_nights_rule?: number | null
           organization_id?: string
-          price_per_night?: number
+          price_per_night?: number | null
           priority?: number
           property_id?: string
           start_date?: string | null
           unit_id?: string | null
           updated_at?: string
+          weekdays?: number[] | null
         }
         Relationships: [
           {
@@ -620,7 +643,10 @@ export type Database = {
         ]
       }
       units: {
+        // TODO: `amenities` y `photo_path` parchados a mano (0015) —
+        // reemplazar por la regeneración real (`supabase gen types`).
         Row: {
+          amenities: string[]
           capacity: number
           created_at: string
           description: string | null
@@ -628,11 +654,13 @@ export type Database = {
           is_active: boolean
           name: string
           organization_id: string
+          photo_path: string | null
           position: number
           property_id: string
           updated_at: string
         }
         Insert: {
+          amenities?: string[]
           capacity?: number
           created_at?: string
           description?: string | null
@@ -640,11 +668,13 @@ export type Database = {
           is_active?: boolean
           name: string
           organization_id: string
+          photo_path?: string | null
           position?: number
           property_id: string
           updated_at?: string
         }
         Update: {
+          amenities?: string[]
           capacity?: number
           created_at?: string
           description?: string | null
@@ -652,6 +682,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           organization_id?: string
+          photo_path?: string | null
           position?: number
           property_id?: string
           updated_at?: string
@@ -959,14 +990,26 @@ export type Database = {
           p_org_slug: string
           p_property_slug: string | null
         }
+        // TODO: columnas nuevas de 0018 parchadas a mano.
         Returns: {
           capacity: number
           currency: string
           description: string
+          min_nights: number
           name: string
           price_per_night: number
+          total_price: number | null
           unit_id: string
         }[]
+      }
+      simulate_price: {
+        Args: {
+          p_check_in: string
+          p_check_out: string
+          p_guests: number
+          p_unit: string
+        }
+        Returns: Json
       }
       public_property: {
         Args: { p_org_slug: string; p_property_slug: string | null }

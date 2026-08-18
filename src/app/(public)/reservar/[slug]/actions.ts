@@ -10,7 +10,13 @@ export type AvailUnit = {
   name: string
   description: string | null
   capacity: number
+  /** Precio de la primera noche, para mostrar "desde $X por noche". */
   price_per_night: number
+  /** Total REAL de la estadía: lo calcula el motor noche por noche, así que
+   *  contempla temporadas, fines de semana y descuentos. No multiplicar
+   *  price_per_night por las noches: da mal en cuanto hay una regla. */
+  total_price: number | null
+  min_nights: number
   currency: string
 }
 
@@ -77,9 +83,15 @@ export async function bookPublic(input: {
   })
 
   if (error) {
-    const msg = error.message.includes("UNAVAILABLE")
-      ? "Esa unidad ya se reservó para esas fechas. Probá con otras."
-      : "No se pudo generar la reserva."
+    // MIN_NIGHTS viene como "MIN_NIGHTS:3" desde _book (0018).
+    const min = error.message.match(/MIN_NIGHTS:(\d+)/)?.[1]
+    const msg = min
+      ? `Esta unidad requiere un mínimo de ${min} noches para esas fechas.`
+      : error.message.includes("UNAVAILABLE")
+        ? "Esa unidad ya se reservó para esas fechas. Probá con otras."
+        : error.message.includes("OVER_CAPACITY")
+          ? "Esa unidad no tiene capacidad para esa cantidad de huéspedes."
+          : "No se pudo generar la reserva."
     return { ok: false, error: msg }
   }
 

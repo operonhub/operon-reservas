@@ -36,3 +36,15 @@ export function nightsBetween(checkIn: string, checkOut: string) {
   const b = new Date(checkOut + "T00:00:00").getTime()
   return Math.round((b - a) / 86400000)
 }
+
+/** Link de WhatsApp a partir de un teléfono en cualquier formato. */
+export function whatsappHref(rawPhone: string) {
+  return `https://wa.me/${rawPhone.replace(/\D/g, "")}`
+}
+
+/** Iniciales para el avatar: "Tomás Cieri" -> "TC". */
+export function initials(fullName: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return "?"
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase()
+}

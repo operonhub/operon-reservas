@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { SettingsSection } from "@/components/settings/settings-section"
+import { cn } from "@/lib/utils"
 import { disconnectMercadoPago } from "@/app/(panel)/configuracion/actions"
+import { CreditCard, CircleCheck, Link2, Unplug } from "lucide-react"
 
 export type MpStatus = {
   connected: boolean
@@ -62,67 +64,67 @@ export function MercadoPagoCard({
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          Cobros con Mercado Pago
-          {status.connected ? (
-            <Badge className="bg-emerald-600 hover:bg-emerald-600">Conectado</Badge>
-          ) : (
-            <Badge variant="secondary">Sin conectar</Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4 text-sm">
-        {status.connected ? (
-          <>
-            <p className="text-muted-foreground">
-              Los pagos ingresan directo a tu cuenta de Mercado Pago. Operon no
-              retiene ni intermedia el dinero.
-            </p>
-            <dl className="grid grid-cols-2 gap-y-1 gap-x-4">
-              <dt className="text-muted-foreground">Cuenta (user id)</dt>
-              <dd className="font-medium">{status.mp_user_id}</dd>
-              <dt className="text-muted-foreground">Modo</dt>
-              <dd className="font-medium">
-                {status.live_mode ? "Producción" : "Prueba"}
-              </dd>
-              {status.connected_at ? (
-                <>
-                  <dt className="text-muted-foreground">Conectada</dt>
-                  <dd className="font-medium">
-                    {new Date(status.connected_at).toLocaleDateString("es-AR")}
-                  </dd>
-                </>
-              ) : null}
-            </dl>
-            <Button
-              variant="outline"
-              onClick={handleDisconnect}
-              disabled={pending}
+    <SettingsSection
+      icon={CreditCard}
+      title="Cobros con Mercado Pago"
+      description="Conectá tu cuenta para cobrar la seña online. El dinero entra directo a vos: Operon no retiene ni intermedia."
+      index={4}
+    >
+      {status.connected ? (
+        <div className="space-y-4 text-sm">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-success/40 bg-success/10 p-4">
+            <span className="flex items-center gap-2 font-semibold">
+              <CircleCheck className="size-4 text-success" /> Cuenta conectada
+            </span>
+            <Badge
+              className={cn(
+                "label-mono border-transparent",
+                status.live_mode
+                  ? "bg-success/20 text-foreground"
+                  : "bg-warning/30 text-foreground"
+              )}
             >
-              Desconectar
-            </Button>
-          </>
-        ) : (
-          <>
-            <p className="text-muted-foreground">
-              Conectá tu cuenta de Mercado Pago para cobrar la seña de las
-              reservas online. El dinero va directo a vos.
-            </p>
-            {configured ? (
-              <a href="/api/mp/connect" className={buttonVariants()}>
-                Conectar Mercado Pago
-              </a>
-            ) : (
-              <div className="rounded-lg border border-dashed p-3 text-muted-foreground">
-                La conexión estará disponible en cuanto Operon habilite Mercado
-                Pago a nivel plataforma.
+              {status.live_mode ? "Producción" : "Modo prueba"}
+            </Badge>
+          </div>
+
+          <dl className="space-y-2 rounded-xl border bg-background/60 p-4">
+            <div className="flex items-center justify-between">
+              <dt className="text-muted-foreground">Cuenta</dt>
+              <dd className="font-mono text-xs">{status.mp_user_id}</dd>
+            </div>
+            {status.connected_at && (
+              <div className="flex items-center justify-between">
+                <dt className="text-muted-foreground">Conectada el</dt>
+                <dd className="font-mono text-xs tabular-nums">
+                  {new Date(status.connected_at).toLocaleDateString("es-AR")}
+                </dd>
               </div>
             )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+          </dl>
+
+          <Button variant="outline" onClick={handleDisconnect} disabled={pending}>
+            <Unplug /> {pending ? "Desconectando…" : "Desconectar"}
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4 text-sm">
+          <p className="text-muted-foreground">
+            Sin la cuenta conectada, las reservas se generan igual pero el
+            huésped no puede pagar la seña online.
+          </p>
+          {configured ? (
+            <a href="/api/mp/connect" className={buttonVariants()}>
+              <Link2 /> Conectar Mercado Pago
+            </a>
+          ) : (
+            <div className="rounded-xl border border-dashed p-4 text-muted-foreground">
+              La conexión estará disponible en cuanto Operon habilite Mercado
+              Pago a nivel plataforma.
+            </div>
+          )}
+        </div>
+      )}
+    </SettingsSection>
   )
 }
