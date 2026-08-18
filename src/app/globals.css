@@ -205,3 +205,52 @@ body:has(.operon-light) {
     @apply font-mono text-[10px] uppercase tracking-wider;
   }
 }
+
+/* ============================================================
+   Impresión — el comprobante de reserva se guarda como PDF con
+   el propio diálogo del navegador ("Guardar como PDF"), sin
+   librerías ni generación en el servidor.
+   ============================================================ */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  /* El panel puede estar en modo oscuro: un comprobante en negro
+     gasta tinta y se lee mal. Se fuerzan los tokens claros. */
+  :root,
+  .dark {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.186 0.008 95.5);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.186 0.008 95.5);
+    --muted: oklch(0.968 0.005 90);
+    --muted-foreground: oklch(0.44 0.015 80.6);
+    --primary: oklch(0.443 0.205 266.2);
+    --primary-foreground: oklch(1 0 0);
+    --success: oklch(0.5 0.133 153.6);
+    --warning: oklch(0.72 0.146 90.5);
+    --warning-foreground: oklch(0.186 0.008 95.5);
+    --border: oklch(0.85 0.01 90);
+    --secondary: oklch(0.968 0.005 90);
+  }
+
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  /* El layout del panel es de alto fijo con scroll interno; en papel
+     el contenido tiene que poder fluir y paginarse. */
+  main {
+    overflow: visible !important;
+  }
+
+  /* No cortar una tarjeta o una fila de pago a la mitad de la hoja. */
+  .print-block {
+    break-inside: avoid;
+  }
+}

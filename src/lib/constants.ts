@@ -46,6 +46,21 @@ export const RESERVATION_SOURCE_LABELS: Record<Enums<"reservation_source">, stri
   other: "Otro",
 }
 
+// ---------- Pagos ----------
+export const PAYMENT_KIND_LABELS: Record<Enums<"payment_kind">, string> = {
+  deposit: "Seña",
+  balance: "Saldo",
+  refund: "Reintegro",
+  other: "Otro",
+}
+
+export const PAYMENT_STATUS_LABELS: Record<Enums<"payment_status">, string> = {
+  pending: "Pendiente",
+  paid: "Acreditado",
+  failed: "Rechazado",
+  refunded: "Reintegrado",
+}
+
 // ---------- Tarifas ----------
 export const RATE_KIND_LABELS: Record<Enums<"rate_kind">, string> = {
   base: "Base",
