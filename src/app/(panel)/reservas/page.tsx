@@ -1,31 +1,12 @@
-import Link from "next/link"
 import { requireContext } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { StatusBadge, SourceBadge } from "@/components/reservations/reservation-badges"
 import { NewReservationDialog } from "@/components/reservations/new-reservation-dialog"
 import { FilterBar } from "@/components/reservations/filter-bar"
-import { formatCurrency, todayISO } from "@/lib/format"
-
-type PaymentRow = { amount: number; status: string }
-
-/** Etiqueta de estado de pago derivada de los pagos de la reserva (no hay
- *  columna propia: se calcula igual que en el detalle de la reserva). */
-function paymentStatusLabel(payments: PaymentRow[]): { label: string; className: string } {
-  if (payments.length === 0) return { label: "—", className: "text-muted-foreground" }
-  if (payments.some((p) => p.status === "paid"))
-    return { label: "Pagado", className: "text-emerald-700 dark:text-emerald-400" }
-  if (payments.some((p) => p.status === "pending"))
-    return { label: "Pendiente", className: "text-amber-700 dark:text-amber-400" }
-  return { label: "Rechazado", className: "text-destructive" }
-}
+import { ReservationsBoard, type ReservationRow } from "@/components/reservations/reservations-board"
+import { OperonArc } from "@/components/brand/operon-arc"
+import { ENTER } from "@/lib/motion"
+import { todayISO, nightsBetween } from "@/lib/format"
+import type { Enums } from "@/lib/supabase/types"
 
 export default async function ReservasPage({
   searchParams,
@@ -40,7 +21,7 @@ export default async function ReservasPage({
   let query = supabase
     .from("reservations")
     .select(
-      "id, code, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, currency, guests(full_name), units(name), payments(amount, status)"
+      "id, code, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, updated_at, guests(full_name, email, phone), units(name, capacity), payments(amount, status, kind, paid_at)"
     )
 
   switch (f) {
@@ -74,94 +55,72 @@ export default async function ReservasPage({
       .order("position"),
   ])
 
-  const list = reservations ?? []
+  type Guest = { full_name: string; email: string | null; phone: string | null }
+  type Unit = { name: string; capacity: number }
+  type Payment = {
+    amount: number
+    status: string
+    kind: string
+    paid_at: string | null
+  }
+
+  const rows: ReservationRow[] = (reservations ?? []).map((r) => {
+    const gRaw = r.guests as Guest | Guest[] | null
+    const guest = Array.isArray(gRaw) ? gRaw[0] : gRaw
+    const uRaw = r.units as Unit | Unit[] | null
+    const unit = Array.isArray(uRaw) ? uRaw[0] : uRaw
+    const payments = (r.payments as Payment[] | null) ?? []
+    const paid = payments
+      .filter((p) => p.status === "paid")
+      .reduce((s, p) => s + Number(p.amount), 0)
+
+    return {
+      id: r.id,
+      code: r.code,
+      status: r.status as Enums<"reservation_status">,
+      source: r.source as Enums<"reservation_source">,
+      checkIn: r.check_in,
+      checkOut: r.check_out,
+      nights: nightsBetween(r.check_in, r.check_out),
+      guestsCount: r.guests_count,
+      guestName: guest?.full_name ?? "—",
+      guestEmail: guest?.email ?? null,
+      guestPhone: guest?.phone ?? null,
+      unitName: unit?.name ?? "—",
+      unitCapacity: unit?.capacity ?? null,
+      totalAmount: r.total_amount,
+      depositAmount: r.deposit_amount,
+      paidAmount: paid,
+      currency: r.currency,
+      notes: r.notes,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      payments: payments.map((p) => ({
+        amount: Number(p.amount),
+        status: p.status,
+        kind: p.kind,
+        paidAt: p.paid_at,
+      })),
+    }
+  })
 
   return (
-    <div className="p-6 space-y-6">
-      <header className="flex items-center justify-between gap-4">
+    <div className="relative p-6 space-y-5">
+      <OperonArc className="inset-0" size={560} thickness={70} corner="bottom-right" />
+
+      <header className={`${ENTER} flex flex-wrap items-end justify-between gap-4`}>
         <div>
-          <h1 className="text-2xl font-semibold">Reservas</h1>
-          <p className="text-sm text-muted-foreground">{ctx.organizationName}</p>
+          <p className="label-mono text-primary">{ctx.organizationName}</p>
+          <h1 className="mt-1 text-[28px] leading-tight font-semibold">Reservas</h1>
         </div>
         {(units ?? []).length > 0 && <NewReservationDialog units={units ?? []} />}
       </header>
 
-      <FilterBar active={f} />
+      <div className={ENTER}>
+        <FilterBar active={f} />
+      </div>
 
-      {list.length === 0 ? (
-        <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No hay reservas en este filtro.
-        </div>
-      ) : (
-        <div className="rounded-xl border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="label-mono text-muted-foreground">Código</TableHead>
-                <TableHead className="label-mono text-muted-foreground">Huésped</TableHead>
-                <TableHead className="label-mono text-muted-foreground">Unidad</TableHead>
-                <TableHead className="label-mono text-muted-foreground">Fechas</TableHead>
-                <TableHead className="label-mono text-center text-muted-foreground">Pers.</TableHead>
-                <TableHead className="label-mono text-right text-muted-foreground">Total</TableHead>
-                <TableHead className="label-mono text-right text-muted-foreground">Seña</TableHead>
-                <TableHead className="label-mono text-right text-muted-foreground">Pagado</TableHead>
-                <TableHead className="label-mono text-right text-muted-foreground">Saldo</TableHead>
-                <TableHead className="label-mono text-muted-foreground">Pago</TableHead>
-                <TableHead className="label-mono text-muted-foreground">Origen</TableHead>
-                <TableHead className="label-mono text-muted-foreground">Estado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.map((r) => {
-                const guest = r.guests as { full_name: string } | { full_name: string }[] | null
-                const guestName = Array.isArray(guest) ? guest[0]?.full_name : guest?.full_name
-                const unit = r.units as { name: string } | { name: string }[] | null
-                const unitName = Array.isArray(unit) ? unit[0]?.name : unit?.name
-                const payments = (r.payments as PaymentRow[] | null) ?? []
-                const paid = payments
-                  .filter((p) => p.status === "paid")
-                  .reduce((s, p) => s + Number(p.amount), 0)
-                const balance = r.total_amount != null ? Number(r.total_amount) - paid : null
-                const payStatus = paymentStatusLabel(payments)
-                return (
-                  <TableRow key={r.id} className="cursor-pointer">
-                    <TableCell className="font-medium">
-                      <Link href={`/reservas/${r.id}`} className="hover:underline">
-                        {r.code}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{guestName ?? "—"}</TableCell>
-                    <TableCell>{unitName ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {r.check_in} → {r.check_out}
-                    </TableCell>
-                    <TableCell className="text-center tabular-nums">{r.guests_count}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCurrency(r.total_amount, r.currency)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {formatCurrency(r.deposit_amount, r.currency)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCurrency(paid, r.currency)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCurrency(balance, r.currency)}
-                    </TableCell>
-                    <TableCell className={payStatus.className}>{payStatus.label}</TableCell>
-                    <TableCell>
-                      <SourceBadge source={r.source} />
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={r.status} />
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <ReservationsBoard rows={rows} today={today} />
     </div>
   )
 }
