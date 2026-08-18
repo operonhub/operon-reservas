@@ -1,44 +1,53 @@
 import { requireContext } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { RateDialog } from "@/components/rates/rate-dialog"
-import { RateDeleteButton } from "@/components/rates/rate-delete-button"
-import { formatCurrency } from "@/lib/format"
-import { RATE_KIND_LABELS } from "@/lib/constants"
+import { UnitRatesCard, RuleLine } from "@/components/rates/unit-rates-card"
+import { PriceSimulator } from "@/components/rates/price-simulator"
+import { OperonArc } from "@/components/brand/operon-arc"
+import { ENTER, ENTER_UP, stagger } from "@/lib/motion"
+import type { RateRow } from "@/lib/rate-rules"
+import { Plus, Globe } from "lucide-react"
 
 export default async function TarifasPage() {
   const ctx = await requireContext()
   const supabase = await createClient()
 
   const [{ data: property }, { data: units }, { data: rates }] = await Promise.all([
-    supabase.from("properties").select("id, currency").order("created_at").limit(1).maybeSingle(),
-    supabase.from("units").select("id, name").order("position"),
+    supabase
+      .from("properties")
+      .select("id, currency")
+      .order("created_at")
+      .limit(1)
+      .maybeSingle(),
+    supabase.from("units").select("id, name, capacity").eq("is_active", true).order("position"),
     supabase
       .from("rates")
-      .select("id, unit_id, kind, price_per_night, currency, min_nights, priority, start_date, end_date, units(name)")
-      .order("kind")
+      .select(
+        "id, unit_id, kind, label, price_per_night, discount_pct, weekdays, min_guests, max_guests, min_nights, min_nights_rule, priority, start_date, end_date, is_active, currency"
+      )
       .order("priority", { ascending: false }),
   ])
 
   const unitList = units ?? []
-  const list = rates ?? []
+  const all = (rates ?? []) as RateRow[]
   const currency = property?.currency ?? "ARS"
 
+  // Las reglas sin unidad valen para todas: se muestran aparte para no
+  // repetirlas en cada tarjeta y que parezcan varias reglas distintas.
+  const globalRules = all.filter((r) => r.unit_id === null && r.kind !== "base")
+  const globalBase = all.find((r) => r.unit_id === null && r.kind === "base") ?? null
+
   return (
-    <div className="p-6 space-y-6">
-      <header className="flex items-center justify-between gap-4">
+    <div className="relative p-6 space-y-6">
+      <OperonArc className="inset-0" size={560} thickness={70} corner="bottom-right" />
+
+      <header className={`${ENTER} flex flex-wrap items-end justify-between gap-4`}>
         <div>
-          <h1 className="text-2xl font-semibold">Tarifas</h1>
-          <p className="text-sm text-muted-foreground">
-            {ctx.organizationName} — precios por noche (base, temporada, fechas especiales)
+          <p className="label-mono text-primary">{ctx.organizationName}</p>
+          <h1 className="mt-1 text-[28px] leading-tight font-semibold">Tarifas</h1>
+          <p className="mt-1 text-sm text-pretty text-muted-foreground">
+            Precio base de cada unidad y reglas que lo modifican por fecha, día
+            o tipo de estadía.
           </p>
         </div>
         {property && (
@@ -46,81 +55,65 @@ export default async function TarifasPage() {
             mode="new"
             units={unitList}
             propertyId={property.id}
-            triggerLabel="Nueva tarifa"
+            triggerLabel="Nueva regla"
+            triggerIcon={<Plus />}
           />
         )}
       </header>
 
-      {list.length === 0 ? (
-        <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-          Todavía no cargaste tarifas.
+      {unitList.length === 0 ? (
+        <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+          Cargá unidades antes de definir tarifas.
         </div>
       ) : (
-        <div className="rounded-xl border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Aplica a</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead className="text-right">Precio / noche</TableHead>
-                <TableHead className="text-center">Mín. noches</TableHead>
-                <TableHead>Vigencia</TableHead>
-                <TableHead className="text-center">Prioridad</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.map((r) => {
-                const unit = r.units as { name: string } | { name: string }[] | null
-                const unitName = Array.isArray(unit) ? unit[0]?.name : unit?.name
-                return (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">
-                      {unitName ?? "Toda la propiedad"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={r.kind === "base" ? "secondary" : "outline"}>
-                        {RATE_KIND_LABELS[r.kind]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCurrency(r.price_per_night, r.currency ?? currency)}
-                    </TableCell>
-                    <TableCell className="text-center tabular-nums">{r.min_nights}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {r.start_date && r.end_date ? `${r.start_date} → ${r.end_date}` : "Siempre"}
-                    </TableCell>
-                    <TableCell className="text-center tabular-nums">{r.priority}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <RateDialog
-                          mode="edit"
-                          rate={{
-                            id: r.id,
-                            unit_id: r.unit_id,
-                            kind: r.kind,
-                            price_per_night: Number(r.price_per_night),
-                            min_nights: r.min_nights,
-                            priority: r.priority,
-                            start_date: r.start_date,
-                            end_date: r.end_date,
-                          }}
-                          units={unitList}
-                          propertyId={property!.id}
-                          triggerLabel="Editar"
-                          triggerVariant="ghost"
-                          triggerSize="sm"
-                        />
-                        <RateDeleteButton id={r.id} />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <>
+          <div className="grid gap-5 xl:grid-cols-2">
+            {unitList.map((u, i) => (
+              <UnitRatesCard
+                key={u.id}
+                unit={u}
+                base={all.find((r) => r.unit_id === u.id && r.kind === "base") ?? globalBase}
+                baseIsInherited={!all.some((r) => r.unit_id === u.id && r.kind === "base")}
+                rules={all.filter((r) => r.unit_id === u.id && r.kind !== "base")}
+                units={unitList}
+                propertyId={property?.id ?? ""}
+                currency={currency}
+                index={i}
+              />
+            ))}
+          </div>
+
+          {globalRules.length > 0 && (
+            <section className={ENTER_UP} style={stagger(unitList.length)}>
+              <h2 className="mb-3 flex items-center gap-2 font-heading text-base font-semibold tracking-tight">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Globe className="size-4" />
+                </span>
+                Reglas para todas las unidades
+              </h2>
+              <div className="space-y-2 rounded-2xl border bg-card p-4">
+                {globalRules.map((r) => (
+                  <RuleLine
+                    key={r.id}
+                    rule={r}
+                    units={unitList}
+                    propertyId={property?.id ?? ""}
+                    currency={currency}
+                    base={globalBase}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {property && (
+            <div className={ENTER_UP} style={stagger(unitList.length + 1)}>
+              <PriceSimulator units={unitList} />
+            </div>
+          )}
+        </>
       )}
     </div>
   )
 }
+

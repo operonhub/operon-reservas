@@ -204,7 +204,10 @@ export function PublicBooking({
             ) : (
               <ul className="space-y-3">
                 {units.map((u, i) => {
-                  const total = Number(u.price_per_night) * nights
+                  // El total lo calcula el motor noche por noche (contempla
+                  // temporadas, fines de semana y descuentos). Multiplicar el
+                  // precio de una noche daría mal en cuanto hay una regla.
+                  const total = u.total_price ?? Number(u.price_per_night) * nights
                   return (
                     <li
                       key={u.unit_id}
@@ -220,7 +223,7 @@ export function PublicBooking({
                         )}
                         <p className="label-mono mt-1.5 text-muted-foreground">
                           Hasta {u.capacity} huéspedes ·{" "}
-                          {formatCurrency(u.price_per_night, u.currency)}/noche
+                          desde {formatCurrency(u.price_per_night, u.currency)}/noche
                         </p>
                       </div>
                       <div className="text-right">
@@ -262,7 +265,10 @@ export function PublicBooking({
               <span className="font-medium">{selected.name}</span> · {checkIn} → {checkOut} ·{" "}
               {nights} noche{nights > 1 ? "s" : ""} ·{" "}
               <span className="font-medium">
-                {formatCurrency(Number(selected.price_per_night) * nights, selected.currency)}
+                {formatCurrency(
+                  selected.total_price ?? Number(selected.price_per_night) * nights,
+                  selected.currency
+                )}
               </span>
             </div>
 

@@ -60,6 +60,12 @@
    ============================================================ */
 
 :root {
+  /* Le dice al navegador con qué esquema pintar los controles NATIVOS:
+     el desplegable de un <select>, los pickers de date/time y las barras de
+     scroll. Sin esto, en modo oscuro el popup del select se dibuja con fondo
+     blanco mientras el texto hereda el color claro — ilegible. */
+  color-scheme: light;
+
   /* Operon — paleta de marca (claro) */
   --background: oklch(0.982 0.007 88.6); /* papel */
   --foreground: oklch(0.186 0.008 95.5); /* tinta */
@@ -100,6 +106,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+
   /* Operon — paleta de marca (oscuro) */
   --background: oklch(0.186 0.008 95.5); /* tinta */
   --foreground: oklch(0.982 0.007 88.6); /* papel */
