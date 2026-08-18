@@ -197,6 +197,16 @@ body:has(.operon-light) {
   h3 {
     @apply font-heading tracking-tight;
   }
+
+  /* Tailwind v4 dejó de aplicar `cursor: pointer` a los botones en su
+     reset, así que nada en la app se sentía clickeable. Se restituye acá
+     una sola vez en lugar de repetir la clase en cada componente. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  label[for],
+  summary {
+    @apply cursor-pointer;
+  }
 }
 
 @layer utilities {

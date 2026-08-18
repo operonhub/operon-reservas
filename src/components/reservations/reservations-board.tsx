@@ -168,9 +168,15 @@ function ReservationStrip({
       style={stagger(index, 40)}
       className={cn(
         ENTER_UP,
-        "w-full overflow-hidden rounded-xl border bg-card text-left transition-all",
-        "hover:border-primary/40 hover:shadow-md",
-        active && "border-primary ring-1 ring-primary/30"
+        "w-full overflow-hidden rounded-xl border-2 bg-card text-left transition-all",
+        // Hover marcado: la ficha se levanta, tiñe el fondo y el borde toma
+        // el color de acento. Sin esto no se leía como clickeable.
+        "hover:-translate-y-0.5 hover:border-primary hover:bg-primary/[0.04] hover:shadow-lg",
+        "motion-reduce:hover:translate-y-0 motion-reduce:transition-none",
+        "focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none",
+        active
+          ? "border-primary ring-2 ring-primary/25"
+          : "border-border"
       )}
     >
       {/* Línea principal: quién, dónde, cuándo, en qué estado */}
