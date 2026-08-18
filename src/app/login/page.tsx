@@ -1,75 +1,130 @@
 "use client"
 
-import { useActionState } from "react"
+import { useActionState, useState } from "react"
+import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react"
 import { login } from "./actions"
+import { LoginBrandLockup } from "./login-brand-lockup"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent } from "@/components/ui/card"
-import { OperonWordmark } from "@/components/brand/operon-mark"
-import { ENTER, ENTER_UP, stagger } from "@/lib/motion"
+import styles from "./login.module.css"
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, null)
+  const [showPassword, setShowPassword] = useState(false)
+  const errorId = state?.error ? "login-error" : undefined
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-muted/40 p-4">
-      {/* Único momento de halo effect del panel: el wordmark manda. */}
-      <div className={ENTER} style={stagger(0)}>
-        <OperonWordmark className="h-11 w-auto" />
-      </div>
-      <p
-        className={`${ENTER} label-mono mt-3 text-muted-foreground`}
-        style={stagger(1)}
-      >
-        Reservas
-      </p>
+    <main className={styles.loginShell}>
+      <section className={styles.brandPane} aria-labelledby="brand-message">
+        <div className={styles.brandContent}>
+          <LoginBrandLockup />
 
-      <Card
-        className={`${ENTER_UP} mt-8 w-full max-w-sm`}
-        style={stagger(2)}
-      >
-        <CardContent className="pt-6">
-          <form action={formAction} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+          <div className={styles.brandMessage}>
+            <p id="brand-message" className={styles.brandTitle}>
+              Tu alojamiento,
+              <br />
+              <em>bajo control.</em>
+            </p>
+            <p>Reservas, disponibilidad y cobros en un solo lugar.</p>
+          </div>
+        </div>
+
+        <div className={styles.brandMeta} aria-hidden="true">
+          <span>Disponibilidad</span>
+          <span>Reservas</span>
+          <span>Cobros</span>
+        </div>
+      </section>
+
+      <section className={styles.formPane} aria-labelledby="login-title">
+        <header className={styles.formTopbar}>
+          <span>Operon Reservas</span>
+          <ThemeToggle />
+        </header>
+
+        <div className={styles.formFrame}>
+          <div className={styles.formHeading}>
+            <span className={styles.formEyebrow}>Acceso privado</span>
+            <h1 id="login-title">Bienvenido de nuevo</h1>
+            <p>Ingresá para acceder al panel de administración.</p>
+          </div>
+
+          <form action={formAction} className={styles.form}>
+            <div className={styles.field}>
+              <Label htmlFor="email" className={styles.fieldLabel}>
+                Email
+              </Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
-                placeholder="admin@demo-cabins.dev"
+                placeholder="nombre@alojamiento.com"
                 autoComplete="email"
+                aria-invalid={Boolean(state?.error)}
+                aria-describedby={errorId}
+                className={styles.input}
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-              />
+
+            <div className={styles.field}>
+              <Label htmlFor="password" className={styles.fieldLabel}>
+                Contraseña
+              </Label>
+              <div className={styles.passwordField}>
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  aria-invalid={Boolean(state?.error)}
+                  aria-describedby={errorId}
+                  className={`${styles.input} ${styles.passwordInput}`}
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className={styles.passwordToggle}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                </Button>
+              </div>
             </div>
+
             {state?.error && (
-              <p className="animate-in fade-in text-sm text-destructive motion-reduce:animate-none">
+              <p id="login-error" role="alert" className={styles.errorMessage}>
                 {state.error}
               </p>
             )}
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Ingresando…" : "Ingresar"}
+
+            <Button
+              type="submit"
+              size="lg"
+              className={styles.submitButton}
+              disabled={pending}
+            >
+              {pending ? (
+                <>
+                  <LoaderCircle className="animate-spin" aria-hidden="true" />
+                  Ingresando…
+                </>
+              ) : (
+                <>
+                  Ingresar al panel
+                  <ArrowRight aria-hidden="true" />
+                </>
+              )}
             </Button>
           </form>
-        </CardContent>
-      </Card>
-
-      <p
-        className={`${ENTER} mt-6 text-xs text-muted-foreground`}
-        style={stagger(3)}
-      >
-        Panel de administración del alojamiento
-      </p>
+        </div>
+      </section>
     </main>
   )
 }
