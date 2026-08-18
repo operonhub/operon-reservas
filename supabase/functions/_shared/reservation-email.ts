@@ -22,6 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
   confirmed: "Reserva confirmada",
   completed: "Estadía completada",
   cancelled: "Reserva cancelada",
+  expired: "Reserva expirada",
 }
 
 function stringValue(value: unknown, fallback = "—"): string {

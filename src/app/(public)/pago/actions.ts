@@ -11,6 +11,7 @@ export type PublicReservationStatus = {
   property_name: string
   property_whatsapp: string | null
   unit_name: string
+  guest_name: string | null
   check_in: string
   check_out: string
   guests_count: number

@@ -44,7 +44,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/reservar") ||
     pathname.startsWith("/api/mp/checkout") ||
     pathname.startsWith("/api/mp/webhook") ||
-    pathname.startsWith("/pago")
+    pathname.startsWith("/pago") ||
+    pathname.startsWith("/ical")
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone()

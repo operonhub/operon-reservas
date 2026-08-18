@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { formatCurrency, nightsBetween, todayISO, addDays } from "@/lib/format"
+import { formatCurrency, formatDay, nightsBetween, todayISO, addDays } from "@/lib/format"
 import { ENTER, ENTER_UP, ENTER_SIDE, ENTER_POP, stagger } from "@/lib/motion"
 import { OperonFooter } from "@/components/public/operon-footer"
 import {
@@ -23,6 +23,9 @@ type PublicProperty = {
   currency: string
   checkin_time: string
   checkout_time: string
+  deposit_pct: number
+  whatsapp: string | null
+  phone: string | null
 }
 
 type Step = "search" | "results" | "form" | "done"
@@ -47,11 +50,18 @@ export function PublicBooking({
   const [units, setUnits] = React.useState<AvailUnit[]>([])
   const [selected, setSelected] = React.useState<AvailUnit | null>(null)
   const [code, setCode] = React.useState<string | null>(null)
+  const [guestName, setGuestName] = React.useState("")
+  const [booked, setBooked] = React.useState<{
+    total: number | null
+    deposit: number | null
+  } | null>(null)
 
   const nights = React.useMemo(
     () => (checkIn && checkOut && checkOut > checkIn ? nightsBetween(checkIn, checkOut) : 0),
     [checkIn, checkOut]
   )
+
+  const depositPct = Number(property.deposit_pct) || 0
 
   async function onSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -70,6 +80,7 @@ export function PublicBooking({
     e.preventDefault()
     if (!selected) return
     const fd = new FormData(e.currentTarget)
+    const name = String(fd.get("full_name") ?? "").trim()
     setPending(true)
     const res = await bookPublic({
       orgSlug,
@@ -77,7 +88,7 @@ export function PublicBooking({
       checkIn,
       checkOut,
       guests,
-      fullName: String(fd.get("full_name") ?? ""),
+      fullName: name,
       email: String(fd.get("email") ?? ""),
       phone: String(fd.get("phone") ?? ""),
       notes: String(fd.get("notes") ?? ""),
@@ -87,7 +98,9 @@ export function PublicBooking({
       toast.error(res.error ?? "No se pudo reservar.")
       return
     }
+    setGuestName(name)
     setCode(res.code ?? null)
+    setBooked({ total: res.total_amount ?? null, deposit: res.deposit_amount ?? null })
     setStep("done")
   }
 
@@ -208,6 +221,7 @@ export function PublicBooking({
                   // temporadas, fines de semana y descuentos). Multiplicar el
                   // precio de una noche daría mal en cuanto hay una regla.
                   const total = u.total_price ?? Number(u.price_per_night) * nights
+                  const deposit = depositPct > 0 ? Math.round((total * depositPct) / 100) : null
                   return (
                     <li
                       key={u.unit_id}
@@ -233,6 +247,11 @@ export function PublicBooking({
                         <p className="label-mono text-muted-foreground">
                           {nights} noche{nights > 1 ? "s" : ""} en total
                         </p>
+                        {deposit != null && (
+                          <p className="label-mono text-muted-foreground">
+                            Seña ({depositPct}%): {formatCurrency(deposit, u.currency)}
+                          </p>
+                        )}
                         <Button
                           size="sm"
                           className="mt-2"
@@ -262,14 +281,22 @@ export function PublicBooking({
             </div>
 
             <div className="rounded-xl bg-muted/50 p-3 text-sm">
-              <span className="font-medium">{selected.name}</span> · {checkIn} → {checkOut} ·{" "}
-              {nights} noche{nights > 1 ? "s" : ""} ·{" "}
-              <span className="font-medium">
-                {formatCurrency(
-                  selected.total_price ?? Number(selected.price_per_night) * nights,
-                  selected.currency
-                )}
-              </span>
+              <p>
+                <span className="font-medium">{selected.name}</span> · {checkIn} → {checkOut} ·{" "}
+                {nights} noche{nights > 1 ? "s" : ""} ·{" "}
+                <span className="font-medium">
+                  {formatCurrency(
+                    selected.total_price ?? Number(selected.price_per_night) * nights,
+                    selected.currency
+                  )}
+                </span>
+              </p>
+              {depositPct > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Para confirmar se paga una seña del {depositPct}% — el resto se abona en el
+                  alojamiento.
+                </p>
+              )}
             </div>
 
             <div className="grid gap-1.5">
@@ -308,7 +335,7 @@ export function PublicBooking({
             <h2 className="mt-3 text-xl font-semibold">¡Reserva generada!</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {mpEnabled
-                ? "Pagá la seña para confirmarla al instante."
+                ? "Pagá la seña para confirmarla al instante — el resto se abona al llegar."
                 : "Guardá tu código. El alojamiento se pondrá en contacto para confirmar."}
             </p>
             {code && (
@@ -328,8 +355,40 @@ export function PublicBooking({
               </p>
             )}
 
+            {booked && (booked.total != null || booked.deposit != null) && (
+              <dl
+                className={`${ENTER_UP} mx-auto mt-4 w-fit space-y-1 rounded-xl border bg-muted/40 p-3 text-left text-sm`}
+                style={stagger(2)}
+              >
+                {booked.total != null && (
+                  <div className="flex justify-between gap-6">
+                    <dt className="text-muted-foreground">Total</dt>
+                    <dd className="font-mono font-medium tabular-nums">
+                      {formatCurrency(booked.total, property.currency)}
+                    </dd>
+                  </div>
+                )}
+                {booked.deposit != null && (
+                  <div className="flex justify-between gap-6">
+                    <dt className="text-muted-foreground">Seña a pagar ahora</dt>
+                    <dd className="font-mono font-medium tabular-nums">
+                      {formatCurrency(booked.deposit, property.currency)}
+                    </dd>
+                  </div>
+                )}
+                {booked.total != null && booked.deposit != null && (
+                  <div className="flex justify-between gap-6">
+                    <dt className="text-muted-foreground">Saldo (en el alojamiento)</dt>
+                    <dd className="font-mono font-medium tabular-nums">
+                      {formatCurrency(booked.total - booked.deposit, property.currency)}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            )}
+
             {mpEnabled && (
-              <div className={ENTER_UP} style={stagger(2)}>
+              <div className={ENTER_UP} style={stagger(3)}>
                 <Button
                   onClick={onPay}
                   disabled={paying}
@@ -338,6 +397,23 @@ export function PublicBooking({
                 >
                   {paying ? "Redirigiendo a Mercado Pago…" : "Pagar seña con Mercado Pago"}
                 </Button>
+              </div>
+            )}
+
+            {property.whatsapp && (
+              <div className="mt-4">
+                <a
+                  href={`https://wa.me/${property.whatsapp}?text=${encodeURIComponent(
+                    `¡Hola!${guestName ? ` Soy ${guestName},` : ""} ya hice la reserva del ${formatDay(
+                      checkIn
+                    )} al ${formatDay(checkOut)}${code ? ` (código ${code})` : ""}.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground underline underline-offset-4"
+                >
+                  Hablar con el alojamiento por WhatsApp
+                </a>
               </div>
             )}
 
@@ -351,6 +427,7 @@ export function PublicBooking({
                   setSelected(null)
                   setUnits([])
                   setCode(null)
+                  setBooked(null)
                 }}
               >
                 Hacer otra reserva

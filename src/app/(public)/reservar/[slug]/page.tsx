@@ -11,6 +11,9 @@ type PublicProperty = {
   currency: string
   checkin_time: string
   checkout_time: string
+  deposit_pct: number
+  whatsapp: string | null
+  phone: string | null
 }
 
 export default async function ReservarPage({

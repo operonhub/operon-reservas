@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Loader2, CheckCircle2, XCircle, Clock, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { formatCurrency, whatsappHref } from "@/lib/format"
+import { formatCurrency, formatDay } from "@/lib/format"
 import { ENTER, ENTER_UP, ENTER_POP, stagger } from "@/lib/motion"
 import { OperonFooter } from "@/components/public/operon-footer"
 import {
@@ -23,6 +23,20 @@ function phaseOf(status: string | undefined): Phase {
   if (status === "confirmed" || status === "completed") return "confirmed"
   if (status === "expired" || status === "cancelled") return "gone"
   return "waiting" // pending / pending_payment / inquiry
+}
+
+/**
+ * Link de WhatsApp con el mensaje ya escrito: el huésped no tiene que
+ * explicar quién es ni qué reservó. Es local a esta pantalla porque necesita
+ * los datos de la reserva; el helper genérico vive en lib/format.
+ */
+function whatsappHref(rawPhone: string, r: PublicReservationStatus): string {
+  const digits = rawPhone.replace(/[^\d]/g, "")
+  const who = r.guest_name ? `soy ${r.guest_name}, ` : ""
+  const text = `¡Hola! ${who}ya hice la reserva del ${formatDay(r.check_in)} al ${formatDay(
+    r.check_out
+  )} (código ${r.code}).`
+  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
 }
 
 export default function PagoPage() {
@@ -200,7 +214,7 @@ function PagoContent() {
         <CodeChip code={r.code} />
         {r.property_whatsapp && (
           <a
-            href={whatsappHref(r.property_whatsapp)}
+            href={whatsappHref(r.property_whatsapp, r)}
             target="_blank"
             rel="noreferrer"
             className={`${ENTER_UP} mt-6 inline-flex items-center gap-2 rounded-lg bg-success px-4 py-2.5 text-sm font-medium text-success-foreground transition-opacity hover:opacity-90`}
