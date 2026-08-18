@@ -21,7 +21,7 @@ export default async function ReservasPage({
   let query = supabase
     .from("reservations")
     .select(
-      "id, code, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, updated_at, guests(full_name, email, phone), units(name, capacity), payments(amount, status, kind, paid_at)"
+      "id, code, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, updated_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, paid_at)"
     )
 
   switch (f) {
@@ -55,7 +55,12 @@ export default async function ReservasPage({
       .order("position"),
   ])
 
-  type Guest = { full_name: string; email: string | null; phone: string | null }
+  type Guest = {
+    id: string
+    full_name: string
+    email: string | null
+    phone: string | null
+  }
   type Unit = { name: string; capacity: number }
   type Payment = {
     amount: number
@@ -83,6 +88,7 @@ export default async function ReservasPage({
       checkOut: r.check_out,
       nights: nightsBetween(r.check_in, r.check_out),
       guestsCount: r.guests_count,
+      guestId: guest?.id ?? null,
       guestName: guest?.full_name ?? "—",
       guestEmail: guest?.email ?? null,
       guestPhone: guest?.phone ?? null,

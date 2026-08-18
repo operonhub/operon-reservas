@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { StatusBadge, SourceBadge } from "@/components/reservations/reservation-badges"
 import { StatusControl } from "@/components/reservations/status-control"
 import { PrintButton } from "@/components/reservations/print-button"
+import { GuestNameTrigger } from "@/components/reservations/guest-name-trigger"
 import { OperonMarkTinta } from "@/components/brand/operon-mark"
 import { formatCurrency, nightsBetween, whatsappHref } from "@/lib/format"
 import { PAYMENT_STATUS_LABELS, PAYMENT_KIND_LABELS } from "@/lib/constants"
@@ -52,7 +53,7 @@ export default async function ReservaDetailPage({
     supabase
       .from("reservations")
       .select(
-        "id, code, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, guests(full_name, email, phone), units(name, capacity), payments(amount, status, kind, method, paid_at, created_at)"
+        "id, code, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, method, paid_at, created_at)"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -66,7 +67,7 @@ export default async function ReservaDetailPage({
   if (!r) notFound()
 
   const guest = r.guests as
-    | { full_name: string; email: string | null; phone: string | null }
+    | { id: string; full_name: string; email: string | null; phone: string | null }
     | null
   const unit = r.units as { name: string; capacity: number } | null
   const payments = ((r.payments as Payment[] | null) ?? []).sort((a, b) =>
@@ -130,7 +131,9 @@ export default async function ReservaDetailPage({
           <div>
             <h2 className="label-mono mb-3 text-muted-foreground">Huésped</h2>
             <p className="font-heading text-lg font-semibold tracking-tight">
-              {guest?.full_name ?? "—"}
+              <GuestNameTrigger guestId={guest?.id ?? null}>
+                {guest?.full_name ?? "—"}
+              </GuestNameTrigger>
             </p>
             <div className="mt-2 space-y-1 text-sm text-muted-foreground">
               {guest?.email && <p>{guest.email}</p>}

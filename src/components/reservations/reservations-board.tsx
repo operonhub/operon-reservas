@@ -7,6 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatusBadge, SourceBadge } from "@/components/reservations/reservation-badges"
 import { StatusControl } from "@/components/reservations/status-control"
+import { GuestNameTrigger } from "@/components/reservations/guest-name-trigger"
 import { formatCurrency, formatDay, whatsappHref, initials } from "@/lib/format"
 import { ENTER, ENTER_UP, stagger } from "@/lib/motion"
 import {
@@ -24,6 +25,7 @@ export type ReservationRow = {
   checkOut: string
   nights: number
   guestsCount: number
+  guestId: string | null
   guestName: string
   guestEmail: string | null
   guestPhone: string | null
@@ -386,7 +388,9 @@ function DetailPanel({
         <div className="min-w-0">
           <p className="label-mono text-muted-foreground">{row.code}</p>
           <h2 className="mt-0.5 truncate font-heading text-lg font-semibold tracking-tight">
-            {row.guestName}
+            <GuestNameTrigger guestId={row.guestId} className="max-w-full truncate">
+              {row.guestName}
+            </GuestNameTrigger>
           </h2>
           <p className="text-xs text-muted-foreground">
             {row.unitName} · {row.nights}N · {row.guestsCount} personas

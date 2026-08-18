@@ -7,6 +7,30 @@ import type { Enums } from "@/lib/supabase/types"
 
 export type ActionResult = { ok: boolean; error?: string; id?: string }
 
+export type GuestProfileReservation = {
+  id: string
+  code: string
+  check_in: string
+  check_out: string
+  status: Enums<"reservation_status">
+  total_amount: number | null
+  currency: string
+  units: { name: string } | { name: string }[] | null
+}
+
+export type GuestProfileResult =
+  | {
+      ok: true
+      guest: {
+        full_name: string
+        email: string | null
+        phone: string | null
+        notes: string | null
+      }
+      reservations: GuestProfileReservation[]
+    }
+  | { ok: false; error: string }
+
 function mapBookingError(message: string): string {
   if (message.includes("UNAVAILABLE"))
     return "Esas fechas ya están ocupadas para esa unidad."
@@ -16,6 +40,42 @@ function mapBookingError(message: string): string {
     return "Las fechas ingresadas no son válidas."
   if (message.includes("UNIT_NOT_FOUND")) return "La unidad no existe."
   return message
+}
+
+export async function getGuestProfile(
+  guestId: string
+): Promise<GuestProfileResult> {
+  await requireContext()
+  const supabase = await createClient()
+
+  if (!guestId) {
+    return { ok: false, error: "No se pudo identificar al huésped." }
+  }
+
+  const [guestResult, reservationsResult] = await Promise.all([
+    supabase
+      .from("guests")
+      .select("full_name, email, phone, notes")
+      .eq("id", guestId)
+      .maybeSingle(),
+    supabase
+      .from("reservations")
+      .select(
+        "id, code, check_in, check_out, status, total_amount, currency, units(name)"
+      )
+      .eq("guest_id", guestId)
+      .order("check_in", { ascending: false }),
+  ])
+
+  if (guestResult.error || !guestResult.data || reservationsResult.error) {
+    return { ok: false, error: "No se pudo cargar la información del huésped." }
+  }
+
+  return {
+    ok: true,
+    guest: guestResult.data,
+    reservations: reservationsResult.data ?? [],
+  }
 }
 
 export async function createManualReservation(
