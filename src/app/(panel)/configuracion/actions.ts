@@ -3,8 +3,15 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { requireContext } from "@/lib/auth"
+import { isCurrencyCode } from "@/lib/currencies"
 
 export type ActionResult = { ok: boolean; error?: string }
+
+/** HH:MM (el input type=time puede venir vacío o manipulado). */
+function parseTime(raw: FormDataEntryValue | null, fallback: string): string {
+  const v = String(raw ?? "").trim()
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : fallback
+}
 
 export async function updateProperty(formData: FormData): Promise<ActionResult> {
   await requireContext()
@@ -33,9 +40,14 @@ export async function updateProperty(formData: FormData): Promise<ActionResult> 
       email: String(formData.get("email") ?? "").trim() || null,
       address: String(formData.get("address") ?? "").trim() || null,
       city: String(formData.get("city") ?? "").trim() || null,
-      currency: String(formData.get("currency") ?? "ARS").trim() || "ARS",
-      checkin_time: String(formData.get("checkin_time") ?? "14:00"),
-      checkout_time: String(formData.get("checkout_time") ?? "10:00"),
+      // El <select> sólo restringe en el navegador: un código inválido rompe
+      // Intl.NumberFormat y con él todos los importes de la app.
+      currency: (() => {
+        const c = String(formData.get("currency") ?? "").trim().toUpperCase()
+        return isCurrencyCode(c) ? c : "ARS"
+      })(),
+      checkin_time: parseTime(formData.get("checkin_time"), "14:00"),
+      checkout_time: parseTime(formData.get("checkout_time"), "10:00"),
       deposit_pct,
     })
     .eq("id", id)
