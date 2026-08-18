@@ -530,7 +530,10 @@ export type Database = {
         ]
       }
       units: {
+        // TODO: `amenities` y `photo_path` parchados a mano (0015) —
+        // reemplazar por la regeneración real (`supabase gen types`).
         Row: {
+          amenities: string[]
           capacity: number
           created_at: string
           description: string | null
@@ -538,11 +541,13 @@ export type Database = {
           is_active: boolean
           name: string
           organization_id: string
+          photo_path: string | null
           position: number
           property_id: string
           updated_at: string
         }
         Insert: {
+          amenities?: string[]
           capacity?: number
           created_at?: string
           description?: string | null
@@ -550,11 +555,13 @@ export type Database = {
           is_active?: boolean
           name: string
           organization_id: string
+          photo_path?: string | null
           position?: number
           property_id: string
           updated_at?: string
         }
         Update: {
+          amenities?: string[]
           capacity?: number
           created_at?: string
           description?: string | null
@@ -562,6 +569,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           organization_id?: string
+          photo_path?: string | null
           position?: number
           property_id?: string
           updated_at?: string
