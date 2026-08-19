@@ -1,4 +1,5 @@
 export const UNIT_PHOTOS_BUCKET = "unit-photos"
+export const HOME_BANNER_FILENAME = "home-banner.jpg"
 
 /**
  * URL pública de una foto de unidad a partir de su ruta en el bucket.
@@ -20,4 +21,26 @@ export function unitPhotoPath(
   ext = "jpg"
 ): string {
   return `${organizationId}/${unitId}/${Date.now()}.${ext}`
+}
+
+/**
+ * El banner usa el bucket público existente, pero en una carpeta estable por
+ * organización. Las policies del bucket validan el primer segmento (org id),
+ * así que un cliente nunca puede reemplazar el banner de otro.
+ */
+export function homeBannerFolder(organizationId: string): string {
+  return `${organizationId}/branding`
+}
+
+export function homeBannerPath(organizationId: string): string {
+  return `${homeBannerFolder(organizationId)}/${HOME_BANNER_FILENAME}`
+}
+
+export function homeBannerUrl(
+  organizationId: string,
+  version?: string | number | null
+): string | null {
+  const url = unitPhotoUrl(homeBannerPath(organizationId))
+  if (!url || !version) return url
+  return `${url}?v=${encodeURIComponent(String(version))}`
 }

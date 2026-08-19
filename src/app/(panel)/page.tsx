@@ -1,4 +1,5 @@
 import type { ElementType } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { requireContext } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
@@ -32,6 +33,12 @@ import {
   WalletCards,
 } from "lucide-react"
 import type { Enums } from "@/lib/supabase/types"
+import {
+  HOME_BANNER_FILENAME,
+  UNIT_PHOTOS_BUCKET,
+  homeBannerFolder,
+  homeBannerUrl,
+} from "@/lib/storage"
 
 const HORIZON = 14
 
@@ -104,6 +111,7 @@ export default async function InicioPage() {
     { data: upcomingArrivals },
     { data: occupancyToday },
     { data: paidThisMonth },
+    { data: bannerFiles },
   ] = await Promise.all([
     supabase
       .from("properties")
@@ -150,6 +158,12 @@ export default async function InicioPage() {
       .eq("status", "paid")
       .gte("paid_at", `${monthStart}T00:00:00`)
       .lt("paid_at", `${monthEnd}T00:00:00`),
+    supabase.storage
+      .from(UNIT_PHOTOS_BUCKET)
+      .list(homeBannerFolder(ctx.organizationId), {
+        limit: 10,
+        search: HOME_BANNER_FILENAME,
+      }),
   ])
 
   const units = activeUnits ?? []
@@ -157,6 +171,13 @@ export default async function InicioPage() {
   const currency = property?.currency ?? "ARS"
   const checkinTime = property?.checkin_time?.slice(0, 5) ?? "14:00"
   const checkoutTime = property?.checkout_time?.slice(0, 5) ?? "10:00"
+  const bannerFile = bannerFiles?.find(
+    (file) => file.name === HOME_BANNER_FILENAME
+  )
+  const bannerVersion = bannerFile?.updated_at ?? bannerFile?.created_at
+  const bannerUrl = bannerFile
+    ? homeBannerUrl(ctx.organizationId, bannerVersion)
+    : null
 
   const occupiedIds = new Set(
     (occupancyToday ?? [])
@@ -217,35 +238,74 @@ export default async function InicioPage() {
           <header
             className={cn(
               ENTER,
-              "relative min-h-[280px] overflow-hidden rounded-[1.75rem] bg-foreground px-5 pt-6 pb-20 text-background shadow-xl shadow-foreground/10 sm:px-8 sm:pt-8 sm:pb-24 lg:px-10"
+              "relative min-h-[280px] overflow-hidden rounded-[1.75rem] bg-foreground px-5 pt-6 pb-20 text-background shadow-xl shadow-foreground/10 sm:px-8 sm:pt-8 sm:pb-24 lg:px-10",
+              bannerUrl && "bg-[#14130f] text-white"
             )}
             style={stagger(0)}
           >
+            {bannerUrl ? (
+              <>
+                <Image
+                  src={bannerUrl}
+                  alt=""
+                  fill
+                  priority
+                  sizes="(max-width: 1280px) 100vw, 1280px"
+                  className="object-cover"
+                  unoptimized
+                />
+                <div
+                  aria-hidden
+                  className="absolute inset-0 bg-[linear-gradient(90deg,rgba(10,10,8,0.82)_0%,rgba(10,10,8,0.58)_52%,rgba(10,10,8,0.34)_100%)]"
+                />
+              </>
+            ) : (
+              <div
+                aria-hidden
+                className="absolute inset-0"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle at 82% 12%, color-mix(in oklch, var(--warning) 26%, transparent), transparent 34%)",
+                }}
+              />
+            )}
             <div
               aria-hidden
-              className="absolute inset-0"
-              style={{
-                backgroundImage:
-                  "radial-gradient(circle at 82% 12%, color-mix(in oklch, var(--warning) 26%, transparent), transparent 34%)",
-              }}
-            />
-            <div
-              aria-hidden
-              className="absolute -top-36 -right-24 size-96 rounded-full border border-background/10"
+              className={cn(
+                "absolute -top-36 -right-24 size-96 rounded-full border border-background/10",
+                bannerUrl && "border-white/15"
+              )}
             />
 
             <div className="relative z-10 max-w-2xl pr-0 md:pr-48">
-              <p className="label-mono text-background/65">
+              <p
+                className={cn(
+                  "label-mono text-background/65",
+                  bannerUrl && "text-white/70"
+                )}
+              >
                 OPERON RESERVAS · {ctx.organizationName}
               </p>
               <h1 className="mt-5 max-w-xl text-[clamp(2.25rem,5vw,4.5rem)] leading-[0.94] font-semibold tracking-[-0.055em] text-balance">
                 Buen día, {firstName(ctx.fullName)}.
               </h1>
               <div className="mt-5 flex flex-wrap items-end gap-x-5 gap-y-1">
-                <p className="text-base font-medium text-background/90 sm:text-lg">
+                <p
+                  className={cn(
+                    "text-base font-medium text-background/90 sm:text-lg",
+                    bannerUrl && "text-white/95"
+                  )}
+                >
                   Esto es lo importante de hoy.
                 </p>
-                <p className="label-mono text-background/55">{longDate(today)}</p>
+                <p
+                  className={cn(
+                    "label-mono text-background/55",
+                    bannerUrl && "text-white/60"
+                  )}
+                >
+                  {longDate(today)}
+                </p>
               </div>
 
               <div className="mt-7 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -254,7 +314,9 @@ export default async function InicioPage() {
                   href="/calendario"
                   className={cn(
                     buttonVariants({ variant: "outline" }),
-                    "border-background/25 bg-background/10 text-background hover:bg-background/20 hover:text-background dark:border-background/25 dark:bg-background/10 dark:hover:bg-background/20"
+                    "border-background/25 bg-background/10 text-background hover:bg-background/20 hover:text-background dark:border-background/25 dark:bg-background/10 dark:hover:bg-background/20",
+                    bannerUrl &&
+                      "border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white dark:border-white/30 dark:bg-white/10 dark:hover:bg-white/20"
                   )}
                 >
                   <CalendarDays /> Ver calendario
@@ -266,8 +328,14 @@ export default async function InicioPage() {
               aria-hidden
               className="pointer-events-none absolute top-1/2 -right-8 -translate-y-1/2 opacity-[0.12] md:right-10 md:opacity-100"
             >
-              <OperonMarkPapel className="h-64 w-44 drop-shadow-2xl dark:hidden" />
-              <OperonMarkTinta className="hidden h-64 w-44 drop-shadow-2xl dark:block" />
+              {bannerUrl ? (
+                <OperonMarkPapel className="h-64 w-44 drop-shadow-2xl" />
+              ) : (
+                <>
+                  <OperonMarkPapel className="h-64 w-44 drop-shadow-2xl dark:hidden" />
+                  <OperonMarkTinta className="hidden h-64 w-44 drop-shadow-2xl dark:block" />
+                </>
+              )}
             </div>
           </header>
 
@@ -352,9 +420,9 @@ function MetricCard({
         href &&
           "group-hover:-translate-y-0.5 group-hover:shadow-xl group-focus-visible:ring-3 group-focus-visible:ring-ring/50 motion-reduce:group-hover:translate-y-0",
         tone === "primary"
-          ? "bg-primary/[0.08] ring-primary/25"
+          ? "bg-card ring-primary/30"
           : tone === "warning"
-            ? "bg-warning/10 ring-warning/45"
+            ? "bg-card ring-warning/45"
             : "ring-foreground/10"
       )}
       style={stagger(delayIndex, 55)}

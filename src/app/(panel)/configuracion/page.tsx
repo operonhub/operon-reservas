@@ -2,6 +2,7 @@ import { Suspense } from "react"
 import { requireContext } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { ConfigForm } from "@/components/settings/config-form"
+import { HomeBannerField } from "@/components/settings/home-banner-field"
 import {
   MercadoPagoCard,
   type MpStatus,
@@ -9,22 +10,38 @@ import {
 import { OperonArc } from "@/components/brand/operon-arc"
 import { ENTER } from "@/lib/motion"
 import { isMercadoPagoConfigured } from "@/lib/mercadopago"
+import {
+  HOME_BANNER_FILENAME,
+  UNIT_PHOTOS_BUCKET,
+  homeBannerFolder,
+} from "@/lib/storage"
 
 export default async function ConfiguracionPage() {
   const ctx = await requireContext()
   const supabase = await createClient()
 
-  const { data: property } = await supabase
-    .from("properties")
-    .select(
-      "id, name, description, phone, whatsapp, email, address, city, currency, checkin_time, checkout_time, deposit_pct"
-    )
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-
-  const { data: mpRaw } = await supabase.rpc("mp_connection_status")
+  const [{ data: property }, { data: bannerFiles }, { data: mpRaw }] =
+    await Promise.all([
+      supabase
+        .from("properties")
+        .select(
+          "id, name, description, phone, whatsapp, email, address, city, currency, checkin_time, checkout_time, deposit_pct"
+        )
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+      supabase.storage
+        .from(UNIT_PHOTOS_BUCKET)
+        .list(homeBannerFolder(ctx.organizationId), {
+          limit: 10,
+          search: HOME_BANNER_FILENAME,
+        }),
+      supabase.rpc("mp_connection_status"),
+    ])
   const mpStatus = (mpRaw ?? { connected: false }) as MpStatus
+  const bannerFile = bannerFiles?.find(
+    (file) => file.name === HOME_BANNER_FILENAME
+  )
 
   return (
     <div className="relative p-6 pb-12">
@@ -41,7 +58,13 @@ export default async function ConfiguracionPage() {
 
       <div className="max-w-5xl space-y-8">
         {property ? (
-          <ConfigForm property={property} />
+          <>
+            <ConfigForm property={property} />
+            <HomeBannerField
+              organizationId={ctx.organizationId}
+              initialVersion={bannerFile?.updated_at ?? bannerFile?.created_at}
+            />
+          </>
         ) : (
           <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
             No hay una propiedad configurada.
