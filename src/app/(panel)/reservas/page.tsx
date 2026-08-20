@@ -111,13 +111,13 @@ export default async function ReservasPage({
   })
 
   return (
-    <div className="relative p-6 space-y-5">
+    <div className="relative p-4 space-y-5 sm:p-6">
       <OperonArc className="inset-0" size={560} thickness={70} corner="bottom-right" />
 
       <header className={`${ENTER} flex flex-wrap items-end justify-between gap-4`}>
         <div>
           <p className="label-mono text-primary">{ctx.organizationName}</p>
-          <h1 className="mt-1 text-[28px] leading-tight font-semibold">Reservas</h1>
+          <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-[28px]">Reservas</h1>
         </div>
         {(units ?? []).length > 0 && <NewReservationDialog units={units ?? []} />}
       </header>

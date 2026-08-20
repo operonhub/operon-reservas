@@ -95,13 +95,13 @@ export default async function UnidadesPage() {
   })
 
   return (
-    <div className="relative p-6 space-y-6">
+    <div className="relative p-4 space-y-6 sm:p-6">
       <OperonArc className="inset-0" size={560} thickness={70} corner="bottom-right" />
 
       <header className={`${ENTER} flex flex-wrap items-end justify-between gap-4`}>
         <div>
           <p className="label-mono text-primary">{ctx.organizationName}</p>
-          <h1 className="mt-1 text-[28px] leading-tight font-semibold">Unidades</h1>
+          <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-[28px]">Unidades</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {list.length} {list.length === 1 ? "unidad" : "unidades"} · cabañas, lofts
             y habitaciones reservables

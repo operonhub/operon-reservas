@@ -44,12 +44,12 @@ export default async function ConfiguracionPage() {
   )
 
   return (
-    <div className="relative p-6 pb-12">
+    <div className="relative p-4 pb-12 sm:p-6">
       <OperonArc className="inset-0" size={560} thickness={70} corner="bottom-right" />
 
       <header className={`${ENTER} mb-8 max-w-2xl`}>
         <p className="label-mono text-primary">{ctx.organizationName}</p>
-        <h1 className="mt-1 text-[28px] leading-tight font-semibold">Configuración</h1>
+        <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-[28px]">Configuración</h1>
         <p className="mt-2 text-sm text-pretty text-muted-foreground">
           Datos de la propiedad, canales de contacto y reglas de operación. Se
           aplican a todas las unidades del alojamiento.

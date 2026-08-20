@@ -69,7 +69,7 @@ export function NewReservationDialog({ units }: { units: Unit[] }) {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="check_in">Ingreso</Label>
               <Input id="check_in" name="check_in" type="date" required />
@@ -80,7 +80,7 @@ export function NewReservationDialog({ units }: { units: Unit[] }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="guests">Huéspedes</Label>
               <Input id="guests" name="guests" type="number" min={1} defaultValue={2} />
@@ -102,7 +102,7 @@ export function NewReservationDialog({ units }: { units: Unit[] }) {
                 <Label htmlFor="full_name">Nombre y apellido</Label>
                 <Input id="full_name" name="full_name" required placeholder="Juan Pérez" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="grid gap-1.5">
                   <Label htmlFor="email">Email</Label>
                   <Input id="email" name="email" type="email" placeholder="juan@mail.com" />

@@ -1,10 +1,22 @@
 import { requireContext } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { AvailabilityCalendar } from "@/components/availability/availability-calendar"
-import { todayISO, addDays, nightsBetween } from "@/lib/format"
+import {
+  todayISO,
+  nightsBetween,
+  startOfMonth,
+  addMonths,
+} from "@/lib/format"
 import type { Enums } from "@/lib/supabase/types"
 
-const WINDOW_DAYS = 30
+/**
+ * Se carga un rango largo de una sola vez (un año para atrás y otro para
+ * adelante) para que moverse por el calendario sea instantáneo: navegar de mes
+ * es scrollear, no volver a consultar. Para un alojamiento son pocos cientos
+ * de filas, y el fondo de la grilla no cuesta DOM (ver `rowBackground`).
+ */
+const MONTHS_BACK = 12
+const MONTHS_FORWARD = 13
 
 // daterange en texto: "[2026-09-10,2026-09-13)" -> { start, endExclusive }
 function parseRange(raw: string): { start: string; endExclusive: string } | null {
@@ -34,29 +46,13 @@ export type CalendarSegment = {
   nights: number
 }
 
-export type CalendarKpis = {
-  occupancyPct: number
-  pendingRevenue: number
-  checkinsToday: number
-  checkoutsToday: number
-  currency: string
-}
-
-const ISO = /^\d{4}-\d{2}-\d{2}$/
-
-export default async function CalendarioPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ desde?: string }>
-}) {
+export default async function CalendarioPage() {
   const ctx = await requireContext()
   const supabase = await createClient()
 
-  // Ventana navegable: ?desde=YYYY-MM-DD. Sin parámetro, arranca hoy.
-  const sp = await searchParams
-  const start = sp.desde && ISO.test(sp.desde) ? sp.desde : todayISO()
-  const end = addDays(start, WINDOW_DAYS)
   const today = todayISO()
+  const start = addMonths(startOfMonth(today), -MONTHS_BACK)
+  const end = addMonths(startOfMonth(today), MONTHS_FORWARD)
 
   const [{ data: units }, { data: occ }, { data: property }] = await Promise.all([
     supabase
@@ -151,43 +147,16 @@ export default async function CalendarioPage({
     })
     .filter((s): s is CalendarSegment => s !== null)
 
-  // ---- KPIs de la ventana visible ----
-  const activeUnits = (units ?? []).length
-  const reservedNights = segments
-    .filter((s) => s.kind === "reservation")
-    .reduce((sum, s) => {
-      // Solo las noches que caen DENTRO de la ventana visible.
-      const from = s.start > start ? s.start : start
-      const to = s.endExclusive < end ? s.endExclusive : end
-      return sum + Math.max(0, nightsBetween(from, to))
-    }, 0)
-
-  const kpis: CalendarKpis = {
-    occupancyPct:
-      activeUnits > 0
-        ? Math.round((reservedNights / (activeUnits * WINDOW_DAYS)) * 100)
-        : 0,
-    // Lo que falta cobrar de las estadías que ya están confirmadas.
-    pendingRevenue: segments
-      .filter((s) => s.status === "confirmed")
-      .reduce((sum, s) => sum + Math.max(0, Number(s.totalAmount ?? 0) - s.paidAmount), 0),
-    checkinsToday: segments.filter((s) => s.kind === "reservation" && s.start === today)
-      .length,
-    // Una salida hoy es la unidad que hay que preparar para el próximo.
-    checkoutsToday: segments.filter(
-      (s) => s.kind === "reservation" && s.endExclusive === today
-    ).length,
-    currency,
-  }
-
+  // Los KPIs se calculan en el cliente, por mes visible: dependen de hacia
+  // dónde scrolleó el usuario, no del rango que se trajo de la base.
   return (
     <AvailabilityCalendar
       organizationName={ctx.organizationName}
       units={units ?? []}
       segments={segments}
-      startDate={start}
-      days={WINDOW_DAYS}
-      kpis={kpis}
+      rangeStart={start}
+      rangeDays={nightsBetween(start, end)}
+      currency={currency}
     />
   )
 }

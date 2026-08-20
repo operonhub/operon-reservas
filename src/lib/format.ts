@@ -30,6 +30,24 @@ export function addDays(iso: string, n: number) {
   return d.toISOString().slice(0, 10)
 }
 
+/** Primer día del mes de una fecha ISO. */
+export function startOfMonth(iso: string) {
+  return `${iso.slice(0, 7)}-01`
+}
+
+/**
+ * Suma n meses al primer día del mes de una fecha ISO.
+ * Siempre devuelve un día 1, así que no hay que preocuparse por el
+ * desborde de meses cortos (31 de enero + 1 mes).
+ */
+export function addMonths(iso: string, n: number) {
+  const [y, m] = iso.split("-").map(Number)
+  const total = y * 12 + (m - 1) + n
+  const year = Math.floor(total / 12)
+  const month = total % 12
+  return `${year}-${String(month + 1).padStart(2, "0")}-01`
+}
+
 /** Cantidad de noches entre dos fechas ISO. */
 export function nightsBetween(checkIn: string, checkOut: string) {
   const a = new Date(checkIn + "T00:00:00").getTime()

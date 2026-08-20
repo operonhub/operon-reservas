@@ -82,7 +82,7 @@ export default async function ReservaDetailPage({
   const nights = nightsBetween(r.check_in, r.check_out)
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {/* Barra de acciones — no sale en el papel */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Link

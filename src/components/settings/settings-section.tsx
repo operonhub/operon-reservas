@@ -29,7 +29,11 @@ export function SettingsSection({
       className={cn(ENTER_UP, "grid gap-5 lg:grid-cols-[260px_1fr]", className)}
       style={stagger(index)}
     >
-      <div className="lg:pt-1">
+      {/* `min-w-0` en ambas columnas: sin esto el `min-width: auto` de los
+          grid items deja que el contenido más ancho (la preview del banner,
+          que por su aspect-ratio pide ~460px) estire la columna y el texto
+          termine cortado fuera de la pantalla. */}
+      <div className="min-w-0 lg:pt-1">
         <h2 className="flex items-center gap-2.5 font-heading text-base font-semibold tracking-tight">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Icon className="size-4" />
@@ -41,7 +45,7 @@ export function SettingsSection({
         </p>
       </div>
 
-      <div className="rounded-2xl border bg-card p-5">{children}</div>
+      <div className="min-w-0 rounded-2xl border bg-card p-4 sm:p-5">{children}</div>
     </section>
   )
 }

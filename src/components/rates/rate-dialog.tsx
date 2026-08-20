@@ -264,7 +264,7 @@ export function RateDialog({
           )}
 
           {shows("guests") && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="grid gap-1.5">
                 <Label htmlFor="min_guests" className="label-mono text-muted-foreground">
                   Desde (huéspedes)
@@ -295,7 +295,7 @@ export function RateDialog({
           )}
 
           {shows("dates") && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="grid gap-1.5">
                 <Label htmlFor="start_date" className="label-mono text-muted-foreground">
                   Desde {!isBase && "(opcional)"}

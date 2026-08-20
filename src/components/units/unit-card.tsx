@@ -135,7 +135,7 @@ export function UnitCard({
       </div>
 
       {/* ---------- Acciones ---------- */}
-      <div className="mt-auto flex items-center gap-1 border-t px-3 py-2.5">
+      <div className="mt-auto flex flex-wrap items-center gap-x-1 gap-y-1.5 border-t px-3 py-2.5">
         <UnitDialog
           mode="edit"
           unit={{

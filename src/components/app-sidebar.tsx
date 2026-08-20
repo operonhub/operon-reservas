@@ -35,12 +35,35 @@ export function AppSidebar({
   orgName: string
   role: string
 }) {
-  const pathname = usePathname()
-
+  // Debajo de `lg` el nav vive en el drawer (ver app-shell-mobile).
   // `print:hidden`: el comprobante de reserva se imprime solo, sin el chrome
   // de la aplicación alrededor.
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground print:hidden">
+    <aside className="hidden w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground lg:flex print:hidden">
+      <SidebarNav userName={userName} orgName={orgName} role={role} />
+    </aside>
+  )
+}
+
+/**
+ * Contenido del sidebar, compartido por el `<aside>` de escritorio y el
+ * drawer mobile. `onNavigate` deja cerrar el drawer al tocar un link.
+ */
+export function SidebarNav({
+  userName,
+  orgName,
+  role,
+  onNavigate,
+}: {
+  userName: string
+  orgName: string
+  role: string
+  onNavigate?: () => void
+}) {
+  const pathname = usePathname()
+
+  return (
+    <>
       <div className="flex h-14 items-center gap-2.5 border-b px-4">
         <OperonMark className="h-7 w-5 shrink-0" />
         <div className="flex min-w-0 flex-col leading-tight">
@@ -59,6 +82,7 @@ export function AppSidebar({
             <Link
               key={href}
               href={href}
+              onClick={onNavigate}
               className={cn(
                 "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                 active
@@ -98,6 +122,6 @@ export function AppSidebar({
           </Button>
         </form>
       </div>
-    </aside>
+    </>
   )
 }

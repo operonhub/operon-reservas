@@ -15,11 +15,19 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import {
   addDays,
+  addMonths,
+  startOfMonth,
   todayISO,
   nightsBetween,
   formatCurrency,
@@ -33,16 +41,19 @@ import { createBlock, deleteBlock } from "@/app/(panel)/calendario/actions"
 import {
   Ban, Plus, ChevronLeft, ChevronRight, CalendarDays, X, Users, Moon,
   LogIn, LogOut, Mail, MessageCircle, TrendingUp, Wallet, DoorOpen, Sparkles,
-  CircleCheck, Clock3, ExternalLink,
+  CircleCheck, Clock3, ExternalLink, Info,
 } from "lucide-react"
-import type { CalendarSegment, CalendarKpis } from "@/app/(panel)/calendario/page"
+import type { CalendarSegment } from "@/app/(panel)/calendario/page"
 
 type Unit = { id: string; name: string; capacity: number }
 
-/** Geometría del grid. Cambiar acá reescala todo el calendario. */
+/**
+ * Geometría del grid. Cambiar acá reescala todo el calendario.
+ * El ancho de la columna de unidades vive en la variable CSS `--unit-col`
+ * porque cambia por breakpoint.
+ */
 const CELL_W = 56
 const ROW_H = 88
-const UNIT_COL_W = 264
 
 const MONTHS = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -54,41 +65,150 @@ function isWeekend(iso: string) {
   return d === 0 || d === 6
 }
 
+function monthLabel(iso: string) {
+  const [y, m] = iso.split("-")
+  return `${MONTHS[Number(m) - 1]} ${y}`
+}
+
+/**
+ * Fondo de una fila (líneas de día + sombreado de fin de semana) dibujado con
+ * gradientes en vez de un div por día: con 14 meses cargados serían ~420
+ * elementos por unidad, y el scroll se vuelve pesado.
+ */
+function rowBackground(rangeStart: string) {
+  const firstDow = new Date(rangeStart + "T00:00:00").getDay()
+  const week = Array.from({ length: 7 }, (_, i) => {
+    const dow = (firstDow + i) % 7
+    const tint =
+      dow === 0 || dow === 6
+        ? "color-mix(in oklab, var(--muted) 55%, transparent)"
+        : "transparent"
+    return `${tint} ${i * CELL_W}px ${(i + 1) * CELL_W}px`
+  }).join(",")
+
+  return {
+    backgroundImage: [
+      `linear-gradient(90deg, color-mix(in oklab, var(--border) 55%, transparent) 0 1px, transparent 1px ${CELL_W}px)`,
+      `linear-gradient(90deg, ${week})`,
+    ].join(","),
+    backgroundSize: `${CELL_W}px 100%, ${CELL_W * 7}px 100%`,
+  }
+}
+
 export function AvailabilityCalendar({
   organizationName,
   units,
   segments,
-  startDate,
-  days,
-  kpis,
+  rangeStart,
+  rangeDays,
+  currency,
 }: {
   organizationName: string
   units: Unit[]
   segments: CalendarSegment[]
-  startDate: string
-  days: number
-  kpis: CalendarKpis
+  rangeStart: string
+  rangeDays: number
+  currency: string
 }) {
   const [selected, setSelected] = React.useState<CalendarSegment | null>(null)
   const today = todayISO()
+  const scrollRef = React.useRef<HTMLDivElement>(null)
 
   const dayList = React.useMemo(
-    () => Array.from({ length: days }, (_, i) => addDays(startDate, i)),
-    [startDate, days]
+    () => Array.from({ length: rangeDays }, (_, i) => addDays(rangeStart, i)),
+    [rangeStart, rangeDays]
   )
-  const endExclusive = addDays(startDate, days)
+  const endExclusive = addDays(rangeStart, rangeDays)
 
-  const monthSpans = React.useMemo(() => {
-    const out: { label: string; span: number }[] = []
-    for (const d of dayList) {
-      const [y, m] = d.split("-")
-      const label = `${MONTHS[Number(m) - 1]} ${y}`
+  /** Meses del rango, con el offset en px donde arranca cada uno. */
+  const months = React.useMemo(() => {
+    const out: { key: string; label: string; offset: number; span: number }[] = []
+    dayList.forEach((d, i) => {
+      const key = d.slice(0, 7)
       const last = out[out.length - 1]
-      if (last && last.label === label) last.span++
-      else out.push({ label, span: 1 })
-    }
+      if (last && last.key === key) last.span++
+      else out.push({ key, label: monthLabel(d), offset: i * CELL_W, span: 1 })
+    })
     return out
   }, [dayList])
+
+  // Mes en el que está parado el scroll. Es lo que titula la vista y lo que
+  // alimenta los KPIs, así que se actualiza mientras el usuario se mueve.
+  const [viewMonth, setViewMonth] = React.useState(() => startOfMonth(today))
+
+  const scrollToMonth = React.useCallback(
+    (key: string, behavior: ScrollBehavior = "smooth") => {
+      const target = months.find((m) => m.key === key)
+      const node = scrollRef.current
+      if (!target || !node) return
+      node.scrollTo({ left: target.offset, behavior })
+      setViewMonth(`${key}-01`)
+    },
+    [months]
+  )
+
+  // Al abrir, el calendario arranca en el mes actual, no en el borde del
+  // rango cargado (que empieza un mes antes).
+  React.useEffect(() => {
+    scrollToMonth(startOfMonth(today).slice(0, 7), "instant")
+    // Solo en el montaje: después manda el usuario.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function onScroll(event: React.UIEvent<HTMLDivElement>) {
+    const left = event.currentTarget.scrollLeft
+    // El mes visible es el último que ya arrancó a la izquierda del viewport.
+    let current = months[0]
+    for (const m of months) {
+      if (m.offset <= left + CELL_W * 2) current = m
+      else break
+    }
+    const iso = `${current.key}-01`
+    if (iso !== viewMonth) setViewMonth(iso)
+  }
+
+  const monthIndex = months.findIndex((m) => m.key === viewMonth.slice(0, 7))
+
+  /** Posición de la columna de hoy dentro del rango (null si queda afuera). */
+  const todayOffset =
+    today >= rangeStart && today < endExclusive
+      ? nightsBetween(rangeStart, today) * CELL_W
+      : null
+
+  /** KPIs del mes que se está mirando. */
+  const kpis = React.useMemo(() => {
+    const from = viewMonth
+    const to = addMonths(viewMonth, 1)
+    const monthDays = nightsBetween(from, to)
+
+    const reservedNights = segments
+      .filter((s) => s.kind === "reservation")
+      .reduce((sum, s) => {
+        const a = s.start > from ? s.start : from
+        const b = s.endExclusive < to ? s.endExclusive : to
+        return sum + Math.max(0, nightsBetween(a, b))
+      }, 0)
+
+    const inMonth = segments.filter((s) => s.start < to && s.endExclusive > from)
+
+    return {
+      occupancyPct:
+        units.length > 0
+          ? Math.round((reservedNights / (units.length * monthDays)) * 100)
+          : 0,
+      pendingRevenue: inMonth
+        .filter((s) => s.status === "confirmed")
+        .reduce(
+          (sum, s) => sum + Math.max(0, Number(s.totalAmount ?? 0) - s.paidAmount),
+          0
+        ),
+      checkins: inMonth.filter((s) => s.kind === "reservation" && s.start >= from)
+        .length,
+      checkouts: inMonth.filter(
+        (s) => s.kind === "reservation" && s.endExclusive < to
+      ).length,
+    }
+  }, [segments, units.length, viewMonth])
 
   /**
    * Posición de una barra dentro de la ventana. Se recorta a los bordes:
@@ -97,46 +217,57 @@ export function AvailabilityCalendar({
    */
   const geometry = React.useCallback(
     (seg: CalendarSegment) => {
-      const from = seg.start > startDate ? seg.start : startDate
+      const from = seg.start > rangeStart ? seg.start : rangeStart
       const to = seg.endExclusive < endExclusive ? seg.endExclusive : endExclusive
-      const offset = nightsBetween(startDate, from)
+      const offset = nightsBetween(rangeStart, from)
       const span = nightsBetween(from, to)
       return {
         left: offset * CELL_W,
         width: span * CELL_W,
-        openLeft: seg.start < startDate,
+        openLeft: seg.start < rangeStart,
         openRight: seg.endExclusive > endExclusive,
       }
     },
-    [startDate, endExclusive]
+    [rangeStart, endExclusive]
   )
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden">
+    // `lg:h-full`: en escritorio ocupa la pantalla y scrollea por dentro;
+    // en mobile fluye hacia abajo, que es como se lee un celular.
+    <div className="relative flex flex-col lg:h-full lg:overflow-hidden">
       {/* Firma de marca: cuarto de anillo en Sol, detrás de todo. */}
       <OperonArc className="inset-0" size={620} thickness={78} corner="bottom-right" />
 
       {/* ---------- Encabezado ---------- */}
-      <header className={cn(ENTER, "shrink-0 px-6 pt-6")}>
+      <header className={cn(ENTER, "shrink-0 px-4 pt-5 sm:px-6 sm:pt-6")}>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="label-mono text-primary">{organizationName}</p>
-            <h1 className="mt-1 text-[28px] leading-tight font-semibold">
+            <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-[28px]">
               Calendario de reservas
             </h1>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <Legend />
-            <WindowNav startDate={startDate} days={days} today={today} />
-            <BlockDialog units={units} startDate={startDate} />
+            <BlockDialog units={units} startDate={today} />
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <MonthNav
+            months={months}
+            index={monthIndex}
+            onGo={scrollToMonth}
+            onToday={() => scrollToMonth(today.slice(0, 7))}
+            isToday={viewMonth === startOfMonth(today)}
+          />
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Kpi
             icon={TrendingUp}
-            label={`Ocupación · ${days} días`}
+            label="Ocupación del mes"
             value={`${kpis.occupancyPct}%`}
             tone="primary"
             delay={1}
@@ -144,21 +275,21 @@ export function AvailabilityCalendar({
           <Kpi
             icon={Wallet}
             label="Por cobrar"
-            value={formatCurrency(kpis.pendingRevenue, kpis.currency)}
+            value={formatCurrency(kpis.pendingRevenue, currency)}
             tone="success"
             delay={2}
           />
           <Kpi
             icon={DoorOpen}
-            label="Llegadas hoy"
-            value={String(kpis.checkinsToday)}
+            label="Llegadas del mes"
+            value={String(kpis.checkins)}
             tone="primary"
             delay={3}
           />
           <Kpi
             icon={Sparkles}
-            label="Salidas hoy · limpieza"
-            value={String(kpis.checkoutsToday)}
+            label="Salidas · limpieza"
+            value={String(kpis.checkouts)}
             tone="warning"
             delay={4}
           />
@@ -166,42 +297,58 @@ export function AvailabilityCalendar({
       </header>
 
       {/* ---------- Grilla ---------- */}
-      <div className="relative min-h-0 flex-1 p-6 pt-5">
+      <div className="relative min-h-0 flex-1 p-4 pt-4 sm:p-6 sm:pt-5">
         {units.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
             No hay unidades activas. Cargalas en la sección Unidades.
           </div>
         ) : (
           <div
+            ref={scrollRef}
+            onScroll={onScroll}
             className={cn(
               ENTER_UP,
               // max-h y no h: con pocas unidades la tarjeta se ajusta al
               // contenido (y deja respirar el arco de marca); con muchas,
               // scrollea por dentro sin empujar la página.
-              "max-h-full overflow-auto rounded-2xl border bg-card shadow-sm"
+              "max-h-full overflow-auto overscroll-x-contain rounded-2xl border bg-card shadow-sm",
+              // La columna de unidades se angosta en mobile: con 264px fijos
+              // se comía 3/4 de la pantalla y no quedaban días a la vista.
+              "[--unit-col:9.5rem] lg:[--unit-col:16.5rem]"
             )}
           >
             <div
               className="relative"
-              style={{ width: UNIT_COL_W + days * CELL_W, minWidth: "100%" }}
+              style={{
+                width: `calc(var(--unit-col) + ${rangeDays * CELL_W}px)`,
+                minWidth: "100%",
+              }}
             >
               {/* Encabezado: meses + días */}
               <div className="sticky top-0 z-30 flex bg-card">
                 <div
-                  className="sticky left-0 z-40 flex shrink-0 items-end border-r border-b bg-card px-5 pb-2"
-                  style={{ width: UNIT_COL_W }}
+                  className="sticky left-0 z-40 flex shrink-0 items-end border-r border-b bg-card px-4 pb-2 lg:px-5"
+                  style={{ width: "var(--unit-col)" }}
                 >
                   <span className="label-mono text-muted-foreground">Unidades</span>
                 </div>
                 <div className="flex flex-col">
-                  <div className="flex border-b">
-                    {monthSpans.map((m) => (
+                  <div className="relative h-9 border-b">
+                    {months.map((m) => (
                       <div
-                        key={m.label}
-                        className="label-mono border-r px-3 py-2 text-foreground last:border-r-0"
-                        style={{ width: m.span * CELL_W }}
+                        key={m.key}
+                        className="absolute inset-y-0 border-r"
+                        style={{ left: m.offset, width: m.span * CELL_W }}
                       >
-                        {m.label}
+                        {/* El nombre del mes acompaña el scroll mientras ese
+                            mes esté en pantalla, frenando contra la columna de
+                            unidades, así siempre se sabe dónde se está parado. */}
+                        <span
+                          className="label-mono sticky inline-block px-3 py-2 text-foreground"
+                          style={{ left: "var(--unit-col)" }}
+                        >
+                          {m.label}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -257,8 +404,8 @@ export function AvailabilityCalendar({
                     style={{ ...stagger(rowIdx, 40), height: ROW_H }}
                   >
                     <div
-                      className="sticky left-0 z-20 flex shrink-0 items-center gap-3 border-r bg-card px-5"
-                      style={{ width: UNIT_COL_W }}
+                      className="sticky left-0 z-20 flex shrink-0 items-center gap-2.5 border-r bg-card px-4 lg:gap-3 lg:px-5"
+                      style={{ width: "var(--unit-col)" }}
                     >
                       <span className="h-11 w-1.5 shrink-0 rounded-full bg-primary/40" />
                       <div className="min-w-0">
@@ -272,21 +419,15 @@ export function AvailabilityCalendar({
                       </div>
                     </div>
 
-                    {/* Celdas de fondo + barras posicionadas */}
-                    <div className="relative flex-1">
-                      <div className="absolute inset-0 flex">
-                        {dayList.map((d) => (
-                          <div
-                            key={d}
-                            className={cn(
-                              "shrink-0 border-r border-border/50 last:border-r-0",
-                              isWeekend(d) && "bg-muted/30",
-                              d === today && "bg-primary/5"
-                            )}
-                            style={{ width: CELL_W }}
-                          />
-                        ))}
-                      </div>
+                    {/* Fondo por gradiente + barras posicionadas */}
+                    <div className="relative flex-1" style={rowBackground(rangeStart)}>
+                      {todayOffset !== null && (
+                        <span
+                          aria-hidden
+                          className="absolute inset-y-0 z-0 bg-primary/10"
+                          style={{ left: todayOffset, width: CELL_W }}
+                        />
+                      )}
 
                       {rowSegments.map((seg) => (
                         <OccupancyBar
@@ -417,7 +558,10 @@ function DetailPanel({ seg, onClose }: { seg: CalendarSegment; onClose: () => vo
   return (
     <aside
       className={cn(
-        "absolute top-5 right-6 bottom-6 z-40 flex w-[360px] flex-col overflow-hidden rounded-2xl border shadow-2xl",
+        // Mobile: drawer a pantalla completa (mismo patrón que reservas).
+        // Desde `lg` recupera el look de tarjeta flotante sobre la grilla.
+        "fixed inset-y-0 right-0 z-50 flex w-full max-w-[400px] flex-col overflow-hidden border-l shadow-2xl",
+        "lg:absolute lg:inset-y-auto lg:top-5 lg:right-6 lg:bottom-6 lg:z-40 lg:w-[360px] lg:rounded-2xl lg:border",
         "bg-card/85 backdrop-blur-xl",
         "animate-in fade-in slide-in-from-right-4 duration-300 motion-reduce:animate-none"
       )}
@@ -616,53 +760,115 @@ function Kpi({
   )
 }
 
+const LEGEND = [
+  { label: "Disponible", cls: "bg-muted-foreground/40" },
+  { label: "Reservado", cls: "bg-primary" },
+  { label: "Bloqueado", cls: "bg-warning" },
+]
+
+/**
+ * En pantallas anchas la referencia va siempre a la vista; en mobile se
+ * guarda detrás de un botón para no comerse una fila entera del encabezado.
+ */
 function Legend() {
   return (
-    <div className="flex items-center gap-3 rounded-full border bg-card px-3.5 py-2">
-      {[
-        { label: "Disponible", cls: "bg-muted-foreground/40" },
-        { label: "Reservado", cls: "bg-primary" },
-        { label: "Bloqueado", cls: "bg-warning" },
-      ].map((l) => (
-        <span key={l.label} className="label-mono flex items-center gap-1.5 text-muted-foreground">
-          <span className={cn("size-2.5 rounded-full", l.cls)} />
-          {l.label}
-        </span>
-      ))}
-    </div>
+    <>
+      <div className="hidden items-center gap-3 rounded-full border bg-card px-3.5 py-2 sm:flex">
+        {LEGEND.map((l) => (
+          <span
+            key={l.label}
+            className="label-mono flex items-center gap-1.5 text-muted-foreground"
+          >
+            <span className={cn("size-2.5 rounded-full", l.cls)} />
+            {l.label}
+          </span>
+        ))}
+      </div>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={<Button variant="outline" size="sm" className="sm:hidden" />}
+        >
+          <Info /> Referencias
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {LEGEND.map((l) => (
+            <DropdownMenuItem key={l.label} className="pointer-events-none">
+              <span className={cn("size-2.5 shrink-0 rounded-full", l.cls)} />
+              {l.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   )
 }
 
-function WindowNav({
-  startDate,
-  days,
-  today,
+/**
+ * Navegación entre meses. Todo el rango ya está en memoria, así que moverse
+ * es scrollear el contenedor: no hay ida al servidor ni recarga.
+ */
+function MonthNav({
+  months,
+  index,
+  onGo,
+  onToday,
+  isToday,
 }: {
-  startDate: string
-  days: number
-  today: string
+  months: { key: string; label: string }[]
+  index: number
+  onGo: (key: string) => void
+  onToday: () => void
+  isToday: boolean
 }) {
-  const prev = addDays(startDate, -days)
-  const next = addDays(startDate, days)
-  const icon = buttonVariants({ variant: "ghost", size: "icon-sm" })
-
   return (
     <div className="flex items-center gap-1 rounded-xl border bg-card p-1">
-      <Link href={`/calendario?desde=${prev}`} className={icon} aria-label="Período anterior">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Mes anterior"
+        disabled={index <= 0}
+        onClick={() => onGo(months[index - 1].key)}
+      >
         <ChevronLeft />
-      </Link>
-      <Link
-        href="/calendario"
-        className={buttonVariants({
-          variant: startDate === today ? "secondary" : "ghost",
-          size: "sm",
-        })}
+      </Button>
+
+      {/* El <select> nativo es lo más rápido para saltar a un mes lejano, y
+          en mobile abre el selector del sistema. */}
+      <div className="relative">
+        <select
+          aria-label="Ir a un mes"
+          value={months[index]?.key ?? ""}
+          onChange={(e) => onGo(e.target.value)}
+          className="w-[10.5rem] cursor-pointer appearance-none rounded-lg bg-transparent px-3 py-1.5 text-center text-sm font-medium capitalize outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {months.map((m) => (
+            <option key={m.key} value={m.key} className="capitalize">
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Mes siguiente"
+        disabled={index < 0 || index >= months.length - 1}
+        onClick={() => onGo(months[index + 1].key)}
+      >
+        <ChevronRight />
+      </Button>
+
+      <span className="mx-0.5 h-5 w-px bg-border" />
+
+      <Button
+        variant={isToday ? "secondary" : "ghost"}
+        size="sm"
+        onClick={onToday}
       >
         <CalendarDays /> Hoy
-      </Link>
-      <Link href={`/calendario?desde=${next}`} className={icon} aria-label="Período siguiente">
-        <ChevronRight />
-      </Link>
+      </Button>
     </div>
   )
 }
