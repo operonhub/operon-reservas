@@ -12,6 +12,10 @@ function parseCapacity(raw: FormDataEntryValue | null): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1
 }
 
+function parseIcalUrl(raw: FormDataEntryValue | null): string | null {
+  return String(raw ?? "").trim() || null
+}
+
 /** Sólo claves del catálogo: lo que llega del form no se guarda a ciegas. */
 function parseAmenities(raw: FormDataEntryValue | null): string[] {
   return sanitizeAmenities(String(raw ?? "").split(",").map((s) => s.trim()))
@@ -65,6 +69,8 @@ export async function createUnit(formData: FormData): Promise<ActionResult> {
     capacity,
     photo_path: parsePhotoPath(formData.get("photo_path"), ctx.organizationId),
     amenities: parseAmenities(formData.get("amenities")),
+    airbnb_ical_url: parseIcalUrl(formData.get("airbnb_ical_url")),
+    booking_ical_url: parseIcalUrl(formData.get("booking_ical_url")),
   })
   if (error) return { ok: false, error: error.message }
 
@@ -95,6 +101,8 @@ export async function updateUnit(formData: FormData): Promise<ActionResult> {
       is_active,
       photo_path: parsePhotoPath(formData.get("photo_path"), ctx.organizationId),
       amenities: parseAmenities(formData.get("amenities")),
+      airbnb_ical_url: parseIcalUrl(formData.get("airbnb_ical_url")),
+      booking_ical_url: parseIcalUrl(formData.get("booking_ical_url")),
     })
     .eq("id", id)
   if (error) return { ok: false, error: error.message }

@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { UnitPhotoField } from "@/components/units/unit-photo-field"
 import { AmenitiesField } from "@/components/units/amenities-field"
+import { IcalSyncFields } from "@/components/units/ical-sync-fields"
 import { createUnit, updateUnit } from "@/app/(panel)/unidades/actions"
 
 type Unit = {
@@ -29,6 +30,8 @@ type Unit = {
   is_active: boolean
   photo_path?: string | null
   amenities?: string[] | null
+  airbnb_ical_url?: string | null
+  booking_ical_url?: string | null
 }
 
 type Property = { id: string; name: string }
@@ -176,6 +179,14 @@ export function UnitDialog({
           </div>
 
           <AmenitiesField initial={unit?.amenities ?? []} />
+
+          {mode === "edit" && (
+            <IcalSyncFields
+              unitId={unit!.id}
+              airbnbUrl={unit!.airbnb_ical_url ?? null}
+              bookingUrl={unit!.booking_ical_url ?? null}
+            />
+          )}
 
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>

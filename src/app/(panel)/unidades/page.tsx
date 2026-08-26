@@ -28,7 +28,7 @@ export default async function UnidadesPage() {
     supabase
       .from("units")
       .select(
-        "id, name, description, capacity, is_active, photo_path, amenities, properties(name)"
+        "id, name, description, capacity, is_active, photo_path, amenities, airbnb_ical_url, booking_ical_url, properties(name)"
       )
       .order("position", { ascending: true }),
     // Ocupación del horizonte: alimenta el estado de "ahora", la próxima
@@ -80,6 +80,8 @@ export default async function UnidadesPage() {
       isActive: u.is_active,
       photoPath: u.photo_path,
       amenities: sanitizeAmenities((u.amenities as string[] | null) ?? []),
+      airbnbIcalUrl: u.airbnb_ical_url,
+      bookingIcalUrl: u.booking_ical_url,
       propertyName: Array.isArray(prop) ? prop[0]?.name : prop?.name,
       current: current
         ? {

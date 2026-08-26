@@ -2,3 +2,6 @@ project_id = "guoxthaxwdsgwcsnvefq"
 
 [functions.notify-reservations]
 verify_jwt = false
+
+[functions.sync-external-calendars]
+verify_jwt = false

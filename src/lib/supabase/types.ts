@@ -590,6 +590,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           during: unknown
+          external_source: string | null
+          external_uid: string | null
           id: string
           kind: Database["public"]["Enums"]["occupancy_kind"]
           organization_id: string
@@ -601,6 +603,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           during: unknown
+          external_source?: string | null
+          external_uid?: string | null
           id?: string
           kind: Database["public"]["Enums"]["occupancy_kind"]
           organization_id: string
@@ -612,6 +616,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           during?: unknown
+          external_source?: string | null
+          external_uid?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["occupancy_kind"]
           organization_id?: string
@@ -646,7 +652,9 @@ export type Database = {
         // TODO: `amenities` y `photo_path` parchados a mano (0015) —
         // reemplazar por la regeneración real (`supabase gen types`).
         Row: {
+          airbnb_ical_url: string | null
           amenities: string[]
+          booking_ical_url: string | null
           capacity: number
           created_at: string
           description: string | null
@@ -660,7 +668,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          airbnb_ical_url?: string | null
           amenities?: string[]
+          booking_ical_url?: string | null
           capacity?: number
           created_at?: string
           description?: string | null
@@ -674,7 +684,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          airbnb_ical_url?: string | null
           amenities?: string[]
+          booking_ical_url?: string | null
           capacity?: number
           created_at?: string
           description?: string | null

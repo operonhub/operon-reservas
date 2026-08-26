@@ -19,6 +19,8 @@ export type UnitCardData = {
   isActive: boolean
   photoPath: string | null
   amenities: AmenityKey[]
+  airbnbIcalUrl: string | null
+  bookingIcalUrl: string | null
   propertyName?: string
   current: { kind: string; until: string; label: string | null } | null
   nextArrival: string | null
@@ -146,6 +148,8 @@ export function UnitCard({
             is_active: unit.isActive,
             photo_path: unit.photoPath,
             amenities: unit.amenities,
+            airbnb_ical_url: unit.airbnbIcalUrl,
+            booking_ical_url: unit.bookingIcalUrl,
           }}
           properties={properties}
           organizationId={organizationId}
