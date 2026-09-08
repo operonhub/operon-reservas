@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { cookies } from "next/headers"
+import { DEMO_CONTEXT } from "@/lib/demo/fixtures"
 
 /**
  * Contexto activo del usuario del panel.
@@ -21,6 +23,9 @@ export type ActiveContext = {
  * (Etapa 1: se toma la primera membership. El switcher multi-org es futuro.)
  */
 export async function requireContext(): Promise<ActiveContext> {
+  if ((await cookies()).get("operon_demo")?.value === "1") {
+    return DEMO_CONTEXT
+  }
   const supabase = await createClient()
   const {
     data: { user },

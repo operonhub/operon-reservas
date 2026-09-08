@@ -9,6 +9,7 @@ export const HOME_BANNER_FILENAME = "home-banner.jpg"
  */
 export function unitPhotoUrl(path: string | null | undefined): string | null {
   if (!path) return null
+  if (/^https?:\/\//i.test(path)) return path
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL
   if (!base) return null
   return `${base}/storage/v1/object/public/${UNIT_PHOTOS_BUCKET}/${path}`

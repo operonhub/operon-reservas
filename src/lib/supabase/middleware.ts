@@ -35,17 +35,22 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
+  const isDemo = request.cookies.get("operon_demo")?.value === "1"
   // Rutas sin sesión: login, API pública y la web pública de reservas de cada cabaña.
+  // `/demo` es un recorrido comercial aislado: no consulta ni muta Supabase.
   // Cobros MP: checkout (huésped anónimo / landing externa), webhook (servidores
   // de MP) y la página de retorno del pago. connect/callback SÍ requieren sesión.
   const isPublic =
     pathname.startsWith("/login") ||
+    pathname.startsWith("/demo") ||
     pathname.startsWith("/api/public") ||
     pathname.startsWith("/reservar") ||
     pathname.startsWith("/api/mp/checkout") ||
     pathname.startsWith("/api/mp/webhook") ||
     pathname.startsWith("/pago") ||
     pathname.startsWith("/ical")
+
+  if (isDemo) return supabaseResponse
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone()

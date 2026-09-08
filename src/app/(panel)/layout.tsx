@@ -1,6 +1,7 @@
 import { requireContext } from "@/lib/auth"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AppShellMobile } from "@/components/app-shell-mobile"
+import { cookies } from "next/headers"
 
 export default async function PanelLayout({
   children,
@@ -8,6 +9,7 @@ export default async function PanelLayout({
   children: React.ReactNode
 }) {
   const ctx = await requireContext()
+  const isDemo = (await cookies()).get("operon_demo")?.value === "1"
 
   return (
     // Alto fijo con scroll en el <main>: así una vista puede ocupar la
@@ -32,6 +34,7 @@ export default async function PanelLayout({
             traen los flex items impediría achicarse -> <main> crecería con el
             contenido y el `overflow-y-auto` nunca scrollearía. */}
         <main className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-muted/20">
+          {isDemo && <div className="sticky top-0 z-20 bg-primary px-4 py-2 text-center text-xs font-medium text-primary-foreground">DEMO INTERACTIVA · Datos ficticios · Sin reservas, pagos ni confirmaciones reales</div>}
           {children}
         </main>
       </div>

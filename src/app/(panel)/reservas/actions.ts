@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { requireContext } from "@/lib/auth"
 import type { Enums } from "@/lib/supabase/types"
+import { cookies } from "next/headers"
+import { demoCreateManualReservation, demoTransitionReservation } from "@/lib/demo/fixtures"
 
 export type ActionResult = { ok: boolean; error?: string; id?: string }
 
@@ -101,6 +103,15 @@ export async function createManualReservation(
   if (check_out <= check_in)
     return { ok: false, error: "La salida debe ser posterior al ingreso." }
 
+  if ((await cookies()).get("operon_demo")?.value === "1") {
+    const created = demoCreateManualReservation({ unitId: unit_id, fullName: full_name, email, phone, checkIn: check_in, checkOut: check_out, guests, status, notes })
+    if (!created) return { ok: false, error: "Unidad inválida." }
+    revalidatePath("/reservas")
+    revalidatePath("/calendario")
+    revalidatePath("/")
+    return { ok: true, id: created.id }
+  }
+
   // La unidad determina property y org (no confiamos en el cliente).
   const { data: unit } = await supabase
     .from("units")
@@ -141,6 +152,14 @@ export async function transitionReservation(
   id: string,
   to: Enums<"reservation_status">
 ): Promise<ActionResult> {
+  if ((await cookies()).get("operon_demo")?.value === "1") {
+    if (!demoTransitionReservation(id, to)) return { ok: false, error: "No se encontró la reserva ficticia." }
+    revalidatePath("/reservas")
+    revalidatePath(`/reservas/${id}`)
+    revalidatePath("/calendario")
+    revalidatePath("/")
+    return { ok: true }
+  }
   await requireContext()
   const supabase = await createClient()
 

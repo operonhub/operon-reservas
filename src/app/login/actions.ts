@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { cookies } from "next/headers"
 
 export async function login(_prevState: unknown, formData: FormData) {
   const email = String(formData.get("email") ?? "").trim()
@@ -22,6 +23,11 @@ export async function login(_prevState: unknown, formData: FormData) {
 }
 
 export async function logout() {
+  const cookieStore = await cookies()
+  if (cookieStore.get("operon_demo")?.value === "1") {
+    cookieStore.delete("operon_demo")
+    redirect("/demo")
+  }
   const supabase = await createClient()
   await supabase.auth.signOut()
   redirect("/login")

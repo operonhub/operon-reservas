@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { requireContext } from "@/lib/auth"
 import { sanitizeAmenities } from "@/lib/amenities"
+import { cookies } from "next/headers"
+import { demoUpdateUnit } from "@/lib/demo/fixtures"
 
 export type ActionResult = { ok: boolean; error?: string }
 
@@ -91,6 +93,14 @@ export async function updateUnit(formData: FormData): Promise<ActionResult> {
   if (!id) return { ok: false, error: "Falta el identificador." }
   if (!name) return { ok: false, error: "El nombre es obligatorio." }
 
+  if ((await cookies()).get("operon_demo")?.value === "1") {
+    const ok = demoUpdateUnit(id, { name, description, capacity, is_active, amenities: parseAmenities(formData.get("amenities")) })
+    if (!ok) return { ok: false, error: "Unidad ficticia no encontrada." }
+    revalidatePath("/unidades")
+    revalidatePath("/calendario")
+    return { ok: true }
+  }
+
   // RLS acota el update a la org del usuario.
   const { error } = await supabase
     .from("units")
@@ -116,6 +126,12 @@ export async function toggleUnitActive(
   id: string,
   isActive: boolean
 ): Promise<ActionResult> {
+  if ((await cookies()).get("operon_demo")?.value === "1") {
+    if (!demoUpdateUnit(id, { is_active: isActive })) return { ok: false, error: "Unidad ficticia no encontrada." }
+    revalidatePath("/unidades")
+    revalidatePath("/calendario")
+    return { ok: true }
+  }
   await requireContext()
   const supabase = await createClient()
 

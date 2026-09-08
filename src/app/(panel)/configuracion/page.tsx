@@ -15,9 +15,11 @@ import {
   UNIT_PHOTOS_BUCKET,
   homeBannerFolder,
 } from "@/lib/storage"
+import { cookies } from "next/headers"
 
 export default async function ConfiguracionPage() {
   const ctx = await requireContext()
+  const isDemo = (await cookies()).get("operon_demo")?.value === "1"
   const supabase = await createClient()
 
   const [{ data: property }, { data: bannerFiles }, { data: mpRaw }] =
@@ -60,10 +62,11 @@ export default async function ConfiguracionPage() {
         {property ? (
           <>
             <ConfigForm property={property} />
-            <HomeBannerField
+            {!isDemo && <HomeBannerField
               organizationId={ctx.organizationId}
               initialVersion={bannerFile?.updated_at ?? bannerFile?.created_at}
-            />
+            />}
+            {isDemo && <div className="rounded-2xl border border-dashed p-5 text-sm text-muted-foreground">Portada e integraciones desactivadas en la demo. Los datos de la propiedad son ficticios.</div>}
           </>
         ) : (
           <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
@@ -73,14 +76,14 @@ export default async function ConfiguracionPage() {
 
         {/* Separado del formulario a propósito: la integración se conecta y
             desconecta sola, no se guarda con el botón de arriba. */}
-        <div className={`${ENTER} flex items-center gap-3 pt-4`}>
+        {!isDemo && <div className={`${ENTER} flex items-center gap-3 pt-4`}>
           <span className="label-mono text-muted-foreground">Integraciones</span>
           <span className="h-px flex-1 bg-border" />
-        </div>
+        </div>}
 
-        <Suspense>
+        {!isDemo && <Suspense>
           <MercadoPagoCard status={mpStatus} configured={isMercadoPagoConfigured()} />
-        </Suspense>
+        </Suspense>}
       </div>
     </div>
   )
