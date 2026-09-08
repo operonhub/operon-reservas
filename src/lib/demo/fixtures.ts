@@ -16,7 +16,26 @@ const units = [
   { id: "unit-3", property_id: "property-1", name: "Casa del Arroyo", capacity: 6, is_active: true, position: 3, description: "Espacio amplio para familias, junto al arroyo.", photo_path: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1400&q=85", amenities: ["Pileta", "Lavadero", "Cochera"], airbnb_ical_url: null, booking_ical_url: null, properties: { name: "Refugio Alto Cielo" } },
 ]
 
-const reservations = [
+type DemoReservation = {
+  id: string
+  code: string
+  check_in: string
+  check_out: string
+  guests_count: number
+  status: string
+  source: string
+  total_amount: number
+  deposit_amount: number
+  currency: string
+  notes: string | null
+  created_at: string
+  updated_at: string
+  guests: { id: string; full_name: string; email: string | null; phone: string | null }
+  units: { name: string; capacity: number }
+  payments: { amount: number; status: string; kind: string; paid_at: string | null }[]
+}
+
+const reservations: DemoReservation[] = [
   { id: "res-1", code: "AC-4821", check_in: "2026-09-12", check_out: "2026-09-16", guests_count: 3, status: "pending_payment", source: "direct", total_amount: 592000, deposit_amount: 296000, currency: "ARS", notes: "Llega cerca de las 18 h.", created_at: now, updated_at: now, guests: { id: "guest-1", full_name: "Martina Roldán", email: "martina@ejemplo.com", phone: "+5493515550101" }, units: { name: "Cabaña del Bosque", capacity: 4 }, payments: [{ amount: 296000, status: "paid", kind: "deposit", paid_at: now }] },
   { id: "res-2", code: "AC-4820", check_in: "2026-09-10", check_out: "2026-09-13", guests_count: 2, status: "confirmed", source: "whatsapp", total_amount: 336000, deposit_amount: 168000, currency: "ARS", notes: null, created_at: now, updated_at: now, guests: { id: "guest-2", full_name: "Tomás Ledesma", email: "tomas@ejemplo.com", phone: "+5493515550102" }, units: { name: "Suite Mirador", capacity: 2 }, payments: [{ amount: 336000, status: "paid", kind: "balance", paid_at: now }] },
   { id: "res-3", code: "AC-4818", check_in: "2026-09-14", check_out: "2026-09-18", guests_count: 5, status: "pending", source: "booking", total_amount: 780000, deposit_amount: 390000, currency: "ARS", notes: null, created_at: now, updated_at: now, guests: { id: "guest-3", full_name: "Paula Méndez", email: "paula@ejemplo.com", phone: "+5493515550103" }, units: { name: "Casa del Arroyo", capacity: 6 }, payments: [] },
@@ -82,7 +101,7 @@ export function demoCreateManualReservation(input: { unitId: string; fullName: s
   if (!unit) return null
   const id = `demo-${Date.now()}`
   const guest = { id: `guest-${Date.now()}`, full_name: input.fullName, email: input.email, phone: input.phone }
-  const reservation = { id, code: `AC-${4830 + reservations.length}`, check_in: input.checkIn, check_out: input.checkOut, guests_count: input.guests, status: input.status, source: "manual", total_amount: 420000, deposit_amount: 210000, currency: "ARS", notes: input.notes, created_at: now, updated_at: now, guests: guest, units: { name: unit.name, capacity: unit.capacity }, payments: [] as { amount: number; status: string; kind: string; paid_at: string | null }[] }
+  const reservation: DemoReservation = { id, code: `AC-${4830 + reservations.length}`, check_in: input.checkIn, check_out: input.checkOut, guests_count: input.guests, status: input.status, source: "manual", total_amount: 420000, deposit_amount: 210000, currency: "ARS", notes: input.notes, created_at: now, updated_at: now, guests: guest, units: { name: unit.name, capacity: unit.capacity }, payments: [] }
   reservations.unshift(reservation)
   occupancy.push({ id: `occ-${Date.now()}`, unit_id: unit.id, during: `[${input.checkIn},${input.checkOut})`, kind: "reservation", block_reason: null, reservations: reservation })
   return { id }
