@@ -4,7 +4,7 @@ import { RateDialog } from "@/components/rates/rate-dialog"
 import { UnitRatesCard, RuleLine } from "@/components/rates/unit-rates-card"
 import { PriceSimulator } from "@/components/rates/price-simulator"
 import { OperonArc } from "@/components/brand/operon-arc"
-import { ENTER, ENTER_UP, stagger } from "@/lib/motion"
+import { ENTER_VIEW } from "@/lib/motion"
 import type { RateRow } from "@/lib/rate-rules"
 import { Plus, Globe } from "lucide-react"
 
@@ -41,7 +41,7 @@ export default async function TarifasPage() {
     <div className="relative p-4 space-y-6 sm:p-6">
       <OperonArc className="inset-0" size={560} thickness={70} corner="bottom-right" />
 
-      <header className={`${ENTER} flex flex-wrap items-end justify-between gap-4`}>
+      <header className={`${ENTER_VIEW} flex flex-wrap items-end justify-between gap-4`}>
         <div>
           <p className="label-mono text-primary">{ctx.organizationName}</p>
           <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-[28px]">Tarifas</h1>
@@ -68,7 +68,7 @@ export default async function TarifasPage() {
       ) : (
         <>
           <div className="grid gap-5 xl:grid-cols-2">
-            {unitList.map((u, i) => (
+            {unitList.map((u) => (
               <UnitRatesCard
                 key={u.id}
                 unit={u}
@@ -78,13 +78,12 @@ export default async function TarifasPage() {
                 units={unitList}
                 propertyId={property?.id ?? ""}
                 currency={currency}
-                index={i}
               />
             ))}
           </div>
 
           {globalRules.length > 0 && (
-            <section className={ENTER_UP} style={stagger(unitList.length)}>
+            <section className={ENTER_VIEW}>
               <h2 className="mb-3 flex items-center gap-2 font-heading text-base font-semibold tracking-tight">
                 <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Globe className="size-4" />
@@ -107,7 +106,7 @@ export default async function TarifasPage() {
           )}
 
           {property && (
-            <div className={ENTER_UP} style={stagger(unitList.length + 1)}>
+            <div className={ENTER_VIEW}>
               <PriceSimulator units={unitList} />
             </div>
           )}

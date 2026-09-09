@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { UnitDialog } from "@/components/units/unit-dialog"
 import { UnitCard, type UnitCardData } from "@/components/units/unit-card"
 import { OperonArc } from "@/components/brand/operon-arc"
-import { ENTER } from "@/lib/motion"
+import { ENTER_VIEW } from "@/lib/motion"
 import { todayISO, addDays, nightsBetween } from "@/lib/format"
 import { sanitizeAmenities } from "@/lib/amenities"
 import { Plus } from "lucide-react"
@@ -100,7 +100,7 @@ export default async function UnidadesPage() {
     <div className="relative p-4 space-y-6 sm:p-6">
       <OperonArc className="inset-0" size={560} thickness={70} corner="bottom-right" />
 
-      <header className={`${ENTER} flex flex-wrap items-end justify-between gap-4`}>
+      <header className={`${ENTER_VIEW} flex flex-wrap items-end justify-between gap-4`}>
         <div>
           <p className="label-mono text-primary">{ctx.organizationName}</p>
           <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-[28px]">Unidades</h1>
@@ -126,13 +126,12 @@ export default async function UnidadesPage() {
         </div>
       ) : (
         <div className="relative grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {list.map((u, i) => (
+          {list.map((u) => (
             <UnitCard
               key={u.id}
               unit={u}
               properties={props}
               organizationId={ctx.organizationId}
-              index={i}
             />
           ))}
         </div>

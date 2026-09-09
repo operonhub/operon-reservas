@@ -68,7 +68,6 @@ export function MercadoPagoCard({
       icon={CreditCard}
       title="Cobros con Mercado Pago"
       description="Conectá tu cuenta para cobrar la seña online. El dinero entra directo a vos: Operon no retiene ni intermedia."
-      index={4}
     >
       {status.connected ? (
         <div className="space-y-4 text-sm">

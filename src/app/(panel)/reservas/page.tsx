@@ -4,7 +4,7 @@ import { NewReservationDialog } from "@/components/reservations/new-reservation-
 import { FilterBar } from "@/components/reservations/filter-bar"
 import { ReservationsBoard, type ReservationRow } from "@/components/reservations/reservations-board"
 import { OperonArc } from "@/components/brand/operon-arc"
-import { ENTER } from "@/lib/motion"
+import { ENTER_VIEW } from "@/lib/motion"
 import { todayISO, nightsBetween } from "@/lib/format"
 import type { Enums } from "@/lib/supabase/types"
 
@@ -114,7 +114,7 @@ export default async function ReservasPage({
     <div className="relative p-4 space-y-5 sm:p-6">
       <OperonArc className="inset-0" size={560} thickness={70} corner="bottom-right" />
 
-      <header className={`${ENTER} flex flex-wrap items-end justify-between gap-4`}>
+      <header className={`${ENTER_VIEW} flex flex-wrap items-end justify-between gap-4`}>
         <div>
           <p className="label-mono text-primary">{ctx.organizationName}</p>
           <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-[28px]">Reservas</h1>
@@ -122,7 +122,7 @@ export default async function ReservasPage({
         {(units ?? []).length > 0 && <NewReservationDialog units={units ?? []} />}
       </header>
 
-      <div className={ENTER}>
+      <div className={ENTER_VIEW}>
         <FilterBar active={f} />
       </div>
 

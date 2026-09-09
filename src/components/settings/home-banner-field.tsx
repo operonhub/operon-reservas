@@ -119,7 +119,6 @@ export function HomeBannerField({
       icon={ImagePlus}
       title="Portada de inicio"
       description="Personalizá la bienvenida del panel con una foto del alojamiento. Si no cargás una, se mantiene la portada editorial de Operon."
-      index={4}
     >
       <div className="space-y-3">
         <div className="relative aspect-[16/5] min-h-36 overflow-hidden rounded-xl border bg-muted">

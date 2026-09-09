@@ -8,7 +8,7 @@ import {
   type MpStatus,
 } from "@/components/settings/mercadopago-card"
 import { OperonArc } from "@/components/brand/operon-arc"
-import { ENTER } from "@/lib/motion"
+import { ENTER_VIEW } from "@/lib/motion"
 import { isMercadoPagoConfigured } from "@/lib/mercadopago"
 import {
   HOME_BANNER_FILENAME,
@@ -49,7 +49,7 @@ export default async function ConfiguracionPage() {
     <div className="relative p-4 pb-12 sm:p-6">
       <OperonArc className="inset-0" size={560} thickness={70} corner="bottom-right" />
 
-      <header className={`${ENTER} mb-8 max-w-2xl`}>
+      <header className={`${ENTER_VIEW} mb-8 max-w-2xl`}>
         <p className="label-mono text-primary">{ctx.organizationName}</p>
         <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-[28px]">Configuración</h1>
         <p className="mt-2 text-sm text-pretty text-muted-foreground">
@@ -76,7 +76,7 @@ export default async function ConfiguracionPage() {
 
         {/* Separado del formulario a propósito: la integración se conecta y
             desconecta sola, no se guarda con el botón de arriba. */}
-        {!isDemo && <div className={`${ENTER} flex items-center gap-3 pt-4`}>
+        {!isDemo && <div className={`${ENTER_VIEW} flex items-center gap-3 pt-4`}>
           <span className="label-mono text-muted-foreground">Integraciones</span>
           <span className="h-px flex-1 bg-border" />
         </div>}

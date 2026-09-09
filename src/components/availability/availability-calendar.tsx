@@ -35,7 +35,7 @@ import {
   initials,
 } from "@/lib/format"
 import { RESERVATION_STATUS_LABELS } from "@/lib/constants"
-import { ENTER, ENTER_UP, stagger } from "@/lib/motion"
+import { ENTER_VIEW } from "@/lib/motion"
 import { OperonArc } from "@/components/brand/operon-arc"
 import { createBlock, deleteBlock } from "@/app/(panel)/calendario/actions"
 import {
@@ -239,7 +239,7 @@ export function AvailabilityCalendar({
       <OperonArc className="inset-0" size={620} thickness={78} corner="bottom-right" />
 
       {/* ---------- Encabezado ---------- */}
-      <header className={cn(ENTER, "shrink-0 px-4 pt-5 sm:px-6 sm:pt-6")}>
+      <header className={cn(ENTER_VIEW, "shrink-0 px-4 pt-5 sm:px-6 sm:pt-6")}>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="label-mono text-primary">{organizationName}</p>
@@ -270,28 +270,24 @@ export function AvailabilityCalendar({
             label="Ocupación del mes"
             value={`${kpis.occupancyPct}%`}
             tone="primary"
-            delay={1}
           />
           <Kpi
             icon={Wallet}
             label="Por cobrar"
             value={formatCurrency(kpis.pendingRevenue, currency)}
             tone="success"
-            delay={2}
           />
           <Kpi
             icon={DoorOpen}
             label="Llegadas del mes"
             value={String(kpis.checkins)}
             tone="primary"
-            delay={3}
           />
           <Kpi
             icon={Sparkles}
             label="Salidas · limpieza"
             value={String(kpis.checkouts)}
             tone="warning"
-            delay={4}
           />
         </div>
       </header>
@@ -307,7 +303,7 @@ export function AvailabilityCalendar({
             ref={scrollRef}
             onScroll={onScroll}
             className={cn(
-              ENTER_UP,
+              ENTER_VIEW,
               // max-h y no h: con pocas unidades la tarjeta se ajusta al
               // contenido (y deja respirar el arco de marca); con muchas,
               // scrollea por dentro sin empujar la página.
@@ -395,13 +391,13 @@ export function AvailabilityCalendar({
               </div>
 
               {/* Filas por unidad */}
-              {units.map((u, rowIdx) => {
+              {units.map((u) => {
                 const rowSegments = segments.filter((s) => s.unitId === u.id)
                 return (
                   <div
                     key={u.id}
-                    className={cn(ENTER, "flex border-b last:border-b-0")}
-                    style={{ ...stagger(rowIdx, 40), height: ROW_H }}
+                    className={cn(ENTER_VIEW, "flex border-b last:border-b-0")}
+                    style={{ height: ROW_H }}
                   >
                     <div
                       className="sticky left-0 z-20 flex shrink-0 items-center gap-2.5 border-r bg-card px-4 lg:gap-3 lg:px-5"
@@ -728,13 +724,11 @@ function Kpi({
   label,
   value,
   tone,
-  delay,
 }: {
   icon: React.ElementType
   label: string
   value: string
   tone: "primary" | "success" | "warning"
-  delay: number
 }) {
   const toneClass = {
     primary: "bg-primary/10 text-primary",
@@ -744,8 +738,7 @@ function Kpi({
 
   return (
     <div
-      className={cn(ENTER_UP, "flex items-center gap-3 rounded-xl border bg-card p-3.5")}
-      style={stagger(delay)}
+      className={cn(ENTER_VIEW, "flex items-center gap-3 rounded-xl border bg-card p-3.5")}
     >
       <span
         className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg", toneClass)}

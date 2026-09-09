@@ -3,7 +3,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { unitPhotoUrl } from "@/lib/storage"
 import { AMENITIES, type AmenityKey } from "@/lib/amenities"
-import { ENTER_UP, stagger } from "@/lib/motion"
+import { ENTER_VIEW } from "@/lib/motion"
 import { formatDay } from "@/lib/format"
 import { UnitDialog } from "@/components/units/unit-dialog"
 import { UnitActiveToggle } from "@/components/units/unit-active-toggle"
@@ -35,12 +35,10 @@ export function UnitCard({
   unit,
   properties,
   organizationId,
-  index,
 }: {
   unit: UnitCardData
   properties: { id: string; name: string }[]
   organizationId: string
-  index: number
 }) {
   const photo = unitPhotoUrl(unit.photoPath)
   const shown = unit.amenities.slice(0, VISIBLE_AMENITIES)
@@ -49,12 +47,11 @@ export function UnitCard({
   return (
     <article
       className={cn(
-        ENTER_UP,
+        ENTER_VIEW,
         "group flex flex-col overflow-hidden rounded-2xl border bg-card transition-all",
         "hover:border-primary/40 hover:shadow-lg",
         !unit.isActive && "opacity-75"
       )}
-      style={stagger(index, 70)}
     >
       {/* ---------- Foto + overlay ---------- */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
