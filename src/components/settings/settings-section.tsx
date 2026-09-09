@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { ENTER_UP, stagger } from "@/lib/motion"
+import { ENTER_VIEW } from "@/lib/motion"
 
 /**
  * Sección de configuración en dos columnas: a la izquierda qué es y para qué
@@ -14,20 +14,17 @@ export function SettingsSection({
   title,
   description,
   children,
-  index = 0,
   className,
 }: {
   icon: React.ElementType
   title: string
   description: string
   children: React.ReactNode
-  index?: number
   className?: string
 }) {
   return (
     <section
-      className={cn(ENTER_UP, "grid gap-5 lg:grid-cols-[260px_1fr]", className)}
-      style={stagger(index)}
+      className={cn(ENTER_VIEW, "grid gap-5 lg:grid-cols-[260px_1fr]", className)}
     >
       {/* `min-w-0` en ambas columnas: sin esto el `min-width: auto` de los
           grid items deja que el contenido más ancho (la preview del banner,

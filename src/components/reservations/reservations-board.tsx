@@ -9,7 +9,7 @@ import { StatusBadge, SourceBadge } from "@/components/reservations/reservation-
 import { StatusControl } from "@/components/reservations/status-control"
 import { GuestNameTrigger } from "@/components/reservations/guest-name-trigger"
 import { formatCurrency, formatDay, whatsappHref, initials } from "@/lib/format"
-import { ENTER, ENTER_UP, stagger } from "@/lib/motion"
+import { ENTER_VIEW } from "@/lib/motion"
 import {
   Search, X, Users, Moon, Hash, Wallet, Globe, ExternalLink, Mail,
   MessageCircle, CircleCheck, Clock3, LogIn, LogOut, FilePlus2, CircleX,
@@ -78,7 +78,7 @@ export function ReservationsBoard({
 
   return (
     <div className="relative">
-      <div className={cn(ENTER, "mb-4 flex flex-wrap items-center justify-between gap-3")}>
+      <div className={cn(ENTER_VIEW, "mb-4 flex flex-wrap items-center justify-between gap-3")}>
         <div className="relative w-full max-w-xs">
           <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -126,11 +126,10 @@ export function ReservationsBoard({
         </div>
       ) : (
         <div className="space-y-2.5">
-          {filtered.map((r, i) => (
+          {filtered.map((r) => (
             <ReservationStrip
               key={r.id}
               row={r}
-              index={i}
               active={selectedId === r.id}
               onSelect={() => setSelectedId(r.id)}
             />
@@ -149,12 +148,10 @@ export function ReservationsBoard({
 
 function ReservationStrip({
   row,
-  index,
   active,
   onSelect,
 }: {
   row: ReservationRow
-  index: number
   active: boolean
   onSelect: () => void
 }) {
@@ -167,9 +164,8 @@ function ReservationStrip({
     <button
       type="button"
       onClick={onSelect}
-      style={stagger(index, 40)}
       className={cn(
-        ENTER_UP,
+        ENTER_VIEW,
         "w-full overflow-hidden rounded-xl border-2 bg-card text-left transition-all",
         // Hover marcado: la ficha se levanta, tiñe el fondo y el borde toma
         // el color de acento. Sin esto no se leía como clickeable.

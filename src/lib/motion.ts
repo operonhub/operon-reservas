@@ -8,6 +8,24 @@
  * `prefers-reduced-motion` sin que haya que acordarse en cada uso.
  */
 
+/**
+ * Entrada de las vistas de trabajo diario (Reservas, Calendario, Unidades,
+ * Tarifas, Configuración). Fade corto y sin escalonado.
+ *
+ * Por qué es distinta de ENTER/ENTER_UP: estas pantallas se abren decenas de
+ * veces por día, y ahí la animación deja de presentar el contenido y pasa a
+ * demorarlo. Con 500 ms más `stagger`, el último elemento de una lista
+ * terminaba de entrar a los ~830 ms del click — la app "se sentía lenta"
+ * incluso cuando los datos ya habían llegado.
+ *
+ * 150 ms alcanza para suavizar el reemplazo del esqueleto de `loading.tsx`
+ * por el contenido real, que es todo lo que la animación tiene que hacer acá.
+ * El efecto completo queda en Inicio, que se abre una vez por sesión y es
+ * donde sí impresiona.
+ */
+export const ENTER_VIEW =
+  "animate-in fade-in duration-150 motion-reduce:animate-none"
+
 /** Aparición simple (opacidad). Para contenido que ya está en su lugar. */
 export const ENTER = "animate-in fade-in duration-500 motion-reduce:animate-none"
 

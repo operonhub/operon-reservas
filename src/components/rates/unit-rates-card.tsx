@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/format"
-import { ENTER_UP, stagger } from "@/lib/motion"
+import { ENTER_VIEW } from "@/lib/motion"
 import { RateDialog } from "@/components/rates/rate-dialog"
 import { RateDeleteButton } from "@/components/rates/rate-delete-button"
 import { RateActiveToggle } from "@/components/rates/rate-active-toggle"
@@ -19,7 +19,6 @@ export function UnitRatesCard({
   units,
   propertyId,
   currency,
-  index,
 }: {
   unit: Unit
   base: RateRow | null
@@ -28,14 +27,12 @@ export function UnitRatesCard({
   units: Unit[]
   propertyId: string
   currency: string
-  index: number
 }) {
   const active = rules.filter((r) => r.is_active)
 
   return (
     <article
-      className={cn(ENTER_UP, "flex flex-col overflow-hidden rounded-2xl border bg-card")}
-      style={stagger(index, 60)}
+      className={cn(ENTER_VIEW, "flex flex-col overflow-hidden rounded-2xl border bg-card")}
     >
       <header className="flex items-start justify-between gap-3 border-b px-5 py-4">
         <div className="min-w-0">

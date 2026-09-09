@@ -77,7 +77,6 @@ export function ConfigForm({ property }: { property: Property }) {
         icon={Building2}
         title="Datos del alojamiento"
         description="Información general de la propiedad. El nombre y los horarios aparecen en el comprobante que recibe el huésped."
-        index={1}
       >
         <div className="space-y-4">
           <Field htmlFor="name" label="Nombre del establecimiento">
@@ -120,7 +119,6 @@ export function ConfigForm({ property }: { property: Property }) {
         icon={Phone}
         title="Contacto"
         description="Canales oficiales para reservas y consultas. El WhatsApp es el que ve el huésped al confirmar su pago."
-        index={2}
       >
         <div className="space-y-4">
           <Pair>
@@ -166,7 +164,6 @@ export function ConfigForm({ property }: { property: Property }) {
         icon={SlidersHorizontal}
         title="Operación"
         description="Horarios de entrada y salida, moneda y política de anticipo. Cambiar la seña afecta a las reservas nuevas, no a las ya generadas."
-        index={3}
       >
         <div className="space-y-4">
           <Pair>

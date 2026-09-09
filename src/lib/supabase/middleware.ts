@@ -30,9 +30,13 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // `getClaims()` y no `getUser()`: el proyecto firma con claves asimétricas
+  // (ES256), así que la firma se verifica localmente con WebCrypto en vez de
+  // pegarle al servidor de Auth. Ahorra ~230 ms en CADA request del panel,
+  // incluidos los RSC de cada click en la sidebar. Sigue refrescando la sesión
+  // cuando el token está por vencer, que es el otro trabajo del middleware.
+  const { data: claims } = await supabase.auth.getClaims()
+  const user = claims?.claims ?? null
 
   const { pathname } = request.nextUrl
   const isDemo = request.cookies.get("operon_demo")?.value === "1"
