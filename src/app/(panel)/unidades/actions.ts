@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { requireContext } from "@/lib/auth"
 import { canManageSettings, SETTINGS_READ_ONLY_MESSAGE } from "@/lib/roles"
 import { sanitizeAmenities } from "@/lib/amenities"
+import { ICAL_URL_ERROR_MESSAGES, normalizeIcalUrl } from "@/lib/ical-url"
 import { cookies } from "next/headers"
 import { demoUpdateUnit } from "@/lib/demo/fixtures"
 
@@ -15,8 +16,31 @@ function parseCapacity(raw: FormDataEntryValue | null): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1
 }
 
-function parseIcalUrl(raw: FormDataEntryValue | null): string | null {
-  return String(raw ?? "").trim() || null
+type IcalUrls =
+  | { ok: true; airbnb_ical_url: string | null; booking_ical_url: string | null }
+  | { ok: false; error: string }
+
+/**
+ * Los links de calendario se validan antes de guardarse: el worker los
+ * descarga cada hora y antes aceptaba cualquier cosa, incluso direcciones
+ * internas (auditoría B-03). webcal:// se guarda ya convertido a https://.
+ */
+function parseIcalUrls(formData: FormData): IcalUrls {
+  const out = { airbnb_ical_url: null as string | null, booking_ical_url: null as string | null }
+  const fields = [
+    ["airbnb_ical_url", "Airbnb"],
+    ["booking_ical_url", "Booking"],
+  ] as const
+  for (const [field, platform] of fields) {
+    const raw = String(formData.get(field) ?? "").trim()
+    if (!raw) continue
+    const result = normalizeIcalUrl(raw)
+    if (!result.ok) {
+      return { ok: false, error: `El calendario de ${platform} ${ICAL_URL_ERROR_MESSAGES[result.reason]}` }
+    }
+    out[field] = result.url
+  }
+  return { ok: true, ...out }
 }
 
 /** Sólo claves del catálogo: lo que llega del form no se guarda a ciegas. */
@@ -65,6 +89,9 @@ export async function createUnit(formData: FormData): Promise<ActionResult> {
   if (!property_id || !(await assertProperty(supabase, property_id)))
     return { ok: false, error: "Propiedad inválida." }
 
+  const icalUrls = parseIcalUrls(formData)
+  if (!icalUrls.ok) return { ok: false, error: icalUrls.error }
+
   const { error } = await supabase.from("units").insert({
     organization_id: ctx.organizationId, // derivado del membership, no del cliente
     property_id,
@@ -73,8 +100,8 @@ export async function createUnit(formData: FormData): Promise<ActionResult> {
     capacity,
     photo_path: parsePhotoPath(formData.get("photo_path"), ctx.organizationId),
     amenities: parseAmenities(formData.get("amenities")),
-    airbnb_ical_url: parseIcalUrl(formData.get("airbnb_ical_url")),
-    booking_ical_url: parseIcalUrl(formData.get("booking_ical_url")),
+    airbnb_ical_url: icalUrls.airbnb_ical_url,
+    booking_ical_url: icalUrls.booking_ical_url,
   })
   if (error) return { ok: false, error: error.message }
 
@@ -96,6 +123,9 @@ export async function updateUnit(formData: FormData): Promise<ActionResult> {
   if (!id) return { ok: false, error: "Falta el identificador." }
   if (!name) return { ok: false, error: "El nombre es obligatorio." }
 
+  const icalUrls = parseIcalUrls(formData)
+  if (!icalUrls.ok) return { ok: false, error: icalUrls.error }
+
   if ((await cookies()).get("operon_demo")?.value === "1") {
     const ok = demoUpdateUnit(id, { name, description, capacity, is_active, amenities: parseAmenities(formData.get("amenities")) })
     if (!ok) return { ok: false, error: "Unidad ficticia no encontrada." }
@@ -114,8 +144,8 @@ export async function updateUnit(formData: FormData): Promise<ActionResult> {
       is_active,
       photo_path: parsePhotoPath(formData.get("photo_path"), ctx.organizationId),
       amenities: parseAmenities(formData.get("amenities")),
-      airbnb_ical_url: parseIcalUrl(formData.get("airbnb_ical_url")),
-      booking_ical_url: parseIcalUrl(formData.get("booking_ical_url")),
+      airbnb_ical_url: icalUrls.airbnb_ical_url,
+      booking_ical_url: icalUrls.booking_ical_url,
     })
     .eq("id", id)
   if (error) return { ok: false, error: error.message }

@@ -65,3 +65,24 @@ test("owner y admin pasan la guarda y llegan a la base", async () => {
     }
   }
 })
+
+test("B-03: un link de calendario interno se rechaza antes de tocar la base", async () => {
+  state.role = "owner"
+  state.dbCalls = []
+  const res = await unidades.updateUnit(
+    form({ id: "u1", name: "Cabaña", capacity: "2", airbnb_ical_url: "https://169.254.169.254/x" })
+  )
+  assert.equal(res.ok, false)
+  assert.match(res.error, /Airbnb/)
+  assert.deepEqual(state.dbCalls, [])
+})
+
+test("B-03: webcal:// se guarda ya convertido a https://", async () => {
+  state.role = "owner"
+  state.lastWrite = null
+  await unidades.updateUnit(
+    form({ id: "u1", name: "Cabaña", capacity: "2", airbnb_ical_url: "webcal://www.airbnb.com/calendar/ical/9.ics" })
+  )
+  assert.equal(state.lastWrite.values.airbnb_ical_url, "https://www.airbnb.com/calendar/ical/9.ics")
+  assert.equal(state.lastWrite.values.booking_ical_url, null)
+})

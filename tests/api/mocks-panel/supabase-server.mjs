@@ -2,7 +2,11 @@ import { state } from "./state.mjs"
 function chain(label) {
   const b = {}
   for (const m of ["select", "insert", "update", "delete", "eq", "in", "order", "limit"]) {
-    b[m] = (...args) => { state.dbCalls.push(`${label}.${m}`); return b }
+    b[m] = (...args) => {
+      state.dbCalls.push(`${label}.${m}`)
+      if (m === "insert" || m === "update") state.lastWrite = { table: label, op: m, values: args[0] }
+      return b
+    }
   }
   b.maybeSingle = async () => ({ data: { id: "x" }, error: null })
   b.then = (ok) => Promise.resolve({ data: null, error: null }).then(ok)
