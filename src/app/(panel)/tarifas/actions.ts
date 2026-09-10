@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { requireContext } from "@/lib/auth"
+import { canManageSettings, SETTINGS_READ_ONLY_MESSAGE } from "@/lib/roles"
 import { RULE_PRESETS, type RulePreset } from "@/lib/rate-rules"
 
 export type ActionResult = { ok: boolean; error?: string }
@@ -122,6 +123,7 @@ function toRow(v: ReturnType<typeof parseForm>) {
 
 export async function createRate(formData: FormData): Promise<ActionResult> {
   const ctx = await requireContext()
+  if (!canManageSettings(ctx.role)) return { ok: false, error: SETTINGS_READ_ONLY_MESSAGE }
   const supabase = await createClient()
 
   const property_id = String(formData.get("property_id") ?? "")
@@ -143,7 +145,8 @@ export async function createRate(formData: FormData): Promise<ActionResult> {
 }
 
 export async function updateRate(formData: FormData): Promise<ActionResult> {
-  await requireContext()
+  const ctx = await requireContext()
+  if (!canManageSettings(ctx.role)) return { ok: false, error: SETTINGS_READ_ONLY_MESSAGE }
   const supabase = await createClient()
 
   const id = String(formData.get("id") ?? "")
@@ -165,7 +168,8 @@ export async function toggleRateActive(
   id: string,
   isActive: boolean
 ): Promise<ActionResult> {
-  await requireContext()
+  const ctx = await requireContext()
+  if (!canManageSettings(ctx.role)) return { ok: false, error: SETTINGS_READ_ONLY_MESSAGE }
   const supabase = await createClient()
   const { error } = await supabase
     .from("rates")
@@ -177,7 +181,8 @@ export async function toggleRateActive(
 }
 
 export async function deleteRate(id: string): Promise<ActionResult> {
-  await requireContext()
+  const ctx = await requireContext()
+  if (!canManageSettings(ctx.role)) return { ok: false, error: SETTINGS_READ_ONLY_MESSAGE }
   const supabase = await createClient()
   const { error } = await supabase.from("rates").delete().eq("id", id)
   if (error) return { ok: false, error: error.message }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { requireContext } from "@/lib/auth"
+import { canManageSettings, SETTINGS_READ_ONLY_MESSAGE } from "@/lib/roles"
 import { sanitizeAmenities } from "@/lib/amenities"
 import { cookies } from "next/headers"
 import { demoUpdateUnit } from "@/lib/demo/fixtures"
@@ -52,6 +53,7 @@ async function assertProperty(
 
 export async function createUnit(formData: FormData): Promise<ActionResult> {
   const ctx = await requireContext()
+  if (!canManageSettings(ctx.role)) return { ok: false, error: SETTINGS_READ_ONLY_MESSAGE }
   const supabase = await createClient()
 
   const property_id = String(formData.get("property_id") ?? "")
@@ -82,6 +84,7 @@ export async function createUnit(formData: FormData): Promise<ActionResult> {
 
 export async function updateUnit(formData: FormData): Promise<ActionResult> {
   const ctx = await requireContext()
+  if (!canManageSettings(ctx.role)) return { ok: false, error: SETTINGS_READ_ONLY_MESSAGE }
   const supabase = await createClient()
 
   const id = String(formData.get("id") ?? "")
@@ -132,7 +135,8 @@ export async function toggleUnitActive(
     revalidatePath("/calendario")
     return { ok: true }
   }
-  await requireContext()
+  const ctx = await requireContext()
+  if (!canManageSettings(ctx.role)) return { ok: false, error: SETTINGS_READ_ONLY_MESSAGE }
   const supabase = await createClient()
 
   const { error } = await supabase

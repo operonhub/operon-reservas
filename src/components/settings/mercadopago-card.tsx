@@ -33,9 +33,12 @@ const FEEDBACK: Record<string, { ok: boolean; msg: string }> = {
 export function MercadoPagoCard({
   status,
   configured,
+  readOnly = false,
 }: {
   status: MpStatus
   configured: boolean
+  /** Staff ve el estado pero no conecta ni desconecta la cuenta (0025). */
+  readOnly?: boolean
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -102,9 +105,11 @@ export function MercadoPagoCard({
             )}
           </dl>
 
-          <Button variant="outline" onClick={handleDisconnect} disabled={pending}>
-            <Unplug /> {pending ? "Desconectando…" : "Desconectar"}
-          </Button>
+          {!readOnly && (
+            <Button variant="outline" onClick={handleDisconnect} disabled={pending}>
+              <Unplug /> {pending ? "Desconectando…" : "Desconectar"}
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-4 text-sm">
@@ -112,7 +117,7 @@ export function MercadoPagoCard({
             Sin la cuenta conectada, las reservas se generan igual pero el
             huésped no puede pagar la seña online.
           </p>
-          {configured ? (
+          {readOnly ? null : configured ? (
             <a href="/api/mp/connect" className={buttonVariants()}>
               <Link2 /> Conectar Mercado Pago
             </a>

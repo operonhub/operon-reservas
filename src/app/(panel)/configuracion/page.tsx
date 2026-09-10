@@ -1,5 +1,7 @@
 import { Suspense } from "react"
 import { requireContext } from "@/lib/auth"
+import { canManageSettings } from "@/lib/roles"
+import { ReadOnlyNotice } from "@/components/panel/read-only-notice"
 import { createClient } from "@/lib/supabase/server"
 import { ConfigForm } from "@/components/settings/config-form"
 import { HomeBannerField } from "@/components/settings/home-banner-field"
@@ -19,6 +21,7 @@ import { cookies } from "next/headers"
 
 export default async function ConfiguracionPage() {
   const ctx = await requireContext()
+  const canEdit = canManageSettings(ctx.role)
   const isDemo = (await cookies()).get("operon_demo")?.value === "1"
   const supabase = await createClient()
 
@@ -59,10 +62,11 @@ export default async function ConfiguracionPage() {
       </header>
 
       <div className="max-w-5xl space-y-8">
+        {!canEdit && <ReadOnlyNotice />}
         {property ? (
           <>
-            <ConfigForm property={property} />
-            {!isDemo && <HomeBannerField
+            <ConfigForm property={property} readOnly={!canEdit} />
+            {!isDemo && canEdit && <HomeBannerField
               organizationId={ctx.organizationId}
               initialVersion={bannerFile?.updated_at ?? bannerFile?.created_at}
             />}
@@ -82,7 +86,7 @@ export default async function ConfiguracionPage() {
         </div>}
 
         {!isDemo && <Suspense>
-          <MercadoPagoCard status={mpStatus} configured={isMercadoPagoConfigured()} />
+          <MercadoPagoCard status={mpStatus} configured={isMercadoPagoConfigured()} readOnly={!canEdit} />
         </Suspense>}
       </div>
     </div>
