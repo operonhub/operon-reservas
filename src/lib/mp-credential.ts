@@ -14,9 +14,12 @@ export async function getValidCredential(
   admin: Admin,
   organizationId: string
 ): Promise<MpCredential | null> {
-  const { data } = await admin.rpc("mp_service_get_credential", {
+  const { data, error } = await admin.rpc("mp_service_get_credential", {
     p_organization_id: organizationId,
   })
+  // Un error de base no es "la org no conectó MP": quien llama tiene que
+  // poder distinguirlo (el webhook reintenta en vez de descartar el pago).
+  if (error) throw error
   const cred = data as MpCredential | null
   if (!cred) return null
 

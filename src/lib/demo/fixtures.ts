@@ -104,7 +104,24 @@ export function demoCreateManualReservation(input: { unitId: string; fullName: s
   const reservation: DemoReservation = { id, code: `AC-${4830 + reservations.length}`, check_in: input.checkIn, check_out: input.checkOut, guests_count: input.guests, status: input.status, source: "manual", total_amount: 420000, deposit_amount: 210000, currency: "ARS", notes: input.notes, created_at: now, updated_at: now, guests: guest, units: { name: unit.name, capacity: unit.capacity }, payments: [] }
   reservations.unshift(reservation)
   occupancy.push({ id: `occ-${Date.now()}`, unit_id: unit.id, during: `[${input.checkIn},${input.checkOut})`, kind: "reservation", block_reason: null, reservations: reservation })
+  pruneDemoReservations()
   return { id }
+}
+
+/**
+ * Estas listas viven en el módulo: las comparten todos los visitantes de la
+ * demo mientras dure el proceso. Se acotan para que no crezcan sin límite
+ * (auditoría M-05); se descartan primero las reservas cargadas más viejas.
+ */
+const MAX_DEMO_CREATED = 20
+
+function pruneDemoReservations() {
+  const created = reservations.filter((item) => item.id.startsWith("demo-"))
+  for (const stale of created.slice(MAX_DEMO_CREATED)) {
+    reservations.splice(reservations.indexOf(stale), 1)
+    const slot = occupancy.findIndex((item) => item.reservations === stale)
+    if (slot >= 0) occupancy.splice(slot, 1)
+  }
 }
 
 export function demoUpdateUnit(id: string, patch: Record<string, unknown>) {

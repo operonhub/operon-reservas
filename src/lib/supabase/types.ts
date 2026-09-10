@@ -1014,6 +1014,12 @@ export type Database = {
           unit_id: string
         }[]
       }
+      // Agregada a mano con la migración 0024; coincide con lo que genera
+      // `supabase gen types` una vez aplicada.
+      recover_paid_expired_reservation: {
+        Args: { p_reservation: string }
+        Returns: string
+      }
       simulate_price: {
         Args: {
           p_check_in: string
