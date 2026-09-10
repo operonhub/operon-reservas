@@ -2,11 +2,30 @@ import { NextResponse } from "next/server"
 import type { Database } from "@/lib/supabase/types"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getValidCredential } from "@/lib/mp-credential"
-import { getPayment } from "@/lib/mercadopago"
+import { getPayment, type MpPayment } from "@/lib/mercadopago"
 
 export const runtime = "nodejs"
 
 type PaymentStatus = Database["public"]["Enums"]["payment_status"]
+
+// Medios en los que el huésped paga después, fuera de línea: cupón de
+// Rapipago o Pago Fácil (ticket), cajero (atm) o transferencia.
+const OFFLINE_PAYMENT_TYPES = new Set(["ticket", "atm", "bank_transfer"])
+
+/**
+ * Si el pago es un cupón generado y todavía sin pagar, devuelve hasta cuándo
+ * vale. Una tarjeta en revisión también llega como pendiente, pero no tiene
+ * un vencimiento que esperar: esa no estira nada.
+ */
+function offlinePaymentDeadline(payment: MpPayment): string | null {
+  if (payment.status !== "pending" || !payment.date_of_expiration) return null
+  const offline =
+    OFFLINE_PAYMENT_TYPES.has(payment.payment_type_id ?? "") ||
+    payment.status_detail === "pending_waiting_payment" ||
+    payment.status_detail === "pending_waiting_transfer"
+  if (!offline || Number.isNaN(Date.parse(payment.date_of_expiration))) return null
+  return payment.date_of_expiration
+}
 
 // Mapea el estado de MP a nuestro enum de payments.
 function mapStatus(mp: string): PaymentStatus {
@@ -129,6 +148,20 @@ export async function POST(request: Request) {
         .from("payments")
         .update({ external_ref: paymentId })
         .eq("id", payRow.id)
+      if (error) throw error
+    }
+
+    // Cupón generado: la retención se estira hasta su vencimiento (5 días
+    // como techo, 0025) para que la fecha no se libere mientras el huésped
+    // va a pagar (auditoría A-02). Solo alarga y es idempotente, así que un
+    // error se reintenta como el resto. Si igual vence, el pago tardío pasa
+    // por recover_paid_expired_reservation.
+    const offlineDeadline = offlinePaymentDeadline(payment)
+    if (offlineDeadline) {
+      const { error } = await admin.rpc("extend_hold_for_offline_payment", {
+        p_reservation: reservationId,
+        p_until: offlineDeadline,
+      })
       if (error) throw error
     }
 

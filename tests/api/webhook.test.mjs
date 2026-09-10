@@ -81,6 +81,35 @@ test("un monto que no coincide no se acredita ni confirma", async () => {
   assert.equal(state.reservations[0].status, "pending_payment")
 })
 
+test("A-02: un cupón de efectivo estira la retención hasta su vencimiento", async () => {
+  const vence = "2026-09-13T23:59:59.000-03:00"
+  const cupon = { id: 1, status: "pending", status_detail: "pending_waiting_payment", payment_type_id: "ticket",
+                  date_of_expiration: vence, transaction_amount: 150000, currency_id: "ARS", external_reference: RES }
+  scenario("pending_payment", { payment: cupon })
+  assert.equal((await call()).status, 200)
+  assert.deepEqual(calls("extend_hold_for_offline_payment").map((c) => c.args), [{ p_reservation: RES, p_until: vence }])
+  assert.equal(state.payments[0].status, "pending")
+  assert.equal(state.reservations[0].status, "pending_payment")
+
+  // Si la base no pudo estirarla, Mercado Pago tiene que reintentar.
+  scenario("pending_payment", { payment: cupon, rpcResults: { extend_hold_for_offline_payment: { data: null, error: { message: "db down" } } } })
+  assert.equal((await call()).status, 500)
+})
+
+test("una tarjeta en revisión o un cupón sin vencimiento no estiran nada", async () => {
+  for (const payment of [
+    { id: 1, status: "in_process", status_detail: "pending_review_manual", payment_type_id: "credit_card",
+      date_of_expiration: "2026-09-13T23:59:59.000-03:00", external_reference: RES },
+    { id: 1, status: "pending", status_detail: "pending_waiting_payment", payment_type_id: "ticket",
+      date_of_expiration: null, external_reference: RES },
+    { id: 1, status: "pending", payment_type_id: "ticket", date_of_expiration: "no es una fecha", external_reference: RES },
+  ]) {
+    scenario("pending_payment", { payment })
+    assert.equal((await call()).status, 200)
+    assert.equal(calls("extend_hold_for_offline_payment").length, 0, JSON.stringify(payment))
+  }
+})
+
 test("notificaciones que no son de pago y reintentos sobre reservas confirmadas se ignoran", async () => {
   scenario("pending_payment")
   assert.equal((await call(ORG, "9", "merchant_order")).status, 200)
