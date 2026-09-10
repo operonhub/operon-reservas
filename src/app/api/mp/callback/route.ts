@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { exchangeCodeForToken } from "@/lib/mercadopago"
 
@@ -10,6 +11,11 @@ export const runtime = "nodejs"
  * RPC. El navegador nunca ve los tokens.
  */
 export async function GET(request: Request) {
+  // Ver api/mp/connect: la demo nunca participa de un OAuth real.
+  if ((await cookies()).get("operon_demo")?.value === "1") {
+    return new NextResponse("No disponible en la demo.", { status: 403 })
+  }
+
   const url = new URL(request.url)
   const configUrl = new URL("/configuracion", request.url)
 
