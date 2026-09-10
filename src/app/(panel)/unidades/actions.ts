@@ -6,8 +6,8 @@ import { requireContext } from "@/lib/auth"
 import { canManageSettings, SETTINGS_READ_ONLY_MESSAGE } from "@/lib/roles"
 import { sanitizeAmenities } from "@/lib/amenities"
 import { ICAL_URL_ERROR_MESSAGES, normalizeIcalUrl } from "@/lib/ical-url"
-import { cookies } from "next/headers"
-import { demoUpdateUnit } from "@/lib/demo/fixtures"
+import { applyDemoUnitPatch } from "@/lib/demo/fixtures"
+import { isDemoRequest, readDemoState, writeDemoState } from "@/lib/demo/session"
 
 export type ActionResult = { ok: boolean; error?: string }
 
@@ -126,9 +126,10 @@ export async function updateUnit(formData: FormData): Promise<ActionResult> {
   const icalUrls = parseIcalUrls(formData)
   if (!icalUrls.ok) return { ok: false, error: icalUrls.error }
 
-  if ((await cookies()).get("operon_demo")?.value === "1") {
-    const ok = demoUpdateUnit(id, { name, description, capacity, is_active, amenities: parseAmenities(formData.get("amenities")) })
-    if (!ok) return { ok: false, error: "Unidad ficticia no encontrada." }
+  if (await isDemoRequest()) {
+    const next = applyDemoUnitPatch(await readDemoState(), id, { name, description, capacity, is_active, amenities: parseAmenities(formData.get("amenities")) })
+    if (!next) return { ok: false, error: "Unidad ficticia no encontrada." }
+    await writeDemoState(next)
     revalidatePath("/unidades")
     revalidatePath("/calendario")
     return { ok: true }
@@ -159,8 +160,10 @@ export async function toggleUnitActive(
   id: string,
   isActive: boolean
 ): Promise<ActionResult> {
-  if ((await cookies()).get("operon_demo")?.value === "1") {
-    if (!demoUpdateUnit(id, { is_active: isActive })) return { ok: false, error: "Unidad ficticia no encontrada." }
+  if (await isDemoRequest()) {
+    const next = applyDemoUnitPatch(await readDemoState(), id, { is_active: isActive })
+    if (!next) return { ok: false, error: "Unidad ficticia no encontrada." }
+    await writeDemoState(next)
     revalidatePath("/unidades")
     revalidatePath("/calendario")
     return { ok: true }
