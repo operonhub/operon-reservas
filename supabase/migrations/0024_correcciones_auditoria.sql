@@ -172,9 +172,12 @@ create policy organizations_select on organizations
 -- M-03 · create_public_reservation devuelve lo que el front muestra
 -- ------------------------------------------------------------
 -- La web pública lee total_amount, deposit_amount, currency y
--- hold_expires_at para la pantalla de confirmación; la RPC devolvía cinco
--- claves y ninguna de esas, así que el huésped nunca veía el precio. Los
--- valores ya estaban calculados en v_res: sólo faltaba devolverlos.
+-- hold_expires_at para la pantalla de confirmación; según las migraciones del
+-- repo la RPC devolvía cinco claves y ninguna de esas.
+--
+-- En PRODUCCIÓN esta versión ya estaba aplicada a mano y nunca volvió al
+-- repo. Se trae tal cual está allá (verificado por huella del código), para
+-- que una base armada desde las migraciones sea igual a producción.
 create or replace function create_public_reservation(
   p_org_slug text, p_property_slug text, p_unit_id uuid,
   p_check_in date, p_check_out date, p_guests int,
@@ -191,19 +194,14 @@ begin
   );
 
   if nullif(trim(p_notes), '') is not null then
-    update public.reservations set notes = p_notes where id = v_res.id;
+    update public.reservations set notes = p_notes where id = v_res.id returning * into v_res;
   end if;
 
   return jsonb_build_object(
-    'ok', true,
-    'code', v_res.code,
-    'status', v_res.status,
-    'check_in', v_res.check_in,
-    'check_out', v_res.check_out,
-    'total_amount', v_res.total_amount,
-    'deposit_amount', v_res.deposit_amount,
-    'currency', v_res.currency,
-    'hold_expires_at', v_res.hold_expires_at
+    'ok', true, 'code', v_res.code, 'status', v_res.status,
+    'check_in', v_res.check_in, 'check_out', v_res.check_out,
+    'total_amount', v_res.total_amount, 'deposit_amount', v_res.deposit_amount,
+    'currency', v_res.currency, 'hold_expires_at', v_res.hold_expires_at
   );
 end; $$;
 
