@@ -85,7 +85,9 @@ function PagoContent() {
       attempts += 1
 
       if (!res.ok) {
-        setNotFound(true)
+        // Tope de consultas (0025): la reserva existe, solo hay que esperar.
+        if (res.rateLimited) setTimedOut(true)
+        else setNotFound(true)
         stop()
         return
       }

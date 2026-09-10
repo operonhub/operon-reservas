@@ -9,6 +9,11 @@ function table(name) {
       return Promise.resolve({ data: null, error: { message: "db down", code: "XX000" } })
     }
     const rows = (state[name] ?? []).filter((r) => filters.every(([k, v, how]) => how === "in" ? v.includes(r[k]) : r[k] === v))
+    if (op === "insert") {
+      const row = { id: `${name}-${(state[name] ?? []).length + 1}`, created_at: new Date().toISOString(), mp_init_point: null, ...patch }
+      state[name] = [...(state[name] ?? []), row]
+      return Promise.resolve({ data: row, error: null })
+    }
     if (op === "update") {
       rows.forEach((r) => Object.assign(r, patch))
       state.updates.push({ table: name, patch, rows: rows.length })
@@ -19,6 +24,8 @@ function table(name) {
   }
   const builder = {
     select: () => builder,
+    insert: (row) => { op = "insert"; patch = row; return builder },
+    single: () => { single = true; return run() },
     update: (p) => { op = "update"; patch = p; return builder },
     eq: (k, v) => { filters.push([k, v, "eq"]); return builder },
     in: (k, v) => { filters.push([k, v, "in"]); return builder },
