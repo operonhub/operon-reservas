@@ -80,7 +80,12 @@ export async function POST(request: Request) {
     r.deposit_amount && r.deposit_amount > 0 ? r.deposit_amount : r.total_amount
   if (!amount || amount <= 0) return fail(422, "SIN_MONTO")
 
-  const cred = await getValidCredential(admin, org.id)
+  let cred: Awaited<ReturnType<typeof getValidCredential>>
+  try {
+    cred = await getValidCredential(admin, org.id)
+  } catch {
+    return fail(503, "PAGOS_NO_DISPONIBLES")
+  }
   if (!cred) return fail(409, "ORG_SIN_MERCADOPAGO")
 
   // Idempotencia: reusar la seña pendiente y su link si ya existe.
