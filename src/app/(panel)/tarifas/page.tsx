@@ -1,4 +1,6 @@
 import { requireContext } from "@/lib/auth"
+import { canManageSettings } from "@/lib/roles"
+import { ReadOnlyNotice } from "@/components/panel/read-only-notice"
 import { createClient } from "@/lib/supabase/server"
 import { RateDialog } from "@/components/rates/rate-dialog"
 import { UnitRatesCard, RuleLine } from "@/components/rates/unit-rates-card"
@@ -10,6 +12,7 @@ import { Plus, Globe } from "lucide-react"
 
 export default async function TarifasPage() {
   const ctx = await requireContext()
+  const canEdit = canManageSettings(ctx.role)
   const supabase = await createClient()
 
   const [{ data: property }, { data: units }, { data: rates }] = await Promise.all([
@@ -50,7 +53,7 @@ export default async function TarifasPage() {
             o tipo de estadía.
           </p>
         </div>
-        {property && (
+        {property && canEdit && (
           <RateDialog
             mode="new"
             units={unitList}
@@ -60,6 +63,8 @@ export default async function TarifasPage() {
           />
         )}
       </header>
+
+      {!canEdit && <ReadOnlyNotice />}
 
       {unitList.length === 0 ? (
         <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
@@ -78,6 +83,7 @@ export default async function TarifasPage() {
                 units={unitList}
                 propertyId={property?.id ?? ""}
                 currency={currency}
+                readOnly={!canEdit}
               />
             ))}
           </div>
@@ -99,6 +105,7 @@ export default async function TarifasPage() {
                     propertyId={property?.id ?? ""}
                     currency={currency}
                     base={globalBase}
+                    readOnly={!canEdit}
                   />
                 ))}
               </div>

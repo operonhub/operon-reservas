@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { createDemoClient } from "@/lib/demo/fixtures"
+import { createDemoClient, parseDemoState, DEMO_STATE_COOKIE } from "@/lib/demo/fixtures"
 import type { Database } from "./types"
 
 /** Cliente Supabase para Server Components, Server Actions y Route Handlers. */
@@ -8,10 +8,12 @@ export async function createClient() {
   const cookieStore = await cookies()
 
   // El recorrido comercial utiliza el mismo árbol de páginas del producto,
-  // pero sus lecturas se resuelven contra fixtures en memoria. Nunca llega a
-  // Supabase ni comparte sesión con un usuario real.
+  // pero sus lecturas se resuelven contra fixtures en memoria más lo que
+  // ESTE visitante creó (su cookie). Nunca llega a Supabase ni comparte
+  // sesión —ni datos— con un usuario real ni con otro visitante.
   if (cookieStore.get("operon_demo")?.value === "1") {
-    return createDemoClient() as never
+    const state = parseDemoState(cookieStore.get(DEMO_STATE_COOKIE)?.value)
+    return createDemoClient(state) as never
   }
 
   return createServerClient<Database>(

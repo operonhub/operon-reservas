@@ -11,8 +11,11 @@ export const RESERVATION_STATUS_LABELS: Record<Enums<"reservation_status">, stri
   expired: "Expirada",
 }
 
-// Transiciones permitidas — ESPEJO de _can_transition() en la base (0003).
-// Fuente única de verdad de estados también en el cliente.
+// Transiciones que ofrece el panel. Es un SUBCONJUNTO de _can_transition()
+// en la base: producción también permite pending/pending_payment → expired
+// (lo agregó el barrido de retenciones y la 0025 lo alinea en el repo), pero
+// ese destino lo maneja solo el sistema, nunca un botón. Fuente única de
+// verdad de estados también en el cliente.
 export const RESERVATION_TRANSITIONS: Record<
   Enums<"reservation_status">,
   Enums<"reservation_status">[]
@@ -23,8 +26,9 @@ export const RESERVATION_TRANSITIONS: Record<
   confirmed: ["completed", "cancelled"],
   completed: [],
   cancelled: [],
-  // Solo el barrido automático (expire_stale_holds, 0012) puede llegar acá;
-  // no es un target válido desde el panel.
+  // Solo el barrido automático (expire_stale_holds, 0012) o un pago tardío
+  // (recover_paid_expired_reservation, 0024) tocan este estado; no es un
+  // target válido desde el panel.
   expired: [],
 }
 

@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { normalizeIcalUrl } from "../_shared/ical-url.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 // A diferencia de notify-reservations (que usa la publishable key), acá las
@@ -131,14 +132,41 @@ type PlatformResult = {
   error?: string
 } & Partial<SyncSummary>
 
+/**
+ * Descarga siguiendo las redirecciones a mano: cada salto se vuelve a
+ * validar con normalizeIcalUrl. `fetch` con `redirect: "follow"` seguiría un
+ * 302 a http://169.254.169.254 sin que lo veamos (auditoría B-03).
+ */
+async function fetchIcal(startUrl: string): Promise<Response> {
+  let current = startUrl
+  for (let hop = 0; hop < 4; hop++) {
+    const res = await fetch(current, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(15000),
+      headers: { accept: "text/calendar, text/plain;q=0.9, */*;q=0.1" },
+    })
+    if (res.status < 300 || res.status >= 400) return res
+    const location = res.headers.get("location")
+    if (!location) return res
+    const next = normalizeIcalUrl(new URL(location, current).toString())
+    if (!next.ok) throw new Error(`REDIRECT_BLOCKED_${next.reason}`)
+    current = next.url
+  }
+  throw new Error("TOO_MANY_REDIRECTS")
+}
+
 async function syncPlatform(
   workerToken: string,
   unitId: string,
   source: "airbnb" | "booking",
-  url: string
+  rawUrl: string
 ): Promise<PlatformResult> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
+    const validated = normalizeIcalUrl(rawUrl)
+    if (!validated.ok) {
+      return { unit_id: unitId, source, ok: false, error: `BAD_URL_${validated.reason}` }
+    }
+    const res = await fetchIcal(validated.url)
     if (!res.ok) {
       return { unit_id: unitId, source, ok: false, error: `HTTP_${res.status}` }
     }

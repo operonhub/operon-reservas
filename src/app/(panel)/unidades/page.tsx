@@ -1,4 +1,6 @@
 import { requireContext } from "@/lib/auth"
+import { canManageSettings } from "@/lib/roles"
+import { ReadOnlyNotice } from "@/components/panel/read-only-notice"
 import { createClient } from "@/lib/supabase/server"
 import { UnitDialog } from "@/components/units/unit-dialog"
 import { UnitCard, type UnitCardData } from "@/components/units/unit-card"
@@ -109,7 +111,7 @@ export default async function UnidadesPage() {
             y habitaciones reservables
           </p>
         </div>
-        {props.length > 0 && (
+        {props.length > 0 && canManageSettings(ctx.role) && (
           <UnitDialog
             mode="new"
             properties={props}
@@ -119,6 +121,8 @@ export default async function UnidadesPage() {
           />
         )}
       </header>
+
+      {!canManageSettings(ctx.role) && <ReadOnlyNotice />}
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
@@ -132,6 +136,7 @@ export default async function UnidadesPage() {
               unit={u}
               properties={props}
               organizationId={ctx.organizationId}
+              readOnly={!canManageSettings(ctx.role)}
             />
           ))}
         </div>

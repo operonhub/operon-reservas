@@ -1,9 +1,11 @@
 "use server"
 
+import { headers } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
+import { clientIp, publicRpcClient, RATE_LIMITED_MESSAGE, withinLimit } from "@/lib/rate-limit"
 
-// Estas acciones corren como rol anon (sin sesión) y sólo llaman a las RPC
-// públicas, que devuelven exclusivamente información pública.
+// Estas acciones sólo llaman a las RPC públicas, que devuelven exclusivamente
+// información pública. La reserva va con límite de intentos por IP (0025).
 
 export type AvailUnit = {
   unit_id: string
@@ -68,7 +70,11 @@ export async function bookPublic(input: {
 }): Promise<BookResult> {
   if (!input.fullName.trim()) return { ok: false, error: "Ingresá tu nombre." }
 
-  const supabase = await createClient()
+  if (!(await withinLimit("reservaPublica", clientIp(await headers())))) {
+    return { ok: false, error: RATE_LIMITED_MESSAGE }
+  }
+
+  const supabase = await publicRpcClient()
   const { data, error } = await supabase.rpc("create_public_reservation", {
     p_org_slug: input.orgSlug,
     p_property_slug: null,
@@ -87,6 +93,8 @@ export async function bookPublic(input: {
     const min = error.message.match(/MIN_NIGHTS:(\d+)/)?.[1]
     const msg = min
       ? `Esta unidad requiere un mínimo de ${min} noches para esas fechas.`
+      : error.message.includes("RATE_LIMITED")
+        ? RATE_LIMITED_MESSAGE
       : error.message.includes("UNAVAILABLE")
         ? "Esa unidad ya se reservó para esas fechas. Probá con otras."
         : error.message.includes("OVER_CAPACITY")

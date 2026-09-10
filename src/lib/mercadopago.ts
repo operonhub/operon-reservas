@@ -130,7 +130,9 @@ export type MpPreference = {
 export type MpPayment = {
   id: number
   status: string // approved | pending | in_process | rejected | cancelled | refunded ...
-  status_detail?: string
+  status_detail?: string // pending_waiting_payment = cupón generado, falta pagarlo
+  payment_type_id?: string // credit_card | debit_card | ticket (Rapipago, Pago Fácil) | atm ...
+  date_of_expiration?: string | null // vencimiento del cupón en los pagos en efectivo
   transaction_amount?: number
   external_reference?: string
   currency_id?: string

@@ -23,11 +23,14 @@ export function IcalSyncFields({
       <div>
         <p className="text-sm font-medium">Sincronización con Airbnb/Booking</p>
         <p className="text-xs text-muted-foreground">
-          Pegá acá la URL que te da Airbnb/Booking al exportar tu calendario
-          desde su panel. Actualizamos las fechas ocupadas cada una hora. Para
-          protección completa, copiá también el link de calendario de esta
-          unidad (abajo) y pegalo en la sección de &quot;importar
-          calendario&quot; de Airbnb y Booking.
+          Pegá acá la URL que te da Airbnb/Booking (o Google Calendar, VRBO…)
+          al exportar tu calendario desde su panel. Sirve cualquier dirección
+          <code className="mx-1 rounded bg-muted px-1">https://</code> o
+          <code className="mx-1 rounded bg-muted px-1">webcal://</code>.
+          Actualizamos las fechas ocupadas cada una hora. Para protección
+          completa, copiá también el link de calendario de esta unidad (abajo)
+          y pegalo en la sección de &quot;importar calendario&quot; de Airbnb
+          y Booking.
         </p>
       </div>
 

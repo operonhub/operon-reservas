@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
+import { DEMO_STATE_COOKIE } from "@/lib/demo/fixtures"
 
 export async function login(_prevState: unknown, formData: FormData) {
   const email = String(formData.get("email") ?? "").trim()
@@ -26,6 +27,7 @@ export async function logout() {
   const cookieStore = await cookies()
   if (cookieStore.get("operon_demo")?.value === "1") {
     cookieStore.delete("operon_demo")
+    cookieStore.delete(DEMO_STATE_COOKIE) // que el próximo visitante no herede lo cargado
     redirect("/demo")
   }
   const supabase = await createClient()

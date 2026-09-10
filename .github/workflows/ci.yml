@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  app:
+    name: App — tipos, lint y tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # tsc necesita los tipos globales de rutas (LayoutProps, PageProps) que
+      # genera Next; sin esto falla en un checkout limpio.
+      - name: Tipos de rutas de Next
+        run: npx next typegen
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - name: Tests (esquema real en PGlite, webhook, fechas, demo)
+        run: npm test
+      - run: npm run test:notifications
+
+  edge-functions:
+    name: Edge Functions — Deno
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      # Las funciones no usan el node_modules de la app: sin esto Deno intenta
+      # resolver ahi las dependencias de los tipos del runtime de Supabase.
+      - run: deno check --node-modules-dir=none --no-lock supabase/functions/notify-reservations/index.ts supabase/functions/sync-external-calendars/index.ts
+      - run: deno test --node-modules-dir=none --no-lock --allow-env --allow-read supabase/functions/
