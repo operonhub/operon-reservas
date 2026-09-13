@@ -8,6 +8,10 @@ import { buttonVariants } from "@/components/ui/button"
 import { StatusBadge } from "@/components/reservations/reservation-badges"
 import { NewReservationDialog } from "@/components/reservations/new-reservation-dialog"
 import { OperonArc } from "@/components/brand/operon-arc"
+import { GettingStartedCard } from "@/components/onboarding/getting-started-card"
+import { loadChecklist } from "@/lib/onboarding/load-checklist"
+import { canManageSettings } from "@/lib/roles"
+import { siteUrl } from "@/lib/site-url"
 import {
   OperonMarkPapel,
   OperonMarkTinta,
@@ -102,6 +106,11 @@ export default async function InicioPage() {
   const resSelect =
     "id, code, check_in, check_out, status, guests(full_name), units(name)"
 
+  // Corre en paralelo con el resto; una vez ocultada la lista, no se consulta.
+  const checklistPromise = ctx.checklistDismissed
+    ? null
+    : loadChecklist(supabase, ctx.organizationId)
+
   const [
     { data: property },
     { count: pending },
@@ -165,6 +174,9 @@ export default async function InicioPage() {
         search: HOME_BANNER_FILENAME,
       }),
   ])
+
+  const checklist = checklistPromise ? await checklistPromise : null
+  const publicUrl = `${await siteUrl()}/reservar/${ctx.organizationSlug}`
 
   const units = activeUnits ?? []
   const totalUnits = units.length
@@ -341,6 +353,7 @@ export default async function InicioPage() {
 
           <section
             aria-label="Resumen operativo"
+            data-tour="metricas"
             className="relative z-20 -mt-14 grid gap-3 px-3 sm:grid-cols-2 sm:px-5 xl:grid-cols-4 xl:px-8"
           >
             <MetricCard
@@ -379,6 +392,14 @@ export default async function InicioPage() {
             />
           </section>
         </div>
+
+        {checklist && (
+          <GettingStartedCard
+            checklist={checklist}
+            canDismiss={canManageSettings(ctx.role)}
+            publicUrl={publicUrl}
+          />
+        )}
 
         <section className="mt-6 grid gap-5 lg:grid-cols-12">
           <TodayAgenda items={agenda} delayIndex={5} />

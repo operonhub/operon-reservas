@@ -10,11 +10,14 @@ import {
   Tag,
   Settings,
   LogOut,
+  CircleHelp,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { OperonMark } from "@/components/brand/operon-mark"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { ShareLink } from "@/components/onboarding/share-link"
+import { useTour } from "@/components/onboarding/tour/tour-provider"
 import { logout } from "@/app/login/actions"
 
 const NAV = [
@@ -30,17 +33,19 @@ export function AppSidebar({
   userName,
   orgName,
   role,
+  publicUrl,
 }: {
   userName: string
   orgName: string
   role: string
+  publicUrl: string
 }) {
   // Debajo de `lg` el nav vive en el drawer (ver app-shell-mobile).
   // `print:hidden`: el comprobante de reserva se imprime solo, sin el chrome
   // de la aplicación alrededor.
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground lg:flex print:hidden">
-      <SidebarNav userName={userName} orgName={orgName} role={role} />
+      <SidebarNav userName={userName} orgName={orgName} role={role} publicUrl={publicUrl} />
     </aside>
   )
 }
@@ -53,14 +58,17 @@ export function SidebarNav({
   userName,
   orgName,
   role,
+  publicUrl,
   onNavigate,
 }: {
   userName: string
   orgName: string
   role: string
+  publicUrl: string
   onNavigate?: () => void
 }) {
   const pathname = usePathname()
+  const { start: startTour } = useTour()
 
   return (
     <>
@@ -83,6 +91,7 @@ export function SidebarNav({
               key={href}
               href={href}
               onClick={onNavigate}
+              data-tour={`nav-${href === "/" ? "inicio" : href.slice(1)}`}
               className={cn(
                 "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                 active
@@ -103,6 +112,21 @@ export function SidebarNav({
       </nav>
 
       <div className="border-t p-3">
+        <ShareLink url={publicUrl} />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          data-tour="tutorial"
+          className="mb-2 w-full justify-start text-muted-foreground"
+          onClick={() => {
+            onNavigate?.()
+            startTour()
+          }}
+        >
+          <CircleHelp className="mr-2 h-4 w-4" />
+          Ver tutorial
+        </Button>
         <div className="mb-2 flex items-start justify-between gap-2 px-1">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{userName}</p>

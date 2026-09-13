@@ -15,6 +15,8 @@ export const LIMITS = {
   // /pago consulta cada 2,5 s durante un minuto: 24 veces por visita.
   estadoReserva: { bucket: "estado_reserva", limit: 120, windowSeconds: 600 },
   checkout: { bucket: "checkout", limit: 20, windowSeconds: 3600 },
+  // Registro con invitación: cada intento puede crear un usuario en Auth.
+  invitacion: { bucket: "invitacion", limit: 10, windowSeconds: 3600 },
 } as const
 
 export const RATE_LIMITED_MESSAGE =

@@ -8,6 +8,9 @@ export const DEMO_CONTEXT = {
   organizationName: "Refugio Alto Cielo",
   organizationSlug: "refugio-alto-cielo",
   role: "owner",
+  // En la demo el tour se recuerda por visitante en su navegador, no en la base.
+  tourCompleted: false,
+  checklistDismissed: false,
 }
 
 /** El nombre de la cookie que lleva lo que cada visitante creó en la demo. */
