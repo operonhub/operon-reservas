@@ -85,6 +85,24 @@ export function normalizeDraft(raw: unknown): SetupDraft {
   }
 }
 
+/**
+ * Lo que se tipea en el precio, tal como lo muestra el campo ("150.000,5"),
+ * a lo que se guarda en el borrador ("150000,5"). Los puntos son solo de
+ * formato y se descartan; la coma es el decimal, con dos dígitos como máximo.
+ */
+export function cleanPriceInput(typed: string): string {
+  const [integer = "", ...decimals] = typed.replace(/[^\d,]/g, "").split(",")
+  const whole = integer.replace(/^0+(?=\d)/, "").slice(0, 10)
+  return decimals.length > 0 ? `${whole},${decimals.join("").slice(0, 2)}` : whole
+}
+
+/** "150000,5" -> "150.000,5": lo que se ve en el campo mientras se escribe. */
+export function formatPriceInput(raw: string): string {
+  const [integer, decimals] = raw.split(",")
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+  return decimals === undefined ? grouped : `${grouped},${decimals}`
+}
+
 /** "85000" o "85000,50". Con puntos de miles ("85.000") es ambiguo: se rechaza. */
 export function parsePrice(raw: string): number | null {
   const value = raw.trim()
@@ -136,7 +154,7 @@ export function stepError(step: number, draft: SetupDraft): string | null {
     case 4:
       for (const unit of draft.units) {
         if (parsePrice(unit.price) === null) {
-          return `Revisá el precio de "${unit.name.trim()}": solo números, sin puntos de miles.`
+          return `Poné el precio por noche de "${unit.name.trim()}".`
         }
       }
       return null

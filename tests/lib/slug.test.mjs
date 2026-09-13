@@ -10,7 +10,15 @@ import { createJiti } from "jiti"
 
 const root = fileURLToPath(new URL("../../", import.meta.url))
 const jiti = createJiti(import.meta.url, { moduleCache: false })
-const { slugify, isValidSlug, RESERVED_SLUGS } = await jiti.import(root + "src/lib/slug.ts")
+const { slugify, toSlugInput, isValidSlug, RESERVED_SLUGS } = await jiti.import(root + "src/lib/slug.ts")
+
+test("escribir el link a mano convierte tildes, eñes y espacios en vez de borrarlos", () => {
+  assert.equal(toSlugInput("cabañas anashe"), "cabanas-anashe")
+  // El guion final se deja para poder seguir escribiendo.
+  assert.equal(toSlugInput("cabanas "), "cabanas-")
+  assert.equal(toSlugInput("Refugio  --  Ñandú"), "refugio-nandu")
+  assert.equal(toSlugInput(" -lago"), "lago")
+})
 
 test("slugify saca tildes, eñes, símbolos y respeta el largo máximo", () => {
   assert.equal(slugify("Cabañas del Ñandú"), "cabanas-del-nandu")

@@ -35,6 +35,20 @@ test("precios: acepta coma decimal; rechaza puntos de miles, cero y más de dos 
   for (const bad of ["85.000", "0", "-5", "10,555", "", "abc", "1e5"]) assert.equal(d.parsePrice(bad), null, bad)
 })
 
+test("el campo de precio muestra puntos de miles y guarda solo el número", () => {
+  assert.equal(d.formatPriceInput("150000"), "150.000")
+  assert.equal(d.formatPriceInput("1500000,5"), "1.500.000,5")
+  assert.equal(d.formatPriceInput(""), "")
+  assert.equal(d.cleanPriceInput("150.000"), "150000")
+  assert.equal(d.cleanPriceInput("150.000,505"), "150000,50")
+  assert.equal(d.cleanPriceInput("$ 85.000 ARS"), "85000")
+  assert.equal(d.cleanPriceInput("0085"), "85")
+  // Borrar el último dígito de "1.000" tiene que dar 100, no 1,00.
+  assert.equal(d.cleanPriceInput("1.00"), "100")
+  // Ida y vuelta: lo que se ve, limpio, vuelve a ser un precio válido.
+  assert.equal(d.parsePrice(d.cleanPriceInput(d.formatPriceInput("120000,50"))), 120000.5)
+})
+
 test("capacidad: entero entre 1 y 50", () => {
   assert.equal(d.parseCapacity("4"), 4)
   for (const bad of ["0", "51", "2.5", "", "muchos"]) assert.equal(d.parseCapacity(bad), null, bad)

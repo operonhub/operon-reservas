@@ -9,11 +9,14 @@ import { CURRENCIES } from "@/lib/currencies"
 import { formatCurrency } from "@/lib/format"
 import {
   MAX_UNITS,
+  cleanPriceInput,
   emptyUnit,
+  formatPriceInput,
   parsePrice,
   type SetupDraft,
   type SetupUnit,
 } from "@/lib/onboarding/setup-draft"
+import { toSlugInput } from "@/lib/slug"
 import { cn } from "@/lib/utils"
 
 export type SlugStatus = "idle" | "checking" | "available" | "taken" | "invalid" | "unknown"
@@ -134,7 +137,7 @@ export function StepLink({ draft, update, slugStatus, publicBase }: StepProps) {
           value={draft.slug}
           onChange={(e) =>
             update({
-              slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48),
+              slug: toSlugInput(e.target.value),
               slugEdited: true,
             })
           }
@@ -172,20 +175,34 @@ export function StepDetails({ draft, update }: StepProps) {
           />
         </Field>
 
-        <Field label="Moneda en la que cobrás" htmlFor="currency">
-          <select
-            id="currency"
-            value={draft.currency}
-            onChange={(e) => update({ currency: e.target.value })}
-            className="h-12 w-full cursor-pointer rounded-lg border border-input bg-transparent px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            {CURRENCIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.label} ({c.code})
-              </option>
-            ))}
-          </select>
-        </Field>
+        <fieldset className="grid gap-1.5">
+          <legend className="mb-1.5 text-sm font-medium">Moneda en la que cobrás</legend>
+          {/* Con dos opciones, un botón por moneda se decide de un toque; un
+              desplegable escondía la elección detrás de un clic más. */}
+          <div className="grid grid-cols-2 gap-3">
+            {CURRENCIES.map((c) => {
+              const selected = draft.currency === c.code
+              return (
+                <button
+                  key={c.code}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => update({ currency: c.code })}
+                  className={cn(
+                    "flex h-12 items-center justify-between gap-2 rounded-lg border px-3.5 text-left text-base transition-colors",
+                    "focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+                    selected
+                      ? "border-primary bg-accent text-accent-foreground"
+                      : "border-input hover:bg-muted"
+                  )}
+                >
+                  <span className="truncate font-medium">{c.label}</span>
+                  <span className="label-mono shrink-0 text-muted-foreground">{c.code}</span>
+                </button>
+              )
+            })}
+          </div>
+        </fieldset>
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Check-in desde" htmlFor="checkin">
@@ -309,20 +326,19 @@ export function StepPrices({ draft, update }: StepProps) {
                 aria-label={`Precio por noche de ${unit.name.trim()}`}
                 autoFocus={index === 0}
                 inputMode="decimal"
-                placeholder="85000"
-                value={unit.price}
-                onChange={(e) =>
-                  update({
-                    units: draft.units.map((u, i) => (i === index ? { ...u, price: e.target.value } : u)),
-                  })
-                }
+                placeholder="85.000"
+                value={formatPriceInput(unit.price)}
+                onChange={(e) => {
+                  const price = cleanPriceInput(e.target.value)
+                  update({ units: draft.units.map((u, i) => (i === index ? { ...u, price } : u)) })
+                }}
                 className="min-w-0 flex-1 bg-transparent px-3 text-right font-mono text-base tabular-nums outline-none"
               />
             </div>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">Sin puntos de miles: 85000, o 85000,50.</p>
+      <p className="mt-3 text-sm text-muted-foreground">Si cobrás con centavos, usá coma: 85.000,50.</p>
     </>
   )
 }

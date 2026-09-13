@@ -24,6 +24,22 @@ export function slugify(input: string): string {
     .replace(/-+$/, "")
 }
 
+/**
+ * Mientras se escribe el link a mano: lo mismo que `slugify`, pero sin
+ * recortar el guion final, para poder seguir con la palabra siguiente.
+ * Antes el campo borraba lo que no fuera [a-z0-9-] y "cabañas anashe"
+ * quedaba "cabaasanashe".
+ */
+export function toSlugInput(typed: string): string {
+  return typed
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+/, "")
+    .slice(0, 48)
+}
+
 export function isValidSlug(slug: string): boolean {
   return SLUG_RE.test(slug) && !slug.includes("--") && !RESERVED_SLUGS.includes(slug)
 }
