@@ -27,21 +27,39 @@ export async function getValidCredential(
     new Date(cred.expires_at).getTime() - Date.now() < 2 * 24 * 60 * 60 * 1000
   if (!expiresSoon) return cred
 
+  let refreshed: Awaited<ReturnType<typeof refreshAccessToken>>
   try {
-    const refreshed = await refreshAccessToken(cred.refresh_token)
-    await admin.rpc("mp_service_update_tokens", {
+    refreshed = await refreshAccessToken(cred.refresh_token)
+  } catch {
+    // Si el refresh falla, seguimos con el token actual (puede que aún sirva).
+    return cred
+  }
+
+  // Mercado Pago ya entregó un refresh_token nuevo y el viejo puede dejar de
+  // servir: si el nuevo no queda guardado, cuando venza el access_token la
+  // org queda desconectada de MP. Antes el error se descartaba sin rastro
+  // (auditoría N-02); ahora se reintenta una vez y, si igual falla, queda
+  // en el log para reconectar a mano. Este pedido sigue con el token nuevo.
+  const save = () =>
+    admin.rpc("mp_service_update_tokens", {
       p_organization_id: organizationId,
       p_access_token: refreshed.access_token,
       p_refresh_token: refreshed.refresh_token,
       p_expires_in: refreshed.expires_in,
     })
-    return {
-      ...cred,
-      access_token: refreshed.access_token,
-      refresh_token: refreshed.refresh_token,
-    }
-  } catch {
-    // Si el refresh falla, seguimos con el token actual (puede que aún sirva).
-    return cred
+  let { error: saveErr } = await save()
+  if (saveErr) ({ error: saveErr } = await save())
+  if (saveErr) {
+    console.error(
+      `Mercado Pago: se renovó el token de la organización ${organizationId} ` +
+        `pero no se pudo guardar (${saveErr.message}). Si el anterior quedó ` +
+        `invalidado, hay que reconectar Mercado Pago desde Configuración.`
+    )
+  }
+
+  return {
+    ...cred,
+    access_token: refreshed.access_token,
+    refresh_token: refreshed.refresh_token,
   }
 }

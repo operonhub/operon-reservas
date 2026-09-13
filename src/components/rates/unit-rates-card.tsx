@@ -19,6 +19,7 @@ export function UnitRatesCard({
   units,
   propertyId,
   currency,
+  readOnly = false,
 }: {
   unit: Unit
   base: RateRow | null
@@ -27,6 +28,8 @@ export function UnitRatesCard({
   units: Unit[]
   propertyId: string
   currency: string
+  /** Staff ve las tarifas pero no las cambia (0025). */
+  readOnly?: boolean
 }) {
   const active = rules.filter((r) => r.is_active)
 
@@ -43,16 +46,18 @@ export function UnitRatesCard({
             hasta {unit.capacity} huéspedes
           </p>
         </div>
-        <RateDialog
-          mode="new"
-          units={units}
-          propertyId={propertyId}
-          defaultUnitId={unit.id}
-          triggerLabel="Regla"
-          triggerIcon={<Plus />}
-          triggerVariant="outline"
-          triggerSize="sm"
-        />
+        {!readOnly && (
+          <RateDialog
+            mode="new"
+            units={units}
+            propertyId={propertyId}
+            defaultUnitId={unit.id}
+            triggerLabel="Regla"
+            triggerIcon={<Plus />}
+            triggerVariant="outline"
+            triggerSize="sm"
+          />
+        )}
       </header>
 
       {/* Precio base: el dato que se consulta a diario */}
@@ -76,15 +81,17 @@ export function UnitRatesCard({
                 </p>
               )}
             </div>
-            <RateDialog
-              mode="edit"
-              rate={base}
-              units={units}
-              propertyId={propertyId}
-              triggerLabel="Editar base"
-              triggerVariant="ghost"
-              triggerSize="sm"
-            />
+            {!readOnly && (
+              <RateDialog
+                mode="edit"
+                rate={base}
+                units={units}
+                propertyId={propertyId}
+                triggerLabel="Editar base"
+                triggerVariant="ghost"
+                triggerSize="sm"
+              />
+            )}
           </div>
         ) : (
           // Sin base no hay precio posible: la reserva se crea en $0 y eso
@@ -94,15 +101,17 @@ export function UnitRatesCard({
               <TriangleAlert className="size-4 shrink-0" />
               Sin precio base: las reservas de esta unidad quedan sin importe.
             </p>
-            <RateDialog
-              mode="new"
-              units={units}
-              propertyId={propertyId}
-              defaultUnitId={unit.id}
-              defaultPreset="base"
-              triggerLabel="Definir precio"
-              triggerSize="sm"
-            />
+            {!readOnly && (
+              <RateDialog
+                mode="new"
+                units={units}
+                propertyId={propertyId}
+                defaultUnitId={unit.id}
+                defaultPreset="base"
+                triggerLabel="Definir precio"
+                triggerSize="sm"
+              />
+            )}
           </div>
         )}
       </div>
@@ -126,6 +135,7 @@ export function UnitRatesCard({
                 propertyId={propertyId}
                 currency={currency}
                 base={base}
+                readOnly={readOnly}
               />
             ))}
           </div>
@@ -142,12 +152,14 @@ export function RuleLine({
   propertyId,
   currency,
   base,
+  readOnly = false,
 }: {
   rule: RateRow
   units: Unit[]
   propertyId: string
   currency: string
   base?: RateRow | null
+  readOnly?: boolean
 }) {
   const preset = presetOf(rule)
   const def = RULE_PRESETS[preset]
@@ -209,19 +221,21 @@ export function RuleLine({
         )}
       </span>
 
-      <span className="flex items-center gap-0.5">
-        <RateActiveToggle id={rule.id} isActive={rule.is_active} />
-        <RateDialog
-          mode="edit"
-          rate={rule}
-          units={units}
-          propertyId={propertyId}
-          triggerLabel="Editar"
-          triggerVariant="ghost"
-          triggerSize="sm"
-        />
-        <RateDeleteButton id={rule.id} />
-      </span>
+      {!readOnly && (
+        <span className="flex items-center gap-0.5">
+          <RateActiveToggle id={rule.id} isActive={rule.is_active} />
+          <RateDialog
+            mode="edit"
+            rate={rule}
+            units={units}
+            propertyId={propertyId}
+            triggerLabel="Editar"
+            triggerVariant="ghost"
+            triggerSize="sm"
+          />
+          <RateDeleteButton id={rule.id} />
+        </span>
+      )}
     </div>
   )
 }

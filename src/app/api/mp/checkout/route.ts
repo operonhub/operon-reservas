@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getValidCredential } from "@/lib/mp-credential"
 import { createPreference, siteUrl } from "@/lib/mercadopago"
+import { clientIp, withinLimit } from "@/lib/rate-limit"
 import type { Database } from "@/lib/supabase/types"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
@@ -9,9 +10,20 @@ export const runtime = "nodejs"
 
 const HOLD_MINUTES_ON_CHECKOUT = 15
 
-/** Reinicia la retención de la unidad al iniciar (o reintentar) el pago. */
-function bumpHold(admin: SupabaseClient<Database>, reservationId: string) {
-  return admin
+/**
+ * Estira la retención de la unidad al iniciar (o reintentar) el pago. Con
+ * la 0025 pasa por extend_checkout_hold: 3 extensiones como máximo y nunca
+ * acorta; antes, cualquiera con el código podía retener la fecha para
+ * siempre (auditoría A-03). Si la RPC todavía no existe, se usa el método
+ * anterior para no perder la retención en el medio del deploy.
+ */
+async function bumpHold(admin: SupabaseClient<Database>, reservationId: string) {
+  const { error } = await admin.rpc("extend_checkout_hold", {
+    p_reservation: reservationId,
+    p_minutes: HOLD_MINUTES_ON_CHECKOUT,
+  })
+  if (!error) return
+  await admin
     .from("reservations")
     .update({
       hold_expires_at: new Date(
@@ -52,6 +64,10 @@ export async function POST(request: Request) {
   const code = body.code?.trim()
   const orgSlug = body.orgSlug?.trim()
   if (!code || !orgSlug) return fail(400, "FALTAN_DATOS")
+
+  if (!(await withinLimit("checkout", clientIp(request.headers)))) {
+    return fail(429, "DEMASIADOS_INTENTOS")
+  }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return fail(500, "PAGOS_NO_CONFIGURADOS")

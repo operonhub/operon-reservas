@@ -4,6 +4,7 @@ export type NotificationEvent = {
     | "reservation_created_admin"
     | "reservation_status_guest"
     | "reservation_confirmed_admin"
+    | "payment_orphaned_admin"
   reservation_status: string | null
   recipient_email: string | null
   idempotency_key: string
@@ -52,6 +53,8 @@ function formatDate(value: unknown): string {
 }
 
 function formatMoney(value: unknown, currency: unknown): string {
+  // Number(null) es 0: sin este corte, un importe desconocido salía "$ 0".
+  if (value === null || value === undefined || value === "") return "—"
   const amount = Number(value)
   if (!Number.isFinite(amount)) return "—"
   return new Intl.NumberFormat("es-AR", {
@@ -138,6 +141,28 @@ export function renderReservationEmail(event: NotificationEvent): RenderedEmail 
         `Reserva confirmada ${code}`,
         "Nueva reserva confirmada",
         `Se acreditó la seña y la reserva de ${property} quedó confirmada automáticamente.`,
+        rows
+      ),
+    }
+  }
+
+  // El pago llegó después de que venciera la retención (efectivo) y otra
+  // reserva ya había tomado la fecha: nadie más se entera (auditoría A-02).
+  if (event.event_type === "payment_orphaned_admin") {
+    const rows = [
+      row("Huésped", stringValue(payload.guest_name)),
+      row("Email del huésped", stringValue(payload.guest_email)),
+      row("Teléfono del huésped", stringValue(payload.guest_phone)),
+      ...commonRows,
+      row("Seña cobrada", formatMoney(payload.paid_amount, payload.currency)),
+    ].join("")
+
+    return {
+      subject: `Requiere acción: se cobró la seña de ${code} pero la fecha ya no está libre`,
+      html: layout(
+        `Seña cobrada sin fecha disponible · ${code}`,
+        "Se cobró una seña sobre una fecha ocupada",
+        `Mercado Pago acreditó la seña de la reserva ${code} de ${property} después de que venciera su retención, y en el medio otra reserva tomó esas fechas. La reserva quedó expirada y el dinero está en tu cuenta de Mercado Pago: contactá al huésped para ofrecerle otra fecha o unidad, o devolvele el pago desde Mercado Pago.`,
         rows
       ),
     }

@@ -54,6 +54,38 @@ assert.match(confirmedAdmin.html, /Nueva reserva confirmada/)
 assert.match(confirmedAdmin.html, /126\.000/) // saldo: 180000 - 54000
 assert.doesNotMatch(confirmedAdmin.html, /<script>/)
 
+const orphaned = renderReservationEmail({
+  id: "event-4",
+  event_type: "payment_orphaned_admin",
+  reservation_status: "expired",
+  recipient_email: "admin@example.com",
+  idempotency_key: "payment-orphaned-admin:1",
+  payload: {
+    ...payload,
+    guest_email: "huesped@example.com",
+    guest_phone: "+54 9 11 5555-0000",
+    paid_amount: 54000,
+  },
+})
+assert.match(orphaned.subject, /R-ABC123/)
+assert.match(orphaned.subject, /Requiere acción/)
+assert.match(orphaned.html, /huesped@example\.com/)
+assert.match(orphaned.html, /5555-0000/)
+assert.match(orphaned.html, /54\.000/)
+assert.match(orphaned.html, /devolvele el pago/)
+assert.doesNotMatch(orphaned.html, /<script>/)
+
+// Un importe desconocido no se muestra como $ 0.
+const orphanedNoAmount = renderReservationEmail({
+  id: "event-5",
+  event_type: "payment_orphaned_admin",
+  reservation_status: "expired",
+  recipient_email: "admin@example.com",
+  idempotency_key: "payment-orphaned-admin:2",
+  payload: { ...payload, paid_amount: null },
+})
+assert.doesNotMatch(orphanedNoAmount.html, /\$\s*0(?!\d)/)
+
 assert.equal(escapeHtml('<a href="x">'), "&lt;a href=&quot;x&quot;&gt;")
 
 console.log("notification email templates: ok")

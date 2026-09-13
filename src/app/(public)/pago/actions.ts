@@ -1,6 +1,7 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { headers } from "next/headers"
+import { clientIp, publicRpcClient, RATE_LIMITED_MESSAGE, withinLimit } from "@/lib/rate-limit"
 
 // Corre como anon: solo llama a la RPC pública, que devuelve exclusivamente
 // campos seguros para mostrarle al huésped (ver 0013).
@@ -23,7 +24,7 @@ export type PublicReservationStatus = {
 
 export type StatusResult =
   | { ok: true; reservation: PublicReservationStatus }
-  | { ok: false; error: string }
+  | { ok: false; error: string; rateLimited?: true }
 
 /**
  * Estado REAL de la reserva contra la base. La página /pago nunca debe
@@ -36,7 +37,11 @@ export async function getReservationStatus(
 ): Promise<StatusResult> {
   if (!orgSlug || !code) return { ok: false, error: "Faltan datos de la reserva." }
 
-  const supabase = await createClient()
+  if (!(await withinLimit("estadoReserva", clientIp(await headers())))) {
+    return { ok: false, error: RATE_LIMITED_MESSAGE, rateLimited: true }
+  }
+
+  const supabase = await publicRpcClient()
   const { data, error } = await supabase.rpc("public_reservation_status", {
     p_org_slug: orgSlug,
     p_code: code,

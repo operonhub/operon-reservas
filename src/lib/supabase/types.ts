@@ -926,6 +926,16 @@ export type Database = {
         Returns: Json
       }
       expire_stale_holds: { Args: { p_limit?: number }; Returns: number }
+      // Agregadas a mano con la migración 0025; coinciden con lo que genera
+      // `supabase gen types` una vez aplicada.
+      extend_checkout_hold: {
+        Args: { p_max_extensions?: number; p_minutes?: number; p_reservation: string }
+        Returns: boolean
+      }
+      extend_hold_for_offline_payment: {
+        Args: { p_reservation: string; p_until: string }
+        Returns: boolean
+      }
       fail_notification: {
         Args: { p_error: string; p_id: string; p_worker_token: string }
         Returns: boolean
@@ -1016,6 +1026,10 @@ export type Database = {
       }
       // Agregada a mano con la migración 0024; coincide con lo que genera
       // `supabase gen types` una vez aplicada.
+      rate_limit_hit: {
+        Args: { p_bucket: string; p_limit: number; p_subject: string; p_window_seconds: number }
+        Returns: boolean
+      }
       recover_paid_expired_reservation: {
         Args: { p_reservation: string }
         Returns: string

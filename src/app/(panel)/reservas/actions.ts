@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { requireContext } from "@/lib/auth"
 import type { Enums } from "@/lib/supabase/types"
-import { cookies } from "next/headers"
-import { demoCreateManualReservation, demoTransitionReservation } from "@/lib/demo/fixtures"
+import { applyDemoManualReservation, applyDemoTransition } from "@/lib/demo/fixtures"
+import { isDemoRequest, readDemoState, writeDemoState } from "@/lib/demo/session"
 
 export type ActionResult = { ok: boolean; error?: string; id?: string }
 
@@ -103,13 +103,14 @@ export async function createManualReservation(
   if (check_out <= check_in)
     return { ok: false, error: "La salida debe ser posterior al ingreso." }
 
-  if ((await cookies()).get("operon_demo")?.value === "1") {
-    const created = demoCreateManualReservation({ unitId: unit_id, fullName: full_name, email, phone, checkIn: check_in, checkOut: check_out, guests, status, notes })
-    if (!created) return { ok: false, error: "Unidad inválida." }
+  if (await isDemoRequest()) {
+    const result = applyDemoManualReservation(await readDemoState(), { unitId: unit_id, fullName: full_name, email, phone, checkIn: check_in, checkOut: check_out, guests, status, notes })
+    if (!result) return { ok: false, error: "Unidad inválida." }
+    await writeDemoState(result.state)
     revalidatePath("/reservas")
     revalidatePath("/calendario")
     revalidatePath("/")
-    return { ok: true, id: created.id }
+    return { ok: true, id: result.id }
   }
 
   // La unidad determina property y org (no confiamos en el cliente).
@@ -152,8 +153,10 @@ export async function transitionReservation(
   id: string,
   to: Enums<"reservation_status">
 ): Promise<ActionResult> {
-  if ((await cookies()).get("operon_demo")?.value === "1") {
-    if (!demoTransitionReservation(id, to)) return { ok: false, error: "No se encontró la reserva ficticia." }
+  if (await isDemoRequest()) {
+    const next = applyDemoTransition(await readDemoState(), id, to)
+    if (!next) return { ok: false, error: "No se encontró la reserva ficticia." }
+    await writeDemoState(next)
     revalidatePath("/reservas")
     revalidatePath(`/reservas/${id}`)
     revalidatePath("/calendario")

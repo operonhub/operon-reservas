@@ -35,10 +35,13 @@ export function UnitCard({
   unit,
   properties,
   organizationId,
+  readOnly = false,
 }: {
   unit: UnitCardData
   properties: { id: string; name: string }[]
   organizationId: string
+  /** Staff ve las unidades pero no las edita ni las pausa (0025). */
+  readOnly?: boolean
 }) {
   const photo = unitPhotoUrl(unit.photoPath)
   const shown = unit.amenities.slice(0, VISIBLE_AMENITIES)
@@ -135,7 +138,7 @@ export function UnitCard({
 
       {/* ---------- Acciones ---------- */}
       <div className="mt-auto flex flex-wrap items-center gap-x-1 gap-y-1.5 border-t px-3 py-2.5">
-        <UnitDialog
+        {!readOnly && <UnitDialog
           mode="edit"
           unit={{
             id: unit.id,
@@ -153,7 +156,7 @@ export function UnitCard({
           triggerLabel="Editar"
           triggerVariant="ghost"
           triggerSize="sm"
-        />
+        />}
         <Link
           href="/calendario"
           className="inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[0.8rem] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -162,9 +165,11 @@ export function UnitCard({
         </Link>
         {/* Link del feed iCal para sincronizar con Booking/Airbnb (Etapa 9). */}
         <CopyIcalLink unitId={unit.id} />
-        <div className="ml-auto">
-          <UnitActiveToggle id={unit.id} isActive={unit.isActive} />
-        </div>
+        {!readOnly && (
+          <div className="ml-auto">
+            <UnitActiveToggle id={unit.id} isActive={unit.isActive} />
+          </div>
+        )}
       </div>
     </article>
   )
