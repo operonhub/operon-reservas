@@ -16,6 +16,10 @@ export type ActiveContext = {
   organizationName: string
   organizationSlug: string
   role: string
+  /** Terminó (o salteó) el tour guiado del panel. */
+  tourCompleted: boolean
+  /** Alguien del equipo ocultó la lista de primeros pasos de Inicio. */
+  checklistDismissed: boolean
 }
 
 /**
@@ -54,24 +58,27 @@ export const requireContext = cache(async function requireContext(): Promise<Act
   const userId = claims.sub
   const email = typeof claims.email === "string" ? claims.email : null
 
+  // El estado del tour y de la lista de primeros pasos viaja en estas mismas
+  // dos consultas: el onboarding no le suma viajes a la navegación normal.
   const [{ data: membership }, { data: profile }] = await Promise.all([
     supabase
       .from("memberships")
-      .select("role, organization_id, organizations(name, slug)")
+      .select("role, organization_id, organizations(name, slug, checklist_dismissed_at)")
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle(),
-    supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+    supabase.from("profiles").select("full_name, tour_completed_at").eq("id", userId).maybeSingle(),
   ])
 
-  const org = membership?.organizations as
-    | { name: string; slug: string }
-    | { name: string; slug: string }[]
-    | null
+  type Org = { name: string; slug: string; checklist_dismissed_at: string | null }
+  const org = membership?.organizations as Org | Org[] | null
   const orgObj = Array.isArray(org) ? org[0] : org
 
   if (!membership || !orgObj) {
-    redirect("/sin-acceso")
+    // Sin organización: si canjeó una invitación, le falta el asistente. Este
+    // viaje extra solo lo paga quien todavía no tiene complejo.
+    const { data: onboarding } = await supabase.rpc("my_onboarding_status")
+    redirect((onboarding as { has_grant?: boolean } | null)?.has_grant ? "/bienvenida" : "/sin-acceso")
   }
 
   return {
@@ -82,5 +89,7 @@ export const requireContext = cache(async function requireContext(): Promise<Act
     organizationName: orgObj.name,
     organizationSlug: orgObj.slug,
     role: membership.role,
+    tourCompleted: Boolean(profile?.tour_completed_at),
+    checklistDismissed: Boolean(orgObj.checklist_dismissed_at),
   }
 })

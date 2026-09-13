@@ -189,22 +189,28 @@ export type Database = {
       }
       organizations: {
         Row: {
+          checklist_dismissed_at: string | null
           created_at: string
           id: string
+          link_shared_at: string | null
           name: string
           slug: string
           updated_at: string
         }
         Insert: {
+          checklist_dismissed_at?: string | null
           created_at?: string
           id?: string
+          link_shared_at?: string | null
           name: string
           slug: string
           updated_at?: string
         }
         Update: {
+          checklist_dismissed_at?: string | null
           created_at?: string
           id?: string
+          link_shared_at?: string | null
           name?: string
           slug?: string
           updated_at?: string
@@ -298,6 +304,7 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
+          tour_completed_at: string | null
           updated_at: string
         }
         Insert: {
@@ -305,6 +312,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id: string
+          tour_completed_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -312,6 +320,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          tour_completed_at?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -944,6 +953,39 @@ export type Database = {
         Args: { s: Database["public"]["Enums"]["reservation_status"] }
         Returns: boolean
       }
+      complete_setup: { Args: { p_payload: Json }; Returns: string }
+      invitation_create: {
+        Args: { p_email?: string; p_note?: string; p_token_hash: string }
+        Returns: string
+      }
+      invitation_list: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          note: string
+          organization_name: string
+          redeemed_at: string
+          redeemed_email: string
+          status: string
+        }[]
+      }
+      invitation_lookup: { Args: { p_token_hash: string }; Returns: Json }
+      invitation_redeem: {
+        Args: { p_token_hash: string; p_user_id: string }
+        Returns: Json
+      }
+      invitation_revoke: { Args: { p_id: string }; Returns: boolean }
+      mark_tour_completed: { Args: never; Returns: undefined }
+      my_onboarding_status: { Args: never; Returns: Json }
+      org_onboarding_mark: {
+        Args: { p_event: string; p_org: string }
+        Returns: undefined
+      }
+      setup_save_draft: { Args: { p_draft: Json }; Returns: undefined }
+      setup_slug_available: { Args: { p_slug: string }; Returns: boolean }
       is_member_of: { Args: { org: string }; Returns: boolean }
       is_notification_worker: { Args: { p_token: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }

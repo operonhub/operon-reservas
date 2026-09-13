@@ -15,10 +15,12 @@ export function AppShellMobile({
   userName,
   orgName,
   role,
+  publicUrl,
 }: {
   userName: string
   orgName: string
   role: string
+  publicUrl: string
 }) {
   const [open, setOpen] = React.useState(false)
 
@@ -26,7 +28,7 @@ export function AppShellMobile({
     <Sheet open={open} onOpenChange={setOpen}>
       <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-sidebar px-3 text-sidebar-foreground lg:hidden print:hidden">
         <SheetTrigger
-          render={<Button variant="ghost" size="icon" className="text-muted-foreground" />}
+          render={<Button variant="ghost" size="icon" data-tour="menu" className="text-muted-foreground" />}
         >
           <Menu className="h-5 w-5" />
           <span className="sr-only">Abrir menú</span>
@@ -53,6 +55,7 @@ export function AppShellMobile({
           userName={userName}
           orgName={orgName}
           role={role}
+          publicUrl={publicUrl}
           onNavigate={() => setOpen(false)}
         />
       </SheetContent>

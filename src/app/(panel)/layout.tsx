@@ -1,6 +1,8 @@
 import { requireContext } from "@/lib/auth"
+import { siteUrl } from "@/lib/site-url"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AppShellMobile } from "@/components/app-shell-mobile"
+import { TourProvider } from "@/components/onboarding/tour/tour-provider"
 import { cookies } from "next/headers"
 
 export default async function PanelLayout({
@@ -10,17 +12,20 @@ export default async function PanelLayout({
 }) {
   const ctx = await requireContext()
   const isDemo = (await cookies()).get("operon_demo")?.value === "1"
+  const publicUrl = `${await siteUrl()}/reservar/${ctx.organizationSlug}`
 
   return (
-    // Alto fijo con scroll en el <main>: así una vista puede ocupar la
-    // pantalla completa y scrollear por dentro (el calendario lo necesita
-    // para dejar el encabezado fijo), sin romper las páginas que
-    // simplemente crecen hacia abajo.
+    <TourProvider autoStart={!ctx.tourCompleted} isDemo={isDemo}>
+    {/* Alto fijo con scroll en el <main>: así una vista puede ocupar la
+        pantalla completa y scrollear por dentro (el calendario lo necesita
+        para dejar el encabezado fijo), sin romper las páginas que
+        simplemente crecen hacia abajo. */}
     <div className="flex h-screen overflow-hidden">
       <AppSidebar
         userName={ctx.fullName}
         orgName={ctx.organizationName}
         role={ctx.role}
+        publicUrl={publicUrl}
       />
       {/* `min-w-0`: sin esto el grid ancho del calendario estira la columna y
           reaparece el scroll horizontal de toda la página. */}
@@ -29,6 +34,7 @@ export default async function PanelLayout({
           userName={ctx.fullName}
           orgName={ctx.organizationName}
           role={ctx.role}
+          publicUrl={publicUrl}
         />
         {/* `min-h-0`: acá el alto lo da `flex-1`, y el `min-height: auto` que
             traen los flex items impediría achicarse -> <main> crecería con el
@@ -39,5 +45,6 @@ export default async function PanelLayout({
         </main>
       </div>
     </div>
+    </TourProvider>
   )
 }

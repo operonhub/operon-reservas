@@ -44,8 +44,10 @@ export async function updateSession(request: NextRequest) {
   // `/demo` es un recorrido comercial aislado: no consulta ni muta Supabase.
   // Cobros MP: checkout (huésped anónimo / landing externa), webhook (servidores
   // de MP) y la página de retorno del pago. connect/callback SÍ requieren sesión.
+  // `/invitacion`: el dueño nuevo todavía no tiene cuenta cuando abre el link.
   const isPublic =
     pathname.startsWith("/login") ||
+    pathname.startsWith("/invitacion") ||
     pathname.startsWith("/demo") ||
     pathname.startsWith("/api/public") ||
     pathname.startsWith("/reservar") ||
