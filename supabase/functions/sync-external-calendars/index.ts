@@ -41,6 +41,8 @@ type SyncSummary = {
   updated: number
   removed: number
   skipped_conflicts: number
+  /** El RPC no borró nada porque el feed vino vacío sin confirmación (0024). */
+  empty_feed_ignored?: boolean
 }
 
 // ============================================================
@@ -69,6 +71,12 @@ function parseIcalDate(value: string): string | null {
   if (digits.length !== 8) return null
   const iso = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`
   return Number.isNaN(Date.parse(iso)) ? null : iso
+}
+
+// Un 200 no garantiza un calendario: cuando el link de exportación de
+// Airbnb/Booking caduca o pide login, responden 200 con una página HTML.
+function isIcalDocument(text: string): boolean {
+  return /(^|[\r\n])BEGIN:VCALENDAR[\r\n]/.test(text) && /(^|[\r\n])END:VCALENDAR/.test(text)
 }
 
 function parseIcal(text: string): IcalEvent[] {
@@ -135,6 +143,11 @@ async function syncPlatform(
       return { unit_id: unitId, source, ok: false, error: `HTTP_${res.status}` }
     }
     const text = await res.text()
+    // Tratar una página de error como "feed sin eventos" liberaba todas las
+    // fechas importadas de la unidad (auditoría A-01).
+    if (!isIcalDocument(text)) {
+      return { unit_id: unitId, source, ok: false, error: "NOT_ICAL" }
+    }
     const events = parseIcal(text)
 
     const summary = await rpc<SyncSummary>("sync_unit_external_blocks", {
@@ -142,6 +155,11 @@ async function syncPlatform(
       p_unit_id: unitId,
       p_source: source,
       p_ranges: events,
+      // Sólo un calendario válido y sin eventos (se cancelaron todas las
+      // reservas en la plataforma) autoriza a liberar todo. Con eventos el
+      // parámetro no se manda y la llamada queda idéntica a la anterior, así
+      // que este worker funciona también contra una base sin la 0024.
+      ...(events.length === 0 ? { p_allow_empty: true } : {}),
     })
 
     return { unit_id: unitId, source, ok: true, ...summary }

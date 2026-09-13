@@ -8,7 +8,7 @@ import { StatusControl } from "@/components/reservations/status-control"
 import { PrintButton } from "@/components/reservations/print-button"
 import { GuestNameTrigger } from "@/components/reservations/guest-name-trigger"
 import { OperonMarkTinta } from "@/components/brand/operon-mark"
-import { formatCurrency, nightsBetween, whatsappHref } from "@/lib/format"
+import { DEFAULT_TIMEZONE, formatCurrency, nightsBetween, whatsappHref } from "@/lib/format"
 import { PAYMENT_STATUS_LABELS, PAYMENT_KIND_LABELS } from "@/lib/constants"
 import { ArrowLeft, MessageCircle, Mail, CircleCheck, Clock3 } from "lucide-react"
 import type { Enums } from "@/lib/supabase/types"
@@ -22,12 +22,16 @@ type Payment = {
   created_at: string
 }
 
-/** dd/mm/aaaa — formato de comprobante, no ISO. */
+/**
+ * dd/mm/aaaa — formato de comprobante, no ISO. Recibe timestamps (ahora,
+ * paid_at): se muestran en el huso del alojamiento, no en el del servidor.
+ */
 function docDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-AR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone: DEFAULT_TIMEZONE,
   })
 }
 

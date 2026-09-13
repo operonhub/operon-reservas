@@ -69,8 +69,10 @@ async function processEvent(
     return "failed"
   }
 
-  const email = renderReservationEmail(event)
   try {
+    // Adentro del try: si el render lanza (p. ej. Intl.NumberFormat con una
+    // moneda inválida), el evento queda marcado como fallido con su error.
+    const email = renderReservationEmail(event)
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -137,8 +139,17 @@ Deno.serve(async (request: Request) => {
     }
 
     for (const event of events) {
-      const result = await processEvent(workerToken, event)
-      summary[result] += 1
+      // Un evento que falla no frena al resto del batch. Antes cualquier
+      // excepción cortaba el for y los eventos que seguían quedaban en
+      // 'processing' hasta que claim_notification_batch los rescatara a los
+      // 10' (auditoría B-04). Este queda igual: se reintenta con el backoff.
+      try {
+        const result = await processEvent(workerToken, event)
+        summary[result] += 1
+      } catch (error) {
+        summary.failed += 1
+        console.error(`notify-reservations: evento ${event.id}`, error)
+      }
     }
 
     return Response.json(summary)

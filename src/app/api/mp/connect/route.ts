@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import crypto from "node:crypto"
+import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { buildAuthorizeUrl, isMercadoPagoConfigured } from "@/lib/mercadopago"
 
@@ -15,6 +16,13 @@ function base64url(buf: Buffer): string {
  * asociados a la org, y redirige al consentimiento de MP.
  */
 export async function GET(request: Request) {
+  // En la demo el cliente de Supabase es ficticio: mp_save_oauth_state
+  // "funcionaba" sin error y la ruta mandaba al visitante al consentimiento
+  // real de Mercado Pago con el client_id de Operon (auditoría M-05).
+  if ((await cookies()).get("operon_demo")?.value === "1") {
+    return new NextResponse("No disponible en la demo.", { status: 403 })
+  }
+
   const configUrl = new URL("/configuracion", request.url)
 
   if (!isMercadoPagoConfigured()) {

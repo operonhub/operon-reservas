@@ -43,7 +43,7 @@ function fail(status: number, error: string) {
  * una reserva y devuelve el `init_point`. El dinero va a la cuenta de la org.
  */
 export async function POST(request: Request) {
-  let body: { code?: string; orgSlug?: string; returnUrl?: string }
+  let body: { code?: string; orgSlug?: string }
   try {
     body = await request.json()
   } catch {
@@ -80,28 +80,33 @@ export async function POST(request: Request) {
     r.deposit_amount && r.deposit_amount > 0 ? r.deposit_amount : r.total_amount
   if (!amount || amount <= 0) return fail(422, "SIN_MONTO")
 
-  const cred = await getValidCredential(admin, org.id)
+  let cred: Awaited<ReturnType<typeof getValidCredential>>
+  try {
+    cred = await getValidCredential(admin, org.id)
+  } catch {
+    return fail(503, "PAGOS_NO_DISPONIBLES")
+  }
   if (!cred) return fail(409, "ORG_SIN_MERCADOPAGO")
 
-  // Idempotencia: reusar el pago pendiente y su link si ya existe.
-  const { data: existing } = await admin
-    .from("payments")
-    .select("id, mp_init_point")
-    .eq("reservation_id", r.id)
-    .eq("kind", "deposit")
-    .eq("status", "pending")
-    .maybeSingle()
+  // Idempotencia: reusar la seña pendiente y su link si ya existe.
+  // order + limit: aunque quedaran duplicados de antes, maybeSingle() nunca
+  // ve más de una fila. Antes, con dos filas devolvía error, el error se
+  // descartaba y cada pedido creaba otra seña y otra preferencia (M-06).
+  const pendingDeposit = () =>
+    admin
+      .from("payments")
+      .select("id, mp_init_point")
+      .eq("reservation_id", r.id)
+      .eq("kind", "deposit")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-  if (existing?.mp_init_point) {
-    await bumpHold(admin, r.id)
-    return NextResponse.json(
-      { ok: true, init_point: existing.mp_init_point },
-      { headers: CORS }
-    )
-  }
+  let { data: deposit, error: depositErr } = await pendingDeposit()
+  if (depositErr) return fail(500, "NO_SE_PUDO_REGISTRAR_PAGO")
 
-  let paymentId = existing?.id
-  if (!paymentId) {
+  if (!deposit) {
     const { data: inserted, error: insErr } = await admin
       .from("payments")
       .insert({
@@ -113,11 +118,29 @@ export async function POST(request: Request) {
         status: "pending",
         method: "mercadopago",
       })
-      .select("id")
+      .select("id, mp_init_point")
       .single()
-    if (insErr || !inserted) return fail(500, "NO_SE_PUDO_REGISTRAR_PAGO")
-    paymentId = inserted.id
+    if (insErr?.code === "23505") {
+      // Otro pedido de esta misma reserva la creó en paralelo (doble click):
+      // el índice único de la 0024 frenó el duplicado, así que se usa esa.
+      const retry = await pendingDeposit()
+      deposit = retry.data
+      depositErr = retry.error
+    } else {
+      deposit = inserted
+      depositErr = insErr
+    }
+    if (depositErr || !deposit) return fail(500, "NO_SE_PUDO_REGISTRAR_PAGO")
   }
+
+  if (deposit.mp_init_point) {
+    await bumpHold(admin, r.id)
+    return NextResponse.json(
+      { ok: true, init_point: deposit.mp_init_point },
+      { headers: CORS }
+    )
+  }
+  const paymentId = deposit.id
 
   let payerEmail: string | undefined
   if (r.guest_id) {
@@ -134,9 +157,12 @@ export async function POST(request: Request) {
     // El código es único solo DENTRO de cada org (unique (organization_id,
     // code)), no globalmente — /pago necesita el slug para no ambigüar
     // reservas de distintos alojamientos con el mismo código.
-    const back =
-      body.returnUrl?.trim() ||
-      `${site}/pago?code=${encodeURIComponent(code)}&org=${encodeURIComponent(orgSlug)}`
+    //
+    // La vuelta es SIEMPRE nuestra /pago. Antes se aceptaba un `returnUrl`
+    // del cuerpo: como este endpoint es público y el init_point se guarda y
+    // se reutiliza, cualquiera podía dejar el link de pago de otro huésped
+    // apuntando a su sitio (auditoría A-03). Ningún llamador lo usaba.
+    const back = `${site}/pago?code=${encodeURIComponent(code)}&org=${encodeURIComponent(orgSlug)}`
 
     const pref = await createPreference(
       cred.access_token,
