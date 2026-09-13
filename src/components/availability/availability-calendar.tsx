@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import {
   Dialog,
@@ -41,9 +41,10 @@ import { createBlock, deleteBlock } from "@/app/(panel)/calendario/actions"
 import {
   Ban, Plus, ChevronLeft, ChevronRight, CalendarDays, X, Users, Moon,
   LogIn, LogOut, Mail, MessageCircle, TrendingUp, Wallet, DoorOpen, Sparkles,
-  CircleCheck, Clock3, ExternalLink, Info,
+  CircleCheck, Clock3, ExternalLink, Info, Maximize2,
 } from "lucide-react"
 import type { CalendarSegment } from "@/app/(panel)/calendario/page"
+import { MonthView } from "./month-view"
 
 type Unit = { id: string; name: string; capacity: number }
 
@@ -155,6 +156,40 @@ export function AvailabilityCalendar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Vista de mes a pantalla completa. Vive en la URL (?vista=mes) para que
+  // recargar la mantenga y Atrás la cierre. Se cambia con el History API
+  // nativo: `router.push` le volvería a pedir al servidor los 25 meses.
+  const searchParams = useSearchParams()
+  const expanded = searchParams.get("vista") === "mes"
+  const pushedHistory = React.useRef(false)
+
+  React.useEffect(() => {
+    if (!expanded) pushedHistory.current = false
+  }, [expanded])
+
+  function openExpanded() {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("vista", "mes")
+    setSelected(null)
+    window.history.pushState(null, "", `?${params}`)
+    pushedHistory.current = true
+  }
+
+  function closeExpanded(month: string) {
+    setSelected(null)
+    // Si la abrimos nosotros, volver atrás deja el historial limpio; si se
+    // entró directo con ?vista=mes, no hay a dónde volver.
+    if (pushedHistory.current) {
+      window.history.back()
+    } else {
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete("vista")
+      const qs = params.toString()
+      window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname)
+    }
+    scrollToMonth(month.slice(0, 7), "instant")
+  }
+
   function onScroll(event: React.UIEvent<HTMLDivElement>) {
     const left = event.currentTarget.scrollLeft
     // El mes visible es el último que ya arrancó a la izquierda del viewport.
@@ -262,6 +297,12 @@ export function AvailabilityCalendar({
             onToday={() => scrollToMonth(today.slice(0, 7))}
             isToday={viewMonth === startOfMonth(today)}
           />
+          <Button
+            onClick={openExpanded}
+            className="ml-auto h-9 gap-2 border-primary/30 bg-accent px-3.5 font-semibold text-accent-foreground shadow-sm hover:border-primary hover:bg-primary hover:text-primary-foreground"
+          >
+            <Maximize2 /> Expandir
+          </Button>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -442,8 +483,33 @@ export function AvailabilityCalendar({
           </div>
         )}
 
-        {selected && <DetailPanel seg={selected} onClose={() => setSelected(null)} />}
+        {selected && !expanded && (
+          <DetailPanel seg={selected} onClose={() => setSelected(null)} />
+        )}
       </div>
+
+      {expanded && (
+        <MonthView
+          organizationName={organizationName}
+          units={units}
+          segments={segments}
+          today={today}
+          initialMonth={viewMonth}
+          minMonth={rangeStart}
+          maxMonth={addMonths(endExclusive, -1)}
+          selectedId={selected?.id ?? null}
+          actions={
+            <>
+              <Legend />
+              <BlockDialog units={units} startDate={today} />
+            </>
+          }
+          onSelect={setSelected}
+          onClose={closeExpanded}
+        >
+          {selected && <DetailPanel seg={selected} onClose={() => setSelected(null)} />}
+        </MonthView>
+      )}
     </div>
   )
 }
