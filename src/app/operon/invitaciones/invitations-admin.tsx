@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { Check, Copy, LoaderCircle, MessageCircle, Plus } from "lucide-react"
-import { OperonArc } from "@/components/brand/operon-arc"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -39,12 +38,8 @@ export function InvitationsAdmin({ invitations }: { invitations: InvitationRow[]
   )
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background">
-      <OperonArc className="inset-0" size={520} thickness={64} corner="bottom-right" />
-
-      <div className="relative mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
+      <div className="max-w-4xl">
         <header>
-          <p className="label-mono text-primary">Operon · uso interno</p>
           <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-[28px]">Invitaciones</h1>
           <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
             Generá un link para que un cliente nuevo cree su cuenta y configure su complejo. Sirve
@@ -130,7 +125,6 @@ export function InvitationsAdmin({ invitations }: { invitations: InvitationRow[]
           )}
         </section>
       </div>
-    </main>
   )
 }
 

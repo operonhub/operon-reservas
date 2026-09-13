@@ -75,10 +75,15 @@ export const requireContext = cache(async function requireContext(): Promise<Act
   const orgObj = Array.isArray(org) ? org[0] : org
 
   if (!membership || !orgObj) {
-    // Sin organización: si canjeó una invitación, le falta el asistente. Este
-    // viaje extra solo lo paga quien todavía no tiene complejo.
-    const { data: onboarding } = await supabase.rpc("my_onboarding_status")
-    redirect((onboarding as { has_grant?: boolean } | null)?.has_grant ? "/bienvenida" : "/sin-acceso")
+    // Sin organización: si canjeó una invitación, le falta el asistente; si es
+    // de Operon, su lugar es el panel interno. Este viaje extra solo lo paga
+    // quien todavía no tiene complejo.
+    const [{ data: onboarding }, { data: isPlatformAdmin }] = await Promise.all([
+      supabase.rpc("my_onboarding_status"),
+      supabase.rpc("is_platform_admin"),
+    ])
+    if ((onboarding as { has_grant?: boolean } | null)?.has_grant) redirect("/bienvenida")
+    redirect(isPlatformAdmin ? "/operon" : "/sin-acceso")
   }
 
   return {

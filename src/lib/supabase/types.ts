@@ -980,6 +980,29 @@ export type Database = {
       invitation_revoke: { Args: { p_id: string }; Returns: boolean }
       mark_tour_completed: { Args: never; Returns: undefined }
       my_onboarding_status: { Args: never; Returns: Json }
+      operon_clients: {
+        Args: never
+        Returns: {
+          created_at: string
+          currency: string
+          deposit_pct: number
+          last_reservation_at: string
+          last_sign_in_at: string
+          link_shared: boolean
+          members: number
+          mp_connected: boolean
+          mp_live: boolean
+          name: string
+          organization_id: string
+          owner_email: string
+          owner_name: string
+          paid_month: number
+          reservations_month: number
+          reservations_total: number
+          slug: string
+          units: number
+        }[]
+      }
       org_onboarding_mark: {
         Args: { p_event: string; p_org: string }
         Returns: undefined
