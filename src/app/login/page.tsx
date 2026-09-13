@@ -1,6 +1,7 @@
 "use client"
 
 import { useActionState, useState } from "react"
+import Link from "next/link"
 import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react"
 import { login } from "./actions"
 import { LoginBrandLockup } from "./login-brand-lockup"
@@ -70,9 +71,17 @@ export default function LoginPage() {
             </div>
 
             <div className={styles.field}>
-              <Label htmlFor="password" className={styles.fieldLabel}>
-                Contraseña
-              </Label>
+              <div className="flex items-baseline justify-between gap-2">
+                <Label htmlFor="password" className={styles.fieldLabel}>
+                  Contraseña
+                </Label>
+                <Link
+                  href="/recuperar"
+                  className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
               <div className={styles.passwordField}>
                 <Input
                   id="password"

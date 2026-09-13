@@ -45,8 +45,14 @@ export async function updateSession(request: NextRequest) {
   // Cobros MP: checkout (huésped anónimo / landing externa), webhook (servidores
   // de MP) y la página de retorno del pago. connect/callback SÍ requieren sesión.
   // `/invitacion`: el dueño nuevo todavía no tiene cuenta cuando abre el link.
+  // `/recuperar` y `/actualizar-contrasena`: el link de "olvidé mi contraseña"
+  // arma la sesión de recuperación SOLO en el navegador (nunca llega una
+  // cookie en este request); si el middleware la mandara antes a /login, esa
+  // sesión se perdería antes de que la página pudiera leerla.
   const isPublic =
     pathname.startsWith("/login") ||
+    pathname.startsWith("/recuperar") ||
+    pathname.startsWith("/actualizar-contrasena") ||
     pathname.startsWith("/invitacion") ||
     pathname.startsWith("/demo") ||
     pathname.startsWith("/api/public") ||
