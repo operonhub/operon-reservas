@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "node --test \"tests/**/*.test.mjs\"",
     "test:functions": "deno test --node-modules-dir=none --no-lock --allow-env --allow-read supabase/functions/",
-    "test:notifications": "node --no-warnings scripts/test-notification-emails.mjs"
+    "test:notifications": "node --no-warnings scripts/test-notification-emails.mjs",
+    "reset-password": "node --env-file=.env.local scripts/reset-password.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
