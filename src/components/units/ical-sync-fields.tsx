@@ -10,10 +10,12 @@ import { CopyIcalLink } from "@/components/units/copy-ical-link"
  */
 export function IcalSyncFields({
   unitId,
+  icalToken,
   airbnbUrl,
   bookingUrl,
 }: {
   unitId: string
+  icalToken: string
   airbnbUrl: string | null
   bookingUrl: string | null
 }) {
@@ -60,7 +62,7 @@ export function IcalSyncFields({
         <p className="text-xs text-muted-foreground">
           Link de calendario de esta unidad (para pegar en Airbnb/Booking)
         </p>
-        <CopyIcalLink unitId={unitId} />
+        <CopyIcalLink unitId={unitId} token={icalToken} />
       </div>
     </div>
   )

@@ -30,7 +30,7 @@ export default async function UnidadesPage() {
     supabase
       .from("units")
       .select(
-        "id, name, description, capacity, is_active, photo_path, amenities, airbnb_ical_url, booking_ical_url, properties(name)"
+        "id, name, description, capacity, is_active, photo_path, amenities, airbnb_ical_url, booking_ical_url, ical_token, properties(name)"
       )
       .order("position", { ascending: true }),
     // Ocupación del horizonte: alimenta el estado de "ahora", la próxima
@@ -84,6 +84,8 @@ export default async function UnidadesPage() {
       amenities: sanitizeAmenities((u.amenities as string[] | null) ?? []),
       airbnbIcalUrl: u.airbnb_ical_url,
       bookingIcalUrl: u.booking_ical_url,
+      // Las unidades que se agregan en la demo no traen token.
+      icalToken: u.ical_token ?? "",
       propertyName: Array.isArray(prop) ? prop[0]?.name : prop?.name,
       current: current
         ? {

@@ -39,13 +39,14 @@ type BaseUnit = {
   amenities: string[]
   airbnb_ical_url: string | null
   booking_ical_url: string | null
+  ical_token: string
   properties: { name: string }
 }
 
 const BASE_UNITS: readonly BaseUnit[] = [
-  { id: "unit-1", property_id: "property-1", name: "Cabaña del Bosque", capacity: 4, is_active: true, position: 1, description: "Dos dormitorios, galería y vista al monte.", photo_path: "https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=1400&q=85", amenities: ["Parrilla", "Wi-Fi", "Cocina equipada"], airbnb_ical_url: null, booking_ical_url: null, properties: { name: "Refugio Alto Cielo" } },
-  { id: "unit-2", property_id: "property-1", name: "Suite Mirador", capacity: 2, is_active: true, position: 2, description: "Suite íntima con terraza privada.", photo_path: "https://images.unsplash.com/photo-1601918774946-25832a4be0d6?auto=format&fit=crop&w=1400&q=85", amenities: ["Desayuno", "Aire acondicionado", "Deck"], airbnb_ical_url: null, booking_ical_url: null, properties: { name: "Refugio Alto Cielo" } },
-  { id: "unit-3", property_id: "property-1", name: "Casa del Arroyo", capacity: 6, is_active: true, position: 3, description: "Espacio amplio para familias, junto al arroyo.", photo_path: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1400&q=85", amenities: ["Pileta", "Lavadero", "Cochera"], airbnb_ical_url: null, booking_ical_url: null, properties: { name: "Refugio Alto Cielo" } },
+  { id: "unit-1", property_id: "property-1", name: "Cabaña del Bosque", capacity: 4, is_active: true, position: 1, description: "Dos dormitorios, galería y vista al monte.", photo_path: "https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=1400&q=85", amenities: ["Parrilla", "Wi-Fi", "Cocina equipada"], airbnb_ical_url: null, booking_ical_url: null, ical_token: "demo", properties: { name: "Refugio Alto Cielo" } },
+  { id: "unit-2", property_id: "property-1", name: "Suite Mirador", capacity: 2, is_active: true, position: 2, description: "Suite íntima con terraza privada.", photo_path: "https://images.unsplash.com/photo-1601918774946-25832a4be0d6?auto=format&fit=crop&w=1400&q=85", amenities: ["Desayuno", "Aire acondicionado", "Deck"], airbnb_ical_url: null, booking_ical_url: null, ical_token: "demo", properties: { name: "Refugio Alto Cielo" } },
+  { id: "unit-3", property_id: "property-1", name: "Casa del Arroyo", capacity: 6, is_active: true, position: 3, description: "Espacio amplio para familias, junto al arroyo.", photo_path: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1400&q=85", amenities: ["Pileta", "Lavadero", "Cochera"], airbnb_ical_url: null, booking_ical_url: null, ical_token: "demo", properties: { name: "Refugio Alto Cielo" } },
 ]
 
 type DemoReservation = {

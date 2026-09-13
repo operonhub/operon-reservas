@@ -32,19 +32,23 @@ function escapeText(text: string): string {
 
 /**
  * Feed iCal público de una unidad: sólo rangos de fechas ocupadas (reservas +
- * bloqueos manuales, ya unificados en unit_occupancy). Pensado para que
- * Booking/Airbnb lo lean y bloqueen su calendario — sin datos de huéspedes,
- * precios ni motivos de bloqueo.
+ * bloqueos manuales, ya unificados en unit_occupancy) desde hace 30 días.
+ * Pensado para que Booking/Airbnb lo lean y bloqueen su calendario — sin
+ * datos de huéspedes, precios ni motivos de bloqueo. Sin el token correcto
+ * responde 404, igual que una unidad que no existe.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ unitId: string }> }
 ) {
   const { unitId } = await params
+  // El token va en el link que el dueño copia del panel (migración 0028).
+  const token = new URL(request.url).searchParams.get("t") ?? ""
   const supabase = await createClient()
 
   const { data, error } = await supabase.rpc("public_ical_feed", {
     p_unit_id: unitId,
+    p_token: token,
   })
   const feed = data as IcalFeed | null
 

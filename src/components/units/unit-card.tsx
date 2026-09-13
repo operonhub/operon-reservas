@@ -21,6 +21,8 @@ export type UnitCardData = {
   amenities: AmenityKey[]
   airbnbIcalUrl: string | null
   bookingIcalUrl: string | null
+  /** Va en el link de exportación del calendario (migración 0028). */
+  icalToken: string
   propertyName?: string
   current: { kind: string; until: string; label: string | null } | null
   nextArrival: string | null
@@ -150,6 +152,7 @@ export function UnitCard({
             amenities: unit.amenities,
             airbnb_ical_url: unit.airbnbIcalUrl,
             booking_ical_url: unit.bookingIcalUrl,
+            ical_token: unit.icalToken,
           }}
           properties={properties}
           organizationId={organizationId}
@@ -164,7 +167,7 @@ export function UnitCard({
           <CalendarDays className="size-3.5" /> Calendario
         </Link>
         {/* Link del feed iCal para sincronizar con Booking/Airbnb (Etapa 9). */}
-        <CopyIcalLink unitId={unit.id} />
+        <CopyIcalLink unitId={unit.id} token={unit.icalToken} />
         {!readOnly && (
           <div className="ml-auto">
             <UnitActiveToggle id={unit.id} isActive={unit.isActive} />

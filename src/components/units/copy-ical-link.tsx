@@ -6,11 +6,12 @@ import { CalendarSync } from "lucide-react"
 
 /**
  * Copia el link del feed iCal de la unidad (fechas ocupadas), para pegarlo
- * en la sincronización de calendarios de Booking/Airbnb.
+ * en la sincronización de calendarios de Booking/Airbnb. El token va en el
+ * link: sin él, el feed responde 404 (migración 0028).
  */
-export function CopyIcalLink({ unitId }: { unitId: string }) {
+export function CopyIcalLink({ unitId, token }: { unitId: string; token: string }) {
   function onClick() {
-    const url = `${window.location.origin}/ical/${unitId}`
+    const url = `${window.location.origin}/ical/${unitId}?t=${encodeURIComponent(token)}`
     navigator.clipboard
       .writeText(url)
       .then(() => toast.success("Link de calendario copiado."))

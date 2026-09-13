@@ -662,6 +662,7 @@ export type Database = {
         // reemplazar por la regeneración real (`supabase gen types`).
         Row: {
           airbnb_ical_url: string | null
+          ical_token: string
           amenities: string[]
           booking_ical_url: string | null
           capacity: number
@@ -678,6 +679,7 @@ export type Database = {
         }
         Insert: {
           airbnb_ical_url?: string | null
+          ical_token?: string
           amenities?: string[]
           booking_ical_url?: string | null
           capacity?: number
@@ -694,6 +696,7 @@ export type Database = {
         }
         Update: {
           airbnb_ical_url?: string | null
+          ical_token?: string
           amenities?: string[]
           booking_ical_url?: string | null
           capacity?: number
@@ -1022,7 +1025,10 @@ export type Database = {
       }
       mp_disconnect: { Args: never; Returns: undefined }
       mp_public_status: { Args: { p_org_slug: string }; Returns: Json }
-      public_ical_feed: { Args: { p_unit_id: string }; Returns: Json }
+      public_ical_feed: {
+        Args: { p_token: string; p_unit_id: string }
+        Returns: Json
+      }
       mp_save_oauth_state: {
         Args: { p_code_verifier: string; p_state: string }
         Returns: string

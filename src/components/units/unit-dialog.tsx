@@ -32,6 +32,7 @@ type Unit = {
   amenities?: string[] | null
   airbnb_ical_url?: string | null
   booking_ical_url?: string | null
+  ical_token?: string
 }
 
 type Property = { id: string; name: string }
@@ -183,6 +184,7 @@ export function UnitDialog({
           {mode === "edit" && (
             <IcalSyncFields
               unitId={unit!.id}
+              icalToken={unit!.ical_token ?? ""}
               airbnbUrl={unit!.airbnb_ical_url ?? null}
               bookingUrl={unit!.booking_ical_url ?? null}
             />

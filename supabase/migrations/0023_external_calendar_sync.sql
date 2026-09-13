@@ -53,6 +53,10 @@ create unique index unit_occupancy_external_uidx
   where external_source is not null;
 
 -- ---------- Config + secreto del worker ----------
+-- El schema lo crea 0006; se repite para que esta migración no dependa del
+-- orden (auditoría B-07).
+create schema if not exists app_private;
+
 create table app_private.ical_sync_worker_config (
   singleton    boolean primary key default true check (singleton),
   worker_token text not null,
