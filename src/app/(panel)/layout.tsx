@@ -1,5 +1,5 @@
 import { requireContext } from "@/lib/auth"
-import { siteUrl } from "@/lib/site-url"
+import { publicReservationUrl } from "@/lib/site-url"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AppShellMobile } from "@/components/app-shell-mobile"
 import { TourProvider } from "@/components/onboarding/tour/tour-provider"
@@ -12,7 +12,7 @@ export default async function PanelLayout({
 }) {
   const ctx = await requireContext()
   const isDemo = (await cookies()).get("operon_demo")?.value === "1"
-  const publicUrl = `${await siteUrl()}/reservar/${ctx.organizationSlug}`
+  const publicUrl = await publicReservationUrl(ctx.organizationSlug)
 
   return (
     <TourProvider autoStart={!ctx.tourCompleted} isDemo={isDemo}>

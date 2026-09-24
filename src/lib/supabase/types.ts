@@ -496,6 +496,8 @@ export type Database = {
         Row: {
           check_in: string
           check_out: string
+          checked_in_at: string | null
+          checked_out_at: string | null
           code: string
           created_at: string
           created_by: string | null
@@ -519,6 +521,8 @@ export type Database = {
         Insert: {
           check_in: string
           check_out: string
+          checked_in_at?: string | null
+          checked_out_at?: string | null
           code: string
           created_at?: string
           created_by?: string | null
@@ -542,6 +546,8 @@ export type Database = {
         Update: {
           check_in?: string
           check_out?: string
+          checked_in_at?: string | null
+          checked_out_at?: string | null
           code?: string
           created_at?: string
           created_by?: string | null

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { cn } from "@/lib/utils"
 import { StatusBadge, SourceBadge } from "@/components/reservations/reservation-badges"
 import { StatusControl } from "@/components/reservations/status-control"
+import { ReservationMovements } from "@/components/reservations/reservation-movements"
 import { PrintButton } from "@/components/reservations/print-button"
 import { GuestNameTrigger } from "@/components/reservations/guest-name-trigger"
 import { OperonMarkTinta } from "@/components/brand/operon-mark"
@@ -57,7 +58,7 @@ export default async function ReservaDetailPage({
     supabase
       .from("reservations")
       .select(
-        "id, code, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, method, paid_at, created_at)"
+        "id, code, check_in, check_out, checked_in_at, checked_out_at, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, method, paid_at, created_at)"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -294,6 +295,13 @@ export default async function ReservaDetailPage({
       </article>
 
       {/* Gestión — fuera del comprobante */}
+      <ReservationMovements
+        reservationId={r.id}
+        checkInAt={r.checked_in_at}
+        checkOutAt={r.checked_out_at}
+        checkInTime={property?.checkin_time}
+        checkOutTime={property?.checkout_time}
+      />
       <div className="mx-auto mt-5 max-w-3xl rounded-2xl border bg-card p-5 print:hidden">
         <h2 className="label-mono mb-3 text-muted-foreground">Cambiar estado</h2>
         <StatusControl id={r.id} status={r.status} />

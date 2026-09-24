@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { requireContext } from "@/lib/auth"
 import type { Enums } from "@/lib/supabase/types"
-import { applyDemoManualReservation, applyDemoTransition } from "@/lib/demo/fixtures"
+import { applyDemoManualReservation, applyDemoMovement, applyDemoTransition } from "@/lib/demo/fixtures"
 import { isDemoRequest, readDemoState, writeDemoState } from "@/lib/demo/session"
 
 export type ActionResult = { ok: boolean; error?: string; id?: string }
@@ -184,6 +184,64 @@ export async function transitionReservation(
   revalidatePath("/reservas")
   revalidatePath(`/reservas/${id}`)
   revalidatePath("/calendario")
+  revalidatePath("/")
+  return { ok: true }
+}
+
+export type ReservationMovement = "checkin" | "checkout"
+
+/** Registra el momento real de ingreso o salida sin alterar estado ni fechas.
+ * El estado `completed` se mantiene como transición administrativa separada,
+ * porque también representa el cierre del circuito de la reserva y sus pagos.
+ */
+export async function recordReservationMovement(
+  id: string,
+  movement: ReservationMovement
+): Promise<ActionResult> {
+  if (!id || !["checkin", "checkout"].includes(movement)) {
+    return { ok: false, error: "Movimiento inválido." }
+  }
+
+  const occurredAt = new Date().toISOString()
+  if (await isDemoRequest()) {
+    const result = applyDemoMovement(await readDemoState(), id, movement, occurredAt)
+    if (!result.ok) return result
+    await writeDemoState(result.state)
+    revalidatePath(`/reservas/${id}`)
+    revalidatePath("/reservas")
+    revalidatePath("/")
+    return { ok: true }
+  }
+
+  await requireContext()
+  const supabase = await createClient()
+  const { data: reservation, error: readError } = await supabase
+    .from("reservations")
+    .select("status, checked_in_at, checked_out_at")
+    .eq("id", id)
+    .maybeSingle()
+
+  if (readError || !reservation) return { ok: false, error: "No se encontró la reserva." }
+  if (reservation.status === "cancelled" || reservation.status === "expired") {
+    return { ok: false, error: "Una reserva cancelada o expirada no tiene movimientos operativos." }
+  }
+
+  const field = movement === "checkin" ? "checked_in_at" : "checked_out_at"
+  if (reservation[field]) {
+    return {
+      ok: false,
+      error: movement === "checkin" ? "El ingreso ya estaba registrado." : "La salida ya estaba registrada.",
+    }
+  }
+
+  const update = movement === "checkin"
+    ? { checked_in_at: occurredAt }
+    : { checked_out_at: occurredAt }
+  const { error } = await supabase.from("reservations").update(update).eq("id", id)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath(`/reservas/${id}`)
+  revalidatePath("/reservas")
   revalidatePath("/")
   return { ok: true }
 }

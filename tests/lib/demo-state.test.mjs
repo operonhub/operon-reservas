@@ -7,6 +7,8 @@ import assert from "node:assert/strict"
 import {
   EMPTY_DEMO_STATE,
   applyDemoManualReservation,
+  applyDemoMovement,
+  applyDemoPropertyPatch,
   applyDemoTransition,
   applyDemoUnitPatch,
   parseDemoState,
@@ -70,6 +72,20 @@ test("parche de unidad: se ve en las lecturas, el id inválido devuelve null", a
   assert.equal(unit.name, "Suite Renombrada")
   assert.equal(unit.is_active, false)
   assert.equal(applyDemoUnitPatch(EMPTY_DEMO_STATE, "unit-999", { name: "x" }), null)
+})
+
+test("la configuración de horarios y los movimientos quedan aislados por visitante", async () => {
+  const configured = applyDemoPropertyPatch(EMPTY_DEMO_STATE, { checkin_time: "13:00", checkout_time: "10:00" })
+  const property = (await createDemoClient(configured).from("properties")).data[0]
+  assert.equal(property.checkin_time, "13:00")
+  assert.equal((await createDemoClient(EMPTY_DEMO_STATE).from("properties")).data[0].checkin_time, "14:00")
+
+  const moved = applyDemoMovement(configured, "res-2", "checkin", "2026-09-21T15:30:00.000Z")
+  assert.equal(moved.ok, true)
+  const reservation = (await reservationsOf(moved.state)).find((r) => r.id === "res-2")
+  assert.equal(reservation.checked_in_at, "2026-09-21T15:30:00.000Z")
+  assert.equal(reservation.status, "confirmed")
+  assert.equal(applyDemoMovement(moved.state, "res-2", "checkin", "2026-09-21T16:00:00.000Z").ok, false)
 })
 
 test("la cookie ida y vuelta conserva el estado; basura vuelve a vacío", () => {

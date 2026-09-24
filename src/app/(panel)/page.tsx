@@ -11,7 +11,7 @@ import { OperonArc } from "@/components/brand/operon-arc"
 import { GettingStartedCard } from "@/components/onboarding/getting-started-card"
 import { loadChecklist } from "@/lib/onboarding/load-checklist"
 import { canManageSettings } from "@/lib/roles"
-import { siteUrl } from "@/lib/site-url"
+import { publicReservationUrl } from "@/lib/site-url"
 import {
   OperonMarkPapel,
   OperonMarkTinta,
@@ -176,7 +176,7 @@ export default async function InicioPage() {
   ])
 
   const checklist = checklistPromise ? await checklistPromise : null
-  const publicUrl = `${await siteUrl()}/reservar/${ctx.organizationSlug}`
+  const publicUrl = await publicReservationUrl(ctx.organizationSlug)
 
   const units = activeUnits ?? []
   const totalUnits = units.length
