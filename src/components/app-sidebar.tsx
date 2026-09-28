@@ -11,7 +11,9 @@ import {
   Settings,
   LogOut,
   CircleHelp,
+  MapPinned,
 } from "lucide-react"
+import { ZONE_MONTH_LABEL } from "@/lib/zone-month/content"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { OperonMark } from "@/components/brand/operon-mark"
@@ -111,6 +113,13 @@ export function SidebarNav({
         })}
       </nav>
 
+      <div className="border-t p-3">
+        <p className="mb-2 px-3 text-xs uppercase tracking-widest text-muted-foreground">Mirada al destino</p>
+        <Link href="/tu-zona" onClick={onNavigate} aria-current={pathname.startsWith("/tu-zona") ? "page" : undefined}
+          className={cn("flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium", pathname.startsWith("/tu-zona") ? "bg-primary text-primary-foreground" : "hover:bg-sidebar-accent")}>
+          <MapPinned className="h-4 w-4 shrink-0" />{ZONE_MONTH_LABEL}
+        </Link>
+      </div>
       <div className="border-t p-3">
         <ShareLink url={publicUrl} />
         <Button

@@ -30,6 +30,17 @@ export type Database = {
   }
   public: {
     Tables: {
+      zone_month_editions: {
+        Row: {
+          zone: string; month: string; status: string; attempts: number;
+          lease: string | null; started_at: string | null; retry_at: string;
+          error_code: string | null; material: Json | null; edition: Json | null;
+          model: string | null; published_at: string | null;
+        }
+        Insert: { zone: string; month: string }
+        Update: { status?: string }
+        Relationships: []
+      }
       guests: {
         Row: {
           created_at: string
@@ -739,6 +750,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      zone_month_claim: { Args: never; Returns: Json }
+      zone_month_material: {
+        Args: { p_zone: string; p_month: string; p_lease: string; p_material: Json; p_model: string }
+        Returns: boolean
+      }
+      zone_month_finish: {
+        Args: { p_zone: string; p_month: string; p_lease: string; p_edition: Json | null; p_error: string | null }
+        Returns: boolean
+      }
       _book: {
         Args: {
           p_check_in: string

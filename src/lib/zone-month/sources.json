@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "facts": [
+    {
+      "id": "ar-2026-oct-12",
+      "kind": "holiday",
+      "country": "AR",
+      "city": null,
+      "title": "Feriado nacional del 12 de octubre",
+      "start": "2026-10-12",
+      "end": "2026-10-12",
+      "url": "https://www.argentina.travel/novedades/feriados-en-argentina-2026-calendario-para-planificar-tu-viaje",
+      "publisher": "Instituto Nacional de Promoción Turística",
+      "published": "2026-01-05",
+      "checked": "2026-09-28",
+      "validUntil": "2026-10-12",
+      "evidence": "Lunes 12: Día de la Raza."
+    },
+    {
+      "id": "ar-2026-nov-23",
+      "kind": "holiday",
+      "country": "AR",
+      "city": null,
+      "title": "Feriado nacional por el Día de la Soberanía Nacional",
+      "start": "2026-11-23",
+      "end": "2026-11-23",
+      "url": "https://www.argentina.travel/novedades/feriados-en-argentina-2026-calendario-para-planificar-tu-viaje",
+      "publisher": "Instituto Nacional de Promoción Turística",
+      "published": "2026-01-05",
+      "checked": "2026-09-28",
+      "validUntil": "2026-11-23",
+      "evidence": "Lunes 23: Día de la Soberanía Nacional."
+    }
+  ]
+}

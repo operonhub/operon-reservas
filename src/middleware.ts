@@ -3,6 +3,8 @@ import { updateSession } from "@/lib/supabase/middleware"
 
 // Convención `middleware` (estable en Next 16). Refresca sesión y protege el panel.
 export async function middleware(request: NextRequest) {
+  // La ruta cron valida CRON_SECRET en su handler, sin sesión de usuario.
+  if (request.nextUrl.pathname === "/api/cron/zone-month") return NextResponse.next()
   const isDemoSession = request.cookies.get("operon_demo")?.value === "1"
   const isDemoEntry = request.nextUrl.pathname === "/demo"
   const isLocalDemoWidget =
