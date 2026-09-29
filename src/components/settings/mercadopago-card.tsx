@@ -8,7 +8,22 @@ import { Badge } from "@/components/ui/badge"
 import { SettingsSection } from "@/components/settings/settings-section"
 import { cn } from "@/lib/utils"
 import { disconnectMercadoPago } from "@/app/(panel)/configuracion/actions"
-import { CreditCard, CircleCheck, Link2, Unplug } from "lucide-react"
+import {
+  CreditCard,
+  CircleCheck,
+  Link2,
+  Unplug,
+  HelpCircle,
+  ChevronDown,
+  ShieldCheck,
+} from "lucide-react"
+
+/** Los 3 pasos del OAuth, en criollo, para la tarjeta de Configuración. */
+const CONNECT_STEPS = [
+  "Te llevamos a Mercado Pago — ingresás con tu cuenta ahí, no acá.",
+  "Le das permiso a Operon para generar el link de cobro de cada seña. No es acceso a tu cuenta ni a tu contraseña.",
+  "Volvés a este panel, listo. La plata de cada seña entra directo a tu cuenta.",
+]
 
 export type MpStatus = {
   connected: boolean
@@ -118,9 +133,41 @@ export function MercadoPagoCard({
             huésped no puede pagar la seña online.
           </p>
           {readOnly ? null : configured ? (
-            <a href="/api/mp/connect" className={buttonVariants()}>
-              <Link2 /> Conectar Mercado Pago
-            </a>
+            <div className="space-y-3">
+              <details className="group rounded-xl border bg-background/60 p-4 [&_summary::-webkit-details-marker]:hidden">
+                <summary className="flex list-none items-center justify-between gap-3">
+                  <span className="flex items-center gap-2.5 font-medium">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <HelpCircle className="size-3.5" />
+                    </span>
+                    ¿Cómo funciona?
+                  </span>
+                  <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+
+                <ol className="mt-4 space-y-3 border-t pt-4">
+                  {CONNECT_STEPS.map((step, i) => (
+                    <li key={step} className="flex items-start gap-3">
+                      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-mono text-[11px] text-primary">
+                        {i + 1}
+                      </span>
+                      <span className="text-muted-foreground">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+
+                <p className="mt-4 flex items-start gap-2 border-t pt-4 text-xs text-muted-foreground">
+                  <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-success" />
+                  Podés desconectar cuando quieras, desde acá o desde tu cuenta
+                  de Mercado Pago. Esto no le da a Operon acceso a tu saldo ni
+                  a tu contraseña.
+                </p>
+              </details>
+
+              <a href="/api/mp/connect" className={buttonVariants()}>
+                <Link2 /> Conectar Mercado Pago
+              </a>
+            </div>
           ) : (
             <div className="rounded-xl border border-dashed p-4 text-muted-foreground">
               La conexión estará disponible en cuanto Operon habilite Mercado
