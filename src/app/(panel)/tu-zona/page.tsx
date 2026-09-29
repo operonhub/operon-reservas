@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { notFound } from "next/navigation"
 import { cookies } from "next/headers"
 import { requireContext } from "@/lib/auth"
 import { canManageSettings } from "@/lib/roles"
@@ -6,9 +7,12 @@ import { createClient } from "@/lib/supabase/server"
 import { ZONE_MONTH_LABEL, ERRORS, monthLabel } from "@/lib/zone-month/content"
 import { targetMonth, validateEdition, zoneKey } from "@/lib/zone-month/validation"
 import { EditionSlides } from "@/components/zone-month/edition-slides"
+import { isZoneMonthEnabled } from "@/lib/zone-month/flag"
 
 export const dynamic = "force-dynamic"
-export const metadata = { title: ZONE_MONTH_LABEL }
+export function generateMetadata() {
+  return isZoneMonthEnabled() ? { title: ZONE_MONTH_LABEL } : {}
+}
 
 function processingWasInterrupted(startedAt: string | null | undefined) {
   return Boolean(startedAt && Date.now() - Date.parse(startedAt) > 5 * 60000)
@@ -21,6 +25,7 @@ function zoneLabel(zone: string) {
 }
 
 export default async function ZoneMonthPage({ searchParams }: { searchParams: Promise<{ zone?: string; month?: string }> }) {
+  if (!isZoneMonthEnabled()) notFound()
   const ctx = await requireContext()
   const params = await searchParams
   const header = <header className="relative mb-8 overflow-hidden rounded-3xl border bg-card p-6 shadow-sm sm:p-8">

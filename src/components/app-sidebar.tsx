@@ -36,18 +36,20 @@ export function AppSidebar({
   orgName,
   role,
   publicUrl,
+  showZoneMonth,
 }: {
   userName: string
   orgName: string
   role: string
   publicUrl: string
+  showZoneMonth: boolean
 }) {
   // Debajo de `lg` el nav vive en el drawer (ver app-shell-mobile).
   // `print:hidden`: el comprobante de reserva se imprime solo, sin el chrome
   // de la aplicación alrededor.
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground lg:flex print:hidden">
-      <SidebarNav userName={userName} orgName={orgName} role={role} publicUrl={publicUrl} />
+      <SidebarNav userName={userName} orgName={orgName} role={role} publicUrl={publicUrl} showZoneMonth={showZoneMonth} />
     </aside>
   )
 }
@@ -61,12 +63,14 @@ export function SidebarNav({
   orgName,
   role,
   publicUrl,
+  showZoneMonth,
   onNavigate,
 }: {
   userName: string
   orgName: string
   role: string
   publicUrl: string
+  showZoneMonth: boolean
   onNavigate?: () => void
 }) {
   const pathname = usePathname()
@@ -113,13 +117,13 @@ export function SidebarNav({
         })}
       </nav>
 
-      <div className="border-t p-3">
+      {showZoneMonth && <div className="border-t p-3">
         <p className="mb-2 px-3 text-xs uppercase tracking-widest text-muted-foreground">Mirada al destino</p>
         <Link href="/tu-zona" onClick={onNavigate} aria-current={pathname.startsWith("/tu-zona") ? "page" : undefined}
           className={cn("flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium", pathname.startsWith("/tu-zona") ? "bg-primary text-primary-foreground" : "hover:bg-sidebar-accent")}>
           <MapPinned className="h-4 w-4 shrink-0" />{ZONE_MONTH_LABEL}
         </Link>
-      </div>
+      </div>}
       <div className="border-t p-3">
         <ShareLink url={publicUrl} />
         <Button

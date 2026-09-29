@@ -16,11 +16,13 @@ export function AppShellMobile({
   orgName,
   role,
   publicUrl,
+  showZoneMonth,
 }: {
   userName: string
   orgName: string
   role: string
   publicUrl: string
+  showZoneMonth: boolean
 }) {
   const [open, setOpen] = React.useState(false)
 
@@ -56,6 +58,7 @@ export function AppShellMobile({
           orgName={orgName}
           role={role}
           publicUrl={publicUrl}
+          showZoneMonth={showZoneMonth}
           onNavigate={() => setOpen(false)}
         />
       </SheetContent>

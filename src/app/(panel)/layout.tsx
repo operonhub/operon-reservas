@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { AppShellMobile } from "@/components/app-shell-mobile"
 import { TourProvider } from "@/components/onboarding/tour/tour-provider"
 import { cookies } from "next/headers"
+import { isZoneMonthEnabled } from "@/lib/zone-month/flag"
 
 export default async function PanelLayout({
   children,
@@ -13,6 +14,7 @@ export default async function PanelLayout({
   const ctx = await requireContext()
   const isDemo = (await cookies()).get("operon_demo")?.value === "1"
   const publicUrl = await publicReservationUrl(ctx.organizationSlug)
+  const showZoneMonth = isZoneMonthEnabled()
 
   return (
     <TourProvider autoStart={!ctx.tourCompleted} isDemo={isDemo}>
@@ -26,6 +28,7 @@ export default async function PanelLayout({
         orgName={ctx.organizationName}
         role={ctx.role}
         publicUrl={publicUrl}
+        showZoneMonth={showZoneMonth}
       />
       {/* `min-w-0`: sin esto el grid ancho del calendario estira la columna y
           reaparece el scroll horizontal de toda la página. */}
@@ -35,6 +38,7 @@ export default async function PanelLayout({
           orgName={ctx.organizationName}
           role={ctx.role}
           publicUrl={publicUrl}
+          showZoneMonth={showZoneMonth}
         />
         {/* `min-h-0`: acá el alto lo da `flex-1`, y el `min-height: auto` que
             traen los flex items impediría achicarse -> <main> crecería con el
