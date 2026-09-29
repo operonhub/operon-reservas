@@ -5,14 +5,14 @@ import { createDb, as, attempt } from './harness.mjs'
 import { seed } from './seed.mjs'
 
 // Única sustitución para fijar el reloj: conserva el cuerpo real de la RPC.
-const migration = readFileSync(new URL('../../supabase/migrations/0030_zone_month.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../../supabase/migrations/0032_zone_month_pilot_allowlist.sql', import.meta.url), 'utf8')
 async function clock(db, timestamp = '2026-09-28 12:00:00+00') {
   await as(db, 'postgres')
-  const fn = migration.match(/create function public.zone_month_claim\(\)[\s\S]+?end; \$\$;/)[0]
+  const fn = migration.match(/create function public.zone_month_claim\(p_allowed_zones text\[\]\)[\s\S]+?end; \$\$;/)[0]
   await db.exec(fn.replace('create function', 'create or replace function').replaceAll('now()', `('${timestamp}'::timestamptz)`))
 }
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0]
-const claim = async db => (await one(db, 'select zone_month_claim() j')).j
+const claim = async (db, zones = ['AR:ushuaia', 'AR:salta']) => (await one(db, 'select zone_month_claim($1::text[]) j', [zones])).j
 async function fresh() {
   const db = await createDb(); const ids = await seed(db)
   await db.query("update properties set city = case when organization_id = $1 then 'Ushuaia' else 'Salta' end, country = 'AR'", [ids.org_a])
@@ -30,13 +30,13 @@ test('RLS: zonas diferentes aisladas, zona compartida y cambio de localización;
       assert.ok((await attempt(db, "insert into zone_month_editions(zone,month) values ('AR:ushuaia','2026-11-01')")).error)
       assert.equal((await db.query("update zone_month_editions set attempts=3 returning zone")).rows.length,0)
       assert.equal((await db.query('delete from zone_month_editions returning zone')).rows.length,0)
-      assert.ok((await attempt(db, 'select zone_month_claim()')).error)
+      assert.ok((await attempt(db, "select zone_month_claim(array['AR:ushuaia'])")).error)
       assert.ok((await attempt(db, "select zone_month_material('AR:ushuaia','2026-10-01',gen_random_uuid(),'{}','x')")).error)
       assert.ok((await attempt(db, "select zone_month_finish('AR:ushuaia','2026-10-01',gen_random_uuid(),null,'quota')")).error)
     }
     await as(db,'anon')
     assert.equal((await db.query('select * from zone_month_editions')).rows.length,0)
-    assert.ok((await attempt(db, 'select zone_month_claim()')).error)
+    assert.ok((await attempt(db, "select zone_month_claim(array['AR:ushuaia'])")).error)
     await as(db,'authenticated',{uid:ids.owner_b})
     assert.deepEqual((await db.query('select zone from zone_month_editions')).rows,[{zone:'AR:salta'}])
     await db.query("update properties set city = 'Ushuaia' where id=$1",[ids.prop_b])
@@ -71,15 +71,30 @@ test('worker: una edición por zona/mes, leases, no duplicación, reintentos aco
   } finally { await db.close() }
 })
 
+test('allowlist: sólo se encola y reclama la zona autorizada', async () => {
+  const {db} = await fresh()
+  try {
+    await as(db,'service_role')
+    assert.equal((await claim(db,['AR:salta'])).zone,'AR:salta')
+    assert.equal(await claim(db,['AR:salta']),null)
+    await as(db,'postgres')
+    assert.deepEqual((await db.query('select zone from zone_month_editions')).rows,[{zone:'AR:salta'}])
+    await as(db,'service_role')
+    assert.ok((await attempt(db,"select zone_month_claim(array[]::text[])")).error)
+  } finally { await db.close() }
+})
+
 test('crash final pasa a fallo, tres intentos máximo y ventana cerrada no encola', async () => {
   const {db,ids} = await fresh()
   try {
     await db.query('update properties set city=null where id=$1',[ids.prop_b])
-    await clock(db,'2026-09-15 12:00:00+00'); await as(db,'service_role'); assert.equal(await claim(db),null)
-    for (const day of [28,29,30]) {
+    await clock(db,'2026-09-25 12:00:00+00'); await as(db,'service_role'); assert.equal(await claim(db),null)
+    await clock(db,'2026-09-26 12:00:00+00'); await as(db,'service_role'); assert.equal((await claim(db)).attempts,1)
+    for (const day of [28,29]) {
       await clock(db,`2026-09-${day} 12:00:00+00`); await as(db,'service_role')
-      assert.equal((await claim(db)).attempts,day-27)
+      assert.equal((await claim(db)).attempts,day===28 ? 2 : 3)
     }
+    await clock(db,'2026-09-30 12:00:00+00'); await as(db,'service_role'); assert.equal(await claim(db),null)
     await clock(db,'2026-10-01 12:00:00+00'); await as(db,'service_role'); assert.equal(await claim(db),null)
     await as(db,'postgres')
     assert.equal((await one(db,'select status from zone_month_editions')).status,'failed')

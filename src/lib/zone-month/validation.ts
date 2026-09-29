@@ -22,9 +22,9 @@ export function zoneKey(country: string | null, city: string | null): string | n
 }
 export function targetMonth(now: Date): string | null {
   const last = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate()
-  if (now.getUTCDate() < last - 6 && now.getUTCDate() > 7) return null
-  const month = now.getUTCDate() <= 7 ? now.getUTCMonth() : now.getUTCMonth() + 1
-  return new Date(Date.UTC(now.getUTCFullYear(), month, 1)).toISOString().slice(0, 10)
+  // Cinco días calendario anteriores al primer día del mes siguiente, en UTC.
+  if (now.getUTCDate() < last - 4) return null
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString().slice(0, 10)
 }
 function publicText(value: unknown, max: number) {
   return typeof value === "string" && value.length > 0 && value.length <= max &&

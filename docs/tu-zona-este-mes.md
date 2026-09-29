@@ -3,18 +3,24 @@
 **Estado de esta rama (no activar en producción):** cron, lector, generación estructurada
 y un conector de agenda oficial de Córdoba están implementados. El conector se probó
 con respuesta simulada y en lectura real de octubre 2026 (dos fechas de Oktoberfest
-en Villa General Belgrano); no se generó ni publicó una edición con Gemini real.
+en Villa General Belgrano). El 28/09/2026 se publicó una edición real para
+AR:villa ventana, octubre de 2026, usando Gemini real y una Supabase local
+para el piloto de Cabañas La Ponderosa. El servidor y la base usaron 127.0.0.1;
+no hubo despliegue ni conexión a la Supabase alojada.
 La cobertura no es universal: sólo las zonas configuradas para esa fuente obtienen
 eventos automáticamente y sólo cuando la ciudad aparece en el título oficial.
-`sources.json` contiene apenas dos feriados de 2026. Antes de activar se necesitan
-fuentes directas adecuadas para cada zona piloto, feriados actualizados, una clave
-Gemini propia y una prueba de punta a punta. No afirmar que las noticias de todas las
-ciudades se investigan automáticamente.
+`sources.json` contiene dos feriados de 2026 y un evento oficial de Huacalera.
+Antes de activar fuera del piloto se necesitan fuentes directas para cada zona, feriados actualizados,
+una clave Gemini propia y validación completa del entorno de destino. No afirmar
+que las noticias de todas las ciudades se investigan automáticamente.
 
 El nombre provisional está en `src/lib/zone-month/content.ts` (`ZONE_MONTH_LABEL`).
 El enlace está al pie de la navegación operativa, separado por un borde; el mismo
 sidebar se usa en escritorio y en el menú móvil. La edición presenta una pantalla
 a la vez, con controles anterior/siguiente, índice y flechas izquierda/derecha.
+El botón Modo presentación abre la edición a pantalla completa, con salida visible,
+Escape, navegación por teclado y desplazamiento interno para diapositivas largas.
+Cada capítulo tiene tratamiento visual propio y usa los colores del panel.
 `/tu-zona` exige el contexto de
 sesión del panel. La cookie demo muestra explícitamente que no hay edición real.
 
@@ -37,13 +43,27 @@ regiones ni destinos desde direcciones o datos comerciales. Tildes distintas son
 ## Fuentes y límites factuales
 
 Estrategia del piloto: **paquetes públicos versionados y un adaptador oficial opcional**;
-no se usa Google Grounding ni búsqueda del modelo. `src/lib/zone-month/sources.json` incluye dos feriados futuros de
-2026 corroborados en el Instituto Nacional de Promoción Turística (organismo oficial),
+no se usa Google Grounding ni búsqueda del modelo. `src/lib/zone-month/sources.json`
+incluye dos feriados futuros de 2026 corroborados en el Instituto Nacional de
+Promoción Turística (organismo oficial)
+y el Desafío TTT de Huacalera del 3 y 4 de octubre, publicado por el Gobierno de Jujuy,
 con URL, publicación, fecha de consulta, período y extracto de evidencia. La página
 original enlaza el calendario nacional. Se verificó el 28/09/2026:
 
 - https://www.argentina.travel/novedades/feriados-en-argentina-2026-calendario-para-planificar-tu-viaje
 - https://www.argentina.gob.ar/feriados
+- https://prensa.jujuy.gob.ar/huacalera/huacalera-se-prepara-recibir-una-nueva-fecha-del-desafio-ttt-el-primer-kilometro-vertical-n125304
+
+Para los dos clientes propuestos, las páginas públicas ubican Tierra Adentro en
+Purmamarca (`AR:purmamarca`) y Cuatro Elementos en Huacalera (`AR:huacalera`).
+Referencias: https://tierra-adentro-purmamarca.netlify.app/ y
+https://cuatro-elementos-psi.vercel.app/ .
+La edición de octubre de Huacalera incluye el evento anterior y el feriado nacional.
+La de Purmamarca incluye el feriado y declara que no hay agenda local corroborada
+en el paquete. La agenda turística provincial estaba temporalmente no disponible
+al revisarla el 28/09/2026; no se importaron eventos de otras localidades.
+Antes de activar, confirmar que cada alojamiento tenga una propiedad activa con
+esa ciudad y un miembro real en su organización de Operon Reservas.
 
 El recopilador filtra el paquete por país, ciudad y mes **antes** de contactar Gemini.
 El paquete versionado no consulta sus enlaces: `checked` es la fecha de revisión
@@ -66,8 +86,9 @@ o configura `ZONE_SOURCE_PACK_JSON` (reemplaza el paquete entero, máximo 64 KB 
 Debe obtener los hechos de una secretaría de turismo, municipio u organizador oficial,
 comprobar fechas/alcance en el documento y transcribir sólo datos públicos. Es curaduría
 de fuentes, **no aprobación de ediciones**: la generación y publicación siguen automáticas.
-Agregar el hostname exacto a `ZONE_SOURCE_HOSTS`; `www.argentina.travel` y
-`www.argentina.gob.ar` ya están permitidos. No aceptar paquetes enviados por huéspedes,
+Agregar el hostname exacto a `ZONE_SOURCE_HOSTS`; `www.argentina.travel`,
+`www.argentina.gob.ar` y `prensa.jujuy.gob.ar` ya están permitidos. No aceptar
+paquetes enviados por huéspedes,
 usuarios del panel ni contenido de propiedades. No incluir PII, URLs firmadas o secretos.
 
 Formato (ejemplo de estructura, NO un evento publicable):
@@ -112,7 +133,7 @@ Los cinco títulos y el cierre son constantes, no salida libre del proveedor.
 Las acciones tienen esfuerzo bajo/medio (el catálogo no requiere acciones de alto esfuerzo)
 y señal a medir. El orden asigna semana 1, semana 2 y semanas 3–4.
 
-## Configuración manual y activación (no ejecutadas por este cambio)
+## Configuración manual y activación fuera del piloto local (pendientes)
 
 1. Con dependencias instaladas, ejecutar tests y revisar la migración
    `supabase/migrations/0030_zone_month.sql`. Aplicarla mediante el procedimiento
@@ -120,8 +141,11 @@ y señal a medir. El orden asigna semana 1, semana 2 y semanas 3–4.
 2. En el servidor, configurar `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`,
    `ZONE_GEMINI_MODEL` y un `CRON_SECRET` aleatorio largo. Nunca `NEXT_PUBLIC_` para secretos.
    No escribir claves en archivos versionados ni en el navegador.
-3. Verificar localizaciones y el paquete público para el mes piloto. Configurar
-   `ZONE_MONTH_ENABLED=1` sólo al activar. `DEMO_ONLY=1` impide ejecutar el worker.
+3. Verificar localizaciones y el paquete público para el mes piloto. Para estos
+   dos clientes configurar `ZONE_MONTH_ALLOWED_ZONES=AR:purmamarca,AR:huacalera`
+   sólo si ambas propiedades y membresías existen. La lista se lee sólo en el
+   servidor; vacía o inválida detiene el worker. Configurar `ZONE_MONTH_ENABLED=1`
+   sólo al activar. `DEMO_ONLY=1` impide ejecutar el worker.
 4. El cron diario UTC ya está declarado en `vercel.json` en esta rama local. No se
    ejecuta hasta un despliegue autorizado y `ZONE_MONTH_ENABLED=1`:
 
@@ -136,24 +160,29 @@ No hay endpoint de generación para el panel, botón Generar ni aprobación.
 Cron funciona en producción de Vercel, no en previews. Confirmar límites/duración del
 plan antes de activar: https://vercel.com/docs/cron-jobs/manage-cron-jobs
 
-La ventana UTC son los últimos siete días del mes anterior, con recuperación durante
-los primeros siete del mes correspondiente. Fuera de ella no se encola ni llama IA.
-Cada ejecución reclama hasta tres zonas secuencialmente, o dos si hay feed configurado;
-la consulta al feed tiene timeout de 7 s por zona y cada llamada LLM de 12 s;
+La ventana UTC son los últimos cinco días calendario del mes anterior. La edición
+del mes siguiente debe quedar visible antes de que empiece ese mes. Fuera de la
+ventana no se encola ni llama IA; los leases vencidos se marcan fallidos incluso
+después del cierre. Cada ejecución reclama hasta dos zonas secuencialmente, o una
+si hay feed configurado y el timeout de Gemini supera 18 s;
+la consulta al feed tiene timeout de 7 s por zona y cada llamada LLM de 25 s
+por defecto (configurable mediante ZONE_GEMINI_TIMEOUT_MS, máximo 25 s);
 la ruta tiene `maxDuration=60`. Una fila por zona/mes, `ON CONFLICT`, bloqueo
 `FOR UPDATE SKIP LOCKED`, lease único y comparación al finalizar impiden publicaciones
 duplicadas o que un worker atrasado sobrescriba otro. Publicar es irreversible para las
 RPC normales: otra ejecución no vuelve a generar una edición publicada.
 
-Hasta tres intentos por zona/mes, separados por al menos 20 h. Leases interrumpidos
-se marcan fallidos tras 5 min en el siguiente cron; el panel también detecta el estado
+Hasta tres intentos por zona/mes, separados por al menos 20 h y sólo dentro de
+la ventana de cinco días. Leases interrumpidos se marcan fallidos tras 5 min en
+el siguiente cron; el panel también detecta el estado
 atrasado. Los fallos finales siguen visibles, sin reemplazo ficticio. Un fallo DB deja
-el lease para recuperación; jamás se finge publicación. En el piloto comenzar con
-**hasta cuatro zonas si hay feed**: dos trabajos diarios por siete días permiten 14
-intentos previos al mes, suficientes si todas precisan tres. Sin feed, hasta siete zonas
-con tres trabajos diarios (21 intentos). Más zonas requieren
-revisar capacidad y costos, no simplemente aumentar el loop. Una interrupción puede
-consumir cuota del proveedor aunque la publicación no se haya completado.
+el lease para recuperación; jamás se finge publicación. Con un cron diario y sin
+feed, dos trabajos por día dan diez oportunidades en cinco días: suficientes para
+dos zonas con hasta tres intentos cada una si el piloto se activa el primer día de
+la ventana. Con feed y timeout de 25 s se procesa sólo una zona por día, lo que
+no garantiza tres intentos para dos zonas; revisar capacidad antes de activarlas.
+Una interrupción puede consumir cuota del proveedor aunque la publicación no
+se haya completado.
 
 Revisar respuestas cron: 401 sin autorización, 200 desactivado/fuera de ventana o éxito,
 503 si hubo fallos o DB no disponible. En DB se conservan estado, intentos, error tipificado,
@@ -164,8 +193,9 @@ es responsabilidad del operador autorizado y no forma parte de este MVP.
 
 ## Modelo, costos y privacidad
 
-Modelo inicial configurable: `gemini-2.5-flash-lite`, con nivel gratuito listado en la
-documentación oficial consultada el 28/09/2026:
+Modelo predeterminado configurable: `gemini-3.5-flash-lite`, el usado en la
+edición local publicada. Google recomienda 3.5 Flash-Lite para proyectos nuevos;
+el nivel gratuito figura en la documentación oficial consultada el 28/09/2026:
 https://ai.google.dev/gemini-api/docs/pricing . Verificar vigencia, región y límites
 antes de activarlo; la cuota gratuita es variable, no una garantía de costo cero.
 No se habilita Google Search, Maps ni grounding. Sus términos de Grounding con Google
@@ -177,10 +207,12 @@ no puede imponer desde la API una cuenta exclusivamente gratuita. Configurar cuo
 presupuestos en la cuenta del operador. No activar búsquedas pagas sin consentimiento.
 
 Falta de clave, 429/cuota, timeout, bloqueo del modelo, salida incompleta o inválida
-producen fallo explícito, nunca publicación con texto de relleno. No se ha realizado
-ninguna generación real en este trabajo. En el nivel gratuito Google puede usar entradas
-y respuestas para mejorar sus productos; sólo viajan zona, mes, fuentes públicas y
-catálogo general. La clave viaja en header servidor→Gemini. `server-only` protege los
+producen fallo explícito, nunca publicación con texto de relleno. La edición de
+Villa Ventana se generó con Gemini real el 28/09/2026 en el entorno local; otra
+zona piloto terminó con fallo de timeout tras tres intentos. En el nivel gratuito
+Google puede usar entradas y respuestas para mejorar sus productos; sólo viajan
+zona, mes, fuentes públicas y catálogo general. La clave viaja en header
+servidor→Gemini. `server-only` protege los
 módulos de generación; el cliente administrativo jamás se importa al panel cliente.
 
 RLS requiere un membership real y una propiedad activa de esa zona, incluso para un
@@ -190,7 +222,19 @@ La lectura del panel usa el cliente SSR con RLS y revalida el JSON antes de rend
 
 ## Verificación local
 
-`npm test`, `npm run lint`, `npx --no-install tsc --noEmit`, `npm run build`.
+En el piloto aislado se confirmó la edición publicada de octubre de 2026 para
+AR:villa ventana, visible con la cuenta local de Cabañas La Ponderosa. La segunda
+cuenta local sólo puede leer AR:los reartes. Tras los reintentos permanece una sola
+fila por zona y mes. Un hostname de fuente no autorizado se rechazó; los fallos
+reales del proveedor quedaron visibles sin publicar texto alternativo. Se revisaron
+manualmente las vistas de escritorio y móvil, incluida la presentación a pantalla
+completa, navegación y desplazamiento. El 28/09/2026 pasaron `npm test` (117 tests),
+`npm run lint`, `npx --no-install tsc --noEmit` y `npm run build` con variables
+de la Supabase local. Las migraciones 0031 y 0032 se aplicaron sólo allí. La
+RPC local con la lista Purmamarca/Huacalera no encontró trabajo: ninguna de esas
+ciudades tiene todavía una propiedad activa en la base de prueba. No se generó
+una edición real con Gemini para esas dos zonas ni se probó producción.
+
 Tests nuevos: `tests/lib/zone-month.test.mjs`, `tests/api/zone-month.test.mjs` y
 `tests/db/zone-month.test.mjs`. PGlite aplica el esquema real; sustituye sólo el reloj
 SQL de la RPC en tests para hacer reproducible la ventana, con los stubs de auth/storage

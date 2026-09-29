@@ -18,6 +18,7 @@ const date = new Date('2026-09-28T12:00:00Z')
 function reset() {
   state.jobs=[{zone:'AR:ushuaia',month:'2026-10-01',lease:'test-lease'}];state.calls=[];state.failMaterial=false;state.failFinish=false
   delete process.env.GEMINI_API_KEY;delete process.env.ZONE_SOURCE_PACK_JSON;delete process.env.ZONE_GEMINI_MODEL;delete process.env.ZONE_SOURCE_HOSTS;delete process.env.ZONE_CORDOBA_FEED_ZONES
+  process.env.ZONE_MONTH_ALLOWED_ZONES='AR:ushuaia,AR:salta,AR:villa general belgrano'
 }
 
 test('cron fail-closed, sin autorización ni activación no llama worker; errores no filtran datos',async()=>{
@@ -50,20 +51,21 @@ test('sin clave registra fallo explícito después de guardar fuentes; nunca pub
   } finally {globalThis.fetch=original}
 })
 
-test('payload Gemini solo zona/mes/fuentes públicas/catálogo; publicación tras validación y máximo tres trabajos',async()=>{
+test('payload Gemini solo zona/mes/fuentes públicas/catálogo; publicación tras validación y máximo dos trabajos por cron',async()=>{
   reset();process.env.GEMINI_API_KEY='test-only'
   state.jobs=Array.from({length:4},()=>({zone:'AR:ushuaia',month:'2026-10-01',lease:'lease'}))
   const original=globalThis.fetch;const requests=[]
   globalThis.fetch=async(url,options)=>{requests.push({url,options});return good()}
   try {
-    assert.equal((await runZoneMonth(date)).published,3)
-    assert.equal(requests.length,3);assert.equal(state.jobs.length,1)
+    assert.equal((await runZoneMonth(date)).published,2)
+    assert.equal(requests.length,2);assert.equal(state.jobs.length,2)
+    assert.deepEqual(state.calls.find(c=>c.fn==='zone_month_claim').args.p_allowed_zones,['AR:ushuaia','AR:salta','AR:villa general belgrano'])
     const body=JSON.parse(requests[0].options.body)
     assert.deepEqual(Object.keys(JSON.parse(body.contents[0].parts[0].text)).sort(),['catalog','month','sources','zone'])
     assert.equal(body.tools,undefined)
     assert.equal(requests[0].options.headers['x-goog-api-key'],'test-only')
     assert.ok(!requests[0].url.includes('test-only'))
-    assert.equal(state.calls.filter(c=>c.fn==='zone_month_finish').length,3)
+    assert.equal(state.calls.filter(c=>c.fn==='zone_month_finish').length,2)
     for(const c of state.calls.filter(c=>c.fn==='zone_month_finish')) assert.deepEqual(c.args.p_edition.selection,selection)
   } finally {globalThis.fetch=original;delete process.env.GEMINI_API_KEY}
 })
@@ -91,6 +93,11 @@ test('fuentes mal configuradas y fuera de ventana no llaman Gemini; fallo DB no 
   await assert.rejects(()=>runZoneMonth(date),/database/)
   assert.ok(!state.calls.some(c=>c.fn==='zone_month_finish'))
 })
+test('sin zonas autorizadas el cron falla cerrado antes de reclamar trabajo',async()=>{
+  reset();delete process.env.ZONE_MONTH_ALLOWED_ZONES
+  await assert.rejects(()=>runZoneMonth(date),/zone allowlist/)
+  assert.equal(state.calls.length,0)
+})
 
 test('proveedor truncado, IDs falsos y prosa extra se rechazan',async()=>{
   const original=globalThis.fetch;process.env.GEMINI_API_KEY='test-only'
@@ -102,7 +109,7 @@ test('proveedor truncado, IDs falsos y prosa extra se rechazan',async()=>{
   } finally {globalThis.fetch=original;delete process.env.GEMINI_API_KEY}
 })
 
-test('feed oficial se suma a hechos públicos y limita el cron a dos zonas',async()=>{
+test('feed oficial se suma a hechos públicos y limita el cron a una zona con timeout largo',async()=>{
   reset();process.env.GEMINI_API_KEY='test-only';process.env.ZONE_CORDOBA_FEED_ZONES='AR:villa general belgrano'
   state.jobs=Array.from({length:3},()=>({zone:'AR:villa general belgrano',month:'2026-10-01',lease:'lease'}))
   const event={id:904046,title:'Oktoberfest 2026 en Villa General Belgrano',start_date:'2026-10-02 00:00:00',end_date:'2026-10-04 23:59:59',date:'2026-09-24 08:44:34',url:'https://cordobaturismo.gov.ar/evento/oktoberfest-2026-en-villa-general-belgrano/'}
@@ -113,7 +120,7 @@ test('feed oficial se suma a hechos públicos y limita el cron a dos zonas',asyn
   }
   try {
     const result=await runZoneMonth(date)
-    assert.equal(result.published,2);assert.equal(feeds,2);assert.equal(models,2);assert.equal(state.jobs.length,1)
+    assert.equal(result.published,1);assert.equal(feeds,1);assert.equal(models,1);assert.equal(state.jobs.length,2)
     const edition=state.calls.find(c=>c.fn==='zone_month_finish').args.p_edition
     assert.deepEqual(edition.material.facts.map(f=>f.id),['ar-2026-oct-12','cordoba-904046'])
   } finally {globalThis.fetch=original;reset()}

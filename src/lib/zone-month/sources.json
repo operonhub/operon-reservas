@@ -30,6 +30,21 @@
       "checked": "2026-09-28",
       "validUntil": "2026-11-23",
       "evidence": "Lunes 23: Día de la Soberanía Nacional."
+    },
+    {
+      "id": "jujuy-huacalera-2026-oct-ttt",
+      "kind": "event",
+      "country": "AR",
+      "city": "Huacalera",
+      "title": "Desafío TTT: Kilómetro Vertical y Trail de Huacalera",
+      "start": "2026-10-03",
+      "end": "2026-10-04",
+      "url": "https://prensa.jujuy.gob.ar/huacalera/huacalera-se-prepara-recibir-una-nueva-fecha-del-desafio-ttt-el-primer-kilometro-vertical-n125304",
+      "publisher": "Gobierno de Jujuy",
+      "published": "2026-09-19",
+      "checked": "2026-09-28",
+      "validUntil": "2026-10-04",
+      "evidence": "El Gobierno de Jujuy anunció para Huacalera el Kilómetro Vertical el 3 de octubre y el Trail el 4 de octubre."
     }
   ]
 }

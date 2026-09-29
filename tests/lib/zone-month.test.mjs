@@ -7,15 +7,15 @@ const { collectMaterial, validateSelection, validateEdition, zoneKey, targetMont
 const { CLOSING, TITLES } = await jiti.import('../../src/lib/zone-month/content.ts')
 const pack = JSON.parse(readFileSync(new URL('../../src/lib/zone-month/sources.json', import.meta.url)))
 const now = new Date('2026-09-28T12:00:00Z')
-const collect = (p = pack, zone = 'AR:ushuaia', month = '2026-10-01') => collectMaterial(p, zone, month, now, ['www.argentina.travel'])
+const collect = (p = pack, zone = 'AR:ushuaia', month = '2026-10-01') => collectMaterial(p, zone, month, now, ['www.argentina.travel', 'prensa.jujuy.gob.ar'])
 const selection = { version: 1, factIds: ['ar-2026-oct-12'], commercial: 'conditions', operational: 'response', actions: ['conditions', 'response', 'interests'] }
 
 test('zona solo por ciudad/país, vacíos y datos ajenos se rechazan', () => {
   assert.equal(zoneKey(' ar ', '  San   Martín '), 'AR:san martín')
   for (const [country, city] of [[null, 'Ushuaia'], ['AR', ''], ['AR', 'a@example.org'], ['AR', 'Calle 123'], ['ARG', 'Ushuaia']]) assert.equal(zoneKey(country, city), null)
 })
-test('ventana UTC exacta: últimos siete días, recuperación y cambio de año', () => {
-  for (const [date, month] of [['2026-09-23', null], ['2026-09-24', '2026-10-01'], ['2026-10-01', '2026-10-01'], ['2026-10-07', '2026-10-01'], ['2026-10-08', null], ['2026-12-25', '2027-01-01'], ['2028-02-23', '2028-03-01']]) assert.equal(targetMonth(new Date(date)), month, date)
+test('ventana UTC exacta: últimos cinco días antes del mes siguiente', () => {
+  for (const [date, month] of [['2026-09-25', null], ['2026-09-26', '2026-10-01'], ['2026-09-30', '2026-10-01'], ['2026-10-01', null], ['2026-12-26', null], ['2026-12-27', '2027-01-01'], ['2028-02-24', null], ['2028-02-25', '2028-03-01'], ['2028-02-29', '2028-03-01']]) assert.equal(targetMonth(new Date(date)), month, date)
 })
 test('recopilación preserva procedencia, filtra mes/zona y declara falta de agenda', () => {
   const m = collect()
@@ -26,6 +26,14 @@ test('recopilación preserva procedencia, filtra mes/zona y declara falta de age
   assert.equal(collect(pack, 'AR:ushuaia', '2027-01-01').facts.length, 0)
   const stale = structuredClone(pack); stale.facts[0].checked = '2026-09-26'; stale.facts[0].validUntil = '2026-09-27'
   assert.equal(collect(stale).facts.length, 0)
+})
+test('Huacalera recibe sólo su evento oficial; Purmamarca declara agenda no corroborada', () => {
+  const huacalera = collect(pack, 'AR:huacalera')
+  assert.deepEqual(huacalera.facts.map(f => f.id), ['ar-2026-oct-12', 'jujuy-huacalera-2026-oct-ttt'])
+  assert.ok(!huacalera.warnings.some(w => w.includes('No hay agenda local corroborada')))
+  const purmamarca = collect(pack, 'AR:purmamarca')
+  assert.deepEqual(purmamarca.facts.map(f => f.id), ['ar-2026-oct-12'])
+  assert.ok(purmamarca.warnings.some(w => w.includes('No hay agenda local corroborada')))
 })
 test('fuentes: URL confiable, fechas reales, revisión pasada, vencimiento acotado y sin PII', () => {
   for (const patch of [{url: 'http://www.argentina.travel/x'}, {url: 'https://evil.example/x'}, {url: 'https://www.argentina.travel@evil.example/x'}, {url: 'https://www.argentina.travel/x?key=foo'}, {start: '2026-02-30'}, {checked: '2026-10-01'}, {validUntil: '2027-12-31'}, {title: 'Huésped ana@example.org'}, {kind: 'inventado'}, {private: 'data'}]) {

@@ -750,7 +750,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      zone_month_claim: { Args: never; Returns: Json }
+      zone_month_claim: { Args: { p_allowed_zones: string[] }; Returns: Json }
       zone_month_material: {
         Args: { p_zone: string; p_month: string; p_lease: string; p_material: Json; p_model: string }
         Returns: boolean

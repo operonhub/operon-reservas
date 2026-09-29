@@ -2,19 +2,26 @@ import "server-only"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/types"
 import { ERRORS, type Edition } from "./content"
-import { collectMaterial, GenerationError, targetMonth } from "./validation"
-import { modelName, selectWithGemini } from "./gemini"
+import { collectMaterial, GenerationError, targetMonth, zoneKey } from "./validation"
+import { geminiTimeoutMs, modelName, selectWithGemini } from "./gemini"
 import { cordobaEvents } from "./cordoba-feed"
 import defaultPack from "./sources.json"
 
 export async function runZoneMonth(now = new Date()) {
   if (!targetMonth(now)) return { processed: 0, published: 0, failed: 0, outsideWindow: true }
+  const allowedZones = (process.env.ZONE_MONTH_ALLOWED_ZONES || "").split(",").map(z => z.trim()).filter(Boolean)
+  if (!allowedZones.length || allowedZones.length > 10 || new Set(allowedZones).size !== allowedZones.length ||
+    allowedZones.some(z => {
+      const parts = z.split(":")
+      return parts.length !== 2 || zoneKey(parts[0], parts[1]) !== z
+    })) throw new Error("zone allowlist missing or invalid")
   const db = createAdminClient()
   const result = { processed: 0, published: 0, failed: 0, outsideWindow: false }
-  // Con feed externo: dos zonas dejan margen bajo maxDuration=60 (7 s + 12 s por zona).
-  const limit = process.env.ZONE_CORDOBA_FEED_ZONES?.trim() ? 2 : 3
+  // Dos zonas por cron cubren ambos clientes; limitar a una si el feed más Gemini
+  // pueden consumir casi el minuto completo de esta función.
+  const limit = process.env.ZONE_CORDOBA_FEED_ZONES?.trim() && geminiTimeoutMs() > 18000 ? 1 : 2
   for (let i = 0; i < limit; i++) {
-    const { data, error } = await db.rpc("zone_month_claim")
+    const { data, error } = await db.rpc("zone_month_claim", { p_allowed_zones: allowedZones })
     if (error) throw new Error("database")
     if (!data) break
     const job = data as { zone: string; month: string; lease: string }
@@ -28,7 +35,7 @@ export async function runZoneMonth(now = new Date()) {
           pack = JSON.parse(process.env.ZONE_SOURCE_PACK_JSON)
         } catch { throw new GenerationError("invalid_sources") }
       }
-      const hosts = ["www.argentina.travel", "www.argentina.gob.ar", "cordobaturismo.gov.ar", ...(process.env.ZONE_SOURCE_HOSTS || "").split(",").map(h => h.trim()).filter(Boolean)]
+      const hosts = ["www.argentina.travel", "www.argentina.gob.ar", "prensa.jujuy.gob.ar", "cordobaturismo.gov.ar", ...(process.env.ZONE_SOURCE_HOSTS || "").split(",").map(h => h.trim()).filter(Boolean)]
       const curated = collectMaterial(pack, job.zone, job.month, now, hosts)
       const events = await cordobaEvents(job.zone, job.month, now)
       const selectedEvents = events.slice(0, Math.max(0, 12 - curated.facts.length))
