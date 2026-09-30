@@ -12,10 +12,11 @@ import {
   LogOut,
   CircleHelp,
   MapPinned,
+  ShieldCheck,
 } from "lucide-react"
 import { ZONE_MONTH_LABEL } from "@/lib/zone-month/content"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { OperonMark } from "@/components/brand/operon-mark"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { ShareLink } from "@/components/onboarding/share-link"
@@ -37,19 +38,21 @@ export function AppSidebar({
   role,
   publicUrl,
   showZoneMonth,
+  isPlatformAdmin,
 }: {
   userName: string
   orgName: string
   role: string
   publicUrl: string
   showZoneMonth: boolean
+  isPlatformAdmin: boolean
 }) {
   // Debajo de `lg` el nav vive en el drawer (ver app-shell-mobile).
   // `print:hidden`: el comprobante de reserva se imprime solo, sin el chrome
   // de la aplicación alrededor.
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground lg:flex print:hidden">
-      <SidebarNav userName={userName} orgName={orgName} role={role} publicUrl={publicUrl} showZoneMonth={showZoneMonth} />
+      <SidebarNav userName={userName} orgName={orgName} role={role} publicUrl={publicUrl} showZoneMonth={showZoneMonth} isPlatformAdmin={isPlatformAdmin} />
     </aside>
   )
 }
@@ -64,6 +67,7 @@ export function SidebarNav({
   role,
   publicUrl,
   showZoneMonth,
+  isPlatformAdmin,
   onNavigate,
 }: {
   userName: string
@@ -71,6 +75,7 @@ export function SidebarNav({
   role: string
   publicUrl: string
   showZoneMonth: boolean
+  isPlatformAdmin: boolean
   onNavigate?: () => void
 }) {
   const pathname = usePathname()
@@ -140,6 +145,20 @@ export function SidebarNav({
           <CircleHelp className="mr-2 h-4 w-4" />
           Ver tutorial
         </Button>
+        {isPlatformAdmin && (
+          // Solo Santiago y Tomás: el acceso al panel interno de Operon.
+          <Link
+            href="/operon"
+            onClick={onNavigate}
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "sm" }),
+              "mb-2 w-full justify-start text-primary hover:text-primary"
+            )}
+          >
+            <ShieldCheck className="mr-2 h-4 w-4" />
+            Panel Operon
+          </Link>
+        )}
         <div className="mb-2 flex items-start justify-between gap-2 px-1">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{userName}</p>

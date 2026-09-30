@@ -7,7 +7,14 @@ import { cn } from "@/lib/utils"
 const ITEMS = [
   { href: "/operon", label: "Clientes" },
   { href: "/operon/invitaciones", label: "Invitaciones" },
+  { href: "/operon/actividad", label: "Actividad" },
 ]
+
+/** Clientes también queda marcado dentro de la ficha de un cliente. */
+function isActive(pathname: string, href: string) {
+  if (href === "/operon") return pathname === "/operon" || pathname.startsWith("/operon/clientes")
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
 
 export function OperonNav() {
   const pathname = usePathname()
@@ -15,7 +22,7 @@ export function OperonNav() {
   return (
     <nav aria-label="Secciones" className="flex items-center gap-1">
       {ITEMS.map((item) => {
-        const active = pathname === item.href
+        const active = isActive(pathname, item.href)
         return (
           <Link
             key={item.href}

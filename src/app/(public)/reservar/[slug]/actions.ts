@@ -7,6 +7,9 @@ import { clientIp, publicRpcClient, RATE_LIMITED_MESSAGE, withinLimit } from "@/
 // Estas acciones sólo llaman a las RPC públicas, que devuelven exclusivamente
 // información pública. La reserva va con límite de intentos por IP (0025).
 
+/** El complejo se suspendió con la página abierta (0033). */
+const UNAVAILABLE_MESSAGE = "Las reservas online no están disponibles en este momento."
+
 export type AvailUnit = {
   unit_id: string
   name: string
@@ -43,7 +46,14 @@ export async function searchAvailability(
     p_guests: Number.isFinite(guests) && guests > 0 ? Math.floor(guests) : 1,
   })
 
-  if (error) return { ok: false, error: "No se pudo consultar la disponibilidad." }
+  if (error) {
+    return {
+      ok: false,
+      error: error.message.includes("ORG_SUSPENDED")
+        ? UNAVAILABLE_MESSAGE
+        : "No se pudo consultar la disponibilidad.",
+    }
+  }
   return { ok: true, units: (data ?? []) as AvailUnit[] }
 }
 
@@ -95,6 +105,8 @@ export async function bookPublic(input: {
       ? `Esta unidad requiere un mínimo de ${min} noches para esas fechas.`
       : error.message.includes("RATE_LIMITED")
         ? RATE_LIMITED_MESSAGE
+      : error.message.includes("ORG_SUSPENDED")
+        ? UNAVAILABLE_MESSAGE
       : error.message.includes("UNAVAILABLE")
         ? "Esa unidad ya se reservó para esas fechas. Probá con otras."
         : error.message.includes("OVER_CAPACITY")

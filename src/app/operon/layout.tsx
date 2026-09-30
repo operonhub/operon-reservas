@@ -1,12 +1,13 @@
 import type { Metadata } from "next"
 import { cookies } from "next/headers"
 import { notFound, redirect } from "next/navigation"
-import { LogOut } from "lucide-react"
+import Link from "next/link"
+import { ArrowLeft, LogOut } from "lucide-react"
 import { logout } from "@/app/login/actions"
 import { OperonArc } from "@/components/brand/operon-arc"
 import { OperonMark } from "@/components/brand/operon-mark"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/server"
 import { OperonNav } from "./operon-nav"
 
@@ -28,7 +29,12 @@ export default async function OperonLayout({ children }: { children: React.React
   const { data: auth } = await supabase.auth.getClaims()
   if (!auth?.claims?.sub) redirect("/login")
 
-  const { data: isAdmin } = await supabase.rpc("is_platform_admin")
+  // Un admin ve todas las membresías por RLS: se filtra por su propio usuario
+  // para saber si tiene un complejo propio al que volver.
+  const [{ data: isAdmin }, { data: ownMembership }] = await Promise.all([
+    supabase.rpc("is_platform_admin"),
+    supabase.from("memberships").select("organization_id").eq("user_id", auth.claims.sub).limit(1).maybeSingle(),
+  ])
   if (!isAdmin) notFound()
 
   const email = typeof auth.claims.email === "string" ? auth.claims.email : ""
@@ -51,6 +57,11 @@ export default async function OperonLayout({ children }: { children: React.React
           </div>
 
           <div className="flex items-center gap-2">
+            {ownMembership && (
+              <Link href="/" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                <ArrowLeft /> Volver a reservas
+              </Link>
+            )}
             <span className="hidden text-xs text-muted-foreground md:inline">{email}</span>
             <ThemeToggle />
             <form action={logout}>

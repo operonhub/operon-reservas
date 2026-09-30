@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { PublicBooking } from "@/components/public/public-booking"
+import { BookingUnavailable } from "@/components/public/booking-unavailable"
 
 export const dynamic = "force-dynamic"
 
@@ -29,6 +30,8 @@ export default async function ReservarPage({
     p_property_slug: null,
   })
 
+  // Suspendido desde el panel de Operon: página neutral, no un 404.
+  if (error?.message.includes("ORG_SUSPENDED")) return <BookingUnavailable />
   if (error || !data) notFound()
 
   const { data: mpRaw } = await supabase.rpc("mp_public_status", {

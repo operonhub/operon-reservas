@@ -20,6 +20,11 @@ type Status = "checking" | "ready" | "invalid" | "done"
  * sesión de recuperación SOLO en el navegador (nunca llega al servidor), así
  * que esta pantalla tiene que ser pública: si el middleware la mandara antes
  * a /login, se perdería esa sesión antes de que este código pudiera leerla.
+ *
+ * Los links que genera el panel de Operon traen `?token_hash=…&type=recovery`
+ * y se canjean acá con verifyOtp. Así el link se consume recién cuando la
+ * persona abre la página: la vista previa de WhatsApp (que no ejecuta JS) no
+ * lo gasta.
  */
 export default function ActualizarContrasenaPage() {
   const router = useRouter()
@@ -33,6 +38,17 @@ export default function ActualizarContrasenaPage() {
   React.useEffect(() => {
     const supabase = createClient()
     let ready = false
+
+    const params = new URLSearchParams(window.location.search)
+    const tokenHash = params.get("token_hash")
+    if (tokenHash && params.get("type") === "recovery") {
+      // El token no queda en el historial ni en una captura de pantalla.
+      window.history.replaceState(null, "", window.location.pathname)
+      supabase.auth
+        .verifyOtp({ type: "recovery", token_hash: tokenHash })
+        .then(({ error: otpError }) => setStatus(otpError ? "invalid" : "ready"))
+      return
+    }
 
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {

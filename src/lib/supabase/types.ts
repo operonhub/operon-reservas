@@ -206,6 +206,7 @@ export type Database = {
           link_shared_at: string | null
           name: string
           slug: string
+          suspended_at: string | null
           updated_at: string
         }
         Insert: {
@@ -215,6 +216,7 @@ export type Database = {
           link_shared_at?: string | null
           name: string
           slug: string
+          suspended_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -224,6 +226,7 @@ export type Database = {
           link_shared_at?: string | null
           name?: string
           slug?: string
+          suspended_at?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1009,12 +1012,28 @@ export type Database = {
       invitation_revoke: { Args: { p_id: string }; Returns: boolean }
       mark_tour_completed: { Args: never; Returns: undefined }
       my_onboarding_status: { Args: never; Returns: Json }
+      operon_audit_log: {
+        Args: { p_limit?: number; p_org?: string }
+        Returns: {
+          action: string
+          actor_email: string
+          created_at: string
+          detail: Json
+          id: number
+          organization_id: string
+          organization_name: string
+          reason: string
+          target_email: string
+        }[]
+      }
+      operon_client_detail: { Args: { p_org: string }; Returns: Json }
       operon_clients: {
         Args: never
         Returns: {
           created_at: string
-          currency: string
-          deposit_pct: number
+          deposit_configured: boolean
+          email_failed_30d: number
+          email_stuck: number
           last_reservation_at: string
           last_sign_in_at: string
           link_shared: boolean
@@ -1025,12 +1044,28 @@ export type Database = {
           organization_id: string
           owner_email: string
           owner_name: string
-          paid_month: number
           reservations_month: number
           reservations_total: number
           slug: string
+          suspended_at: string
           units: number
         }[]
+      }
+      operon_prepare_recovery: {
+        Args: { p_org: string; p_user: string }
+        Returns: string
+      }
+      operon_reactivate_org: {
+        Args: { p_org: string; p_reason?: string }
+        Returns: boolean
+      }
+      operon_remove_member: {
+        Args: { p_org: string; p_reason: string; p_user: string }
+        Returns: boolean
+      }
+      operon_suspend_org: {
+        Args: { p_org: string; p_reason: string }
+        Returns: string
       }
       org_onboarding_mark: {
         Args: { p_event: string; p_org: string }

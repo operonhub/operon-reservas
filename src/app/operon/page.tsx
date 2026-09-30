@@ -1,41 +1,19 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { UserPlus } from "lucide-react"
+import { ChevronRight, UserPlus } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
-import { formatCurrency } from "@/lib/format"
+import { activity, relative, shortDate } from "@/lib/operon/format"
+import type { ClientRow } from "@/lib/operon/types"
 import { siteUrl } from "@/lib/site-url"
 import { createClient } from "@/lib/supabase/server"
 import { cn } from "@/lib/utils"
+import { MpBadge } from "./badges"
 
 export const metadata: Metadata = {
   title: "Clientes · Operon",
   robots: { index: false, follow: false },
 }
-
-type ClientRow = {
-  organization_id: string
-  name: string
-  slug: string
-  created_at: string
-  owner_email: string | null
-  owner_name: string | null
-  last_sign_in_at: string | null
-  members: number
-  units: number
-  reservations_total: number
-  reservations_month: number
-  last_reservation_at: string | null
-  paid_month: number
-  currency: string
-  deposit_pct: number
-  mp_connected: boolean
-  mp_live: boolean
-  link_shared: boolean
-}
-
-const DAY = 86_400_000
-const relativeTime = new Intl.RelativeTimeFormat("es-AR", { numeric: "auto" })
 
 // Fuera del componente: la regla de pureza de React no deja leer el reloj
 // directo en el render.
@@ -43,45 +21,45 @@ function currentTime() {
   return Date.now()
 }
 
-function daysSince(iso: string | null, now: number) {
-  return iso ? Math.floor((now - new Date(iso).getTime()) / DAY) : Infinity
+const FILTERS = [
+  { key: "todos", label: "Todos" },
+  { key: "activos", label: "Activos" },
+  { key: "suspendidos", label: "Suspendidos" },
+  { key: "problemas", label: "Con problemas" },
+] as const
+type Filter = (typeof FILTERS)[number]["key"]
+
+const hasProblems = (c: ClientRow) => c.email_failed_30d > 0 || c.email_stuck > 0
+
+function matches(filter: Filter, c: ClientRow) {
+  if (filter === "activos") return !c.suspended_at
+  if (filter === "suspendidos") return Boolean(c.suspended_at)
+  if (filter === "problemas") return hasProblems(c)
+  return true
 }
 
-function relative(iso: string, now: number) {
-  const days = (new Date(iso).getTime() - now) / DAY
-  if (Math.abs(days) < 1) {
-    const hours = Math.round(days * 24)
-    return hours === 0 ? "recién" : relativeTime.format(hours, "hour")
-  }
-  if (Math.abs(days) < 30) return relativeTime.format(Math.round(days), "day")
-  return relativeTime.format(Math.round(days / 30), "month")
-}
-
-/**
- * `last_sign_in_at` cuenta inicios de sesión, no uso: una sesión abierta se
- * renueva sola y no lo actualiza. Por eso "activo" también mira la última
- * reserva cargada, y la etiqueta habla de ingresos, no de "uso".
- */
-function activity(client: ClientRow, now: number) {
-  const days = Math.min(daysSince(client.last_sign_in_at, now), daysSince(client.last_reservation_at, now))
-  if (days === Infinity) return { label: "Sin actividad", dot: "bg-muted-foreground/40", days }
-  if (days <= 7) return { label: "Activo", dot: "bg-success", days }
-  if (days <= 30) return { label: "Poco activo", dot: "bg-warning", days }
-  return { label: "Inactivo", dot: "bg-destructive", days }
-}
-
-export default async function ClientesPage() {
+export default async function ClientesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ estado?: string }>
+}) {
   const supabase = await createClient()
   const { data, error } = await supabase.rpc("operon_clients")
   if (error) notFound()
 
-  const clients = (data ?? []) as ClientRow[]
+  const { estado } = await searchParams
+  const filter: Filter = FILTERS.some((f) => f.key === estado) ? (estado as Filter) : "todos"
+
+  const all = (data ?? []) as ClientRow[]
+  const clients = all.filter((c) => matches(filter, c))
   const now = currentTime()
   const base = await siteUrl()
 
-  const active = clients.filter((c) => activity(c, now).days <= 30).length
-  const reservationsMonth = clients.reduce((sum, c) => sum + c.reservations_month, 0)
-  const withMp = clients.filter((c) => c.mp_connected).length
+  const running = all.filter((c) => !c.suspended_at)
+  const active = running.filter((c) => activity(c, now).days <= 30).length
+  const reservationsMonth = all.reduce((sum, c) => sum + c.reservations_month, 0)
+  const withProblems = all.filter(hasProblems).length
+  const suspended = all.length - running.length
 
   return (
     <>
@@ -89,8 +67,8 @@ export default async function ClientesPage() {
         <div>
           <h1 className="text-2xl leading-tight font-semibold sm:text-[28px]">Clientes</h1>
           <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
-            Cada complejo que usa Operon Reservas: quién lo maneja, cuánto lo usa y qué le falta
-            configurar.
+            Cada complejo que usa Operon Reservas: quién lo maneja, cuánto lo usa, qué le falta
+            configurar y si algo está fallando. Tocá un complejo para ver su ficha.
           </p>
         </div>
         <Link href="/operon/invitaciones" className={cn(buttonVariants(), "h-9 px-3.5")}>
@@ -99,14 +77,43 @@ export default async function ClientesPage() {
       </header>
 
       <section aria-label="Resumen" className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Clientes" value={clients.length} />
-        <Stat label="Activos · 30 días" value={active} of={clients.length} />
+        <Stat
+          label="Clientes"
+          value={running.length}
+          note={suspended > 0 ? `+${suspended} suspendido${suspended === 1 ? "" : "s"}` : undefined}
+        />
+        <Stat label="Activos · 30 días" value={active} of={running.length} />
         <Stat label="Reservas este mes" value={reservationsMonth} />
-        <Stat label="Con Mercado Pago" value={withMp} of={clients.length} />
+        <Stat
+          label="Con problemas"
+          value={withProblems}
+          tone={withProblems > 0 ? "warning" : undefined}
+          note={withProblems > 0 ? "Mails que no salen" : "Todo en orden"}
+        />
       </section>
 
-      <section className="mt-6 overflow-hidden rounded-2xl border bg-card shadow-sm">
-        {clients.length === 0 ? (
+      <nav aria-label="Filtrar clientes" className="mt-6 flex flex-wrap gap-1.5">
+        {FILTERS.map((f) => {
+          const count = all.filter((c) => matches(f.key, c)).length
+          const current = f.key === filter
+          return (
+            <Link
+              key={f.key}
+              href={f.key === "todos" ? "/operon" : `/operon?estado=${f.key}`}
+              aria-current={current ? "page" : undefined}
+              className={cn(
+                "rounded-full border px-3 py-1 text-sm transition-colors",
+                current ? "border-transparent bg-foreground text-background" : "hover:bg-muted"
+              )}
+            >
+              {f.label} <span className="font-mono text-xs tabular-nums opacity-70">{count}</span>
+            </Link>
+          )
+        })}
+      </nav>
+
+      <section className="mt-3 overflow-hidden rounded-2xl border bg-card shadow-sm">
+        {all.length === 0 ? (
           <div className="p-10 text-center">
             <p className="font-medium">Todavía no hay clientes.</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -119,12 +126,16 @@ export default async function ClientesPage() {
               <UserPlus /> Invitar al primero
             </Link>
           </div>
+        ) : clients.length === 0 ? (
+          <p className="p-10 text-center text-sm text-muted-foreground">
+            Ningún cliente en este filtro.
+          </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-sm">
+            <table className="w-full min-w-[960px] text-sm">
               <thead className="border-b bg-muted/40 text-left">
                 <tr>
-                  {["Complejo", "Dueño", "Actividad", "Unidades", "Reservas", "Cobrado este mes", "Mercado Pago", "Alta"].map(
+                  {["Complejo", "Dueño", "Actividad", "Unidades", "Reservas", "Configuración", "Salud", "Alta"].map(
                     (heading) => (
                       <th
                         key={heading}
@@ -140,16 +151,32 @@ export default async function ClientesPage() {
               <tbody>
                 {clients.map((client) => {
                   const status = activity(client, now)
-                  const paid = Number(client.paid_month)
                   return (
-                    <tr key={client.organization_id} className="border-b align-top last:border-b-0">
+                    <tr
+                      key={client.organization_id}
+                      className={cn(
+                        "border-b align-top transition-colors last:border-b-0 hover:bg-muted/30",
+                        client.suspended_at && "bg-muted/20"
+                      )}
+                    >
                       <td className="px-4 py-3">
-                        <p className="font-medium">{client.name}</p>
+                        <Link
+                          href={`/operon/clientes/${client.organization_id}`}
+                          className="group inline-flex items-center gap-1 font-medium hover:underline"
+                        >
+                          {client.name}
+                          <ChevronRight className="size-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                        </Link>
+                        {client.suspended_at && (
+                          <span className="label-mono ml-2 rounded-md bg-destructive/15 px-1.5 py-0.5 text-destructive">
+                            Suspendido
+                          </span>
+                        )}
                         <a
                           href={`${base}/reservar/${client.slug}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-mono text-xs text-muted-foreground hover:text-foreground hover:underline"
+                          className="block font-mono text-xs text-muted-foreground hover:text-foreground hover:underline"
                         >
                           /reservar/{client.slug}
                         </a>
@@ -197,42 +224,22 @@ export default async function ClientesPage() {
                         </p>
                       </td>
 
-                      <td className="px-4 py-3 font-mono whitespace-nowrap tabular-nums">
-                        {paid > 0 ? (
-                          formatCurrency(paid, client.currency)
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
+                      <td className="px-4 py-3">
+                        <MpBadge connected={client.mp_connected} live={client.mp_live} />
+                        {!client.deposit_configured && (
+                          <p className="mt-1.5 text-xs text-muted-foreground">Sin seña configurada</p>
+                        )}
+                        {!client.link_shared && (
+                          <p className="mt-0.5 text-xs text-muted-foreground">No compartió su link</p>
                         )}
                       </td>
 
                       <td className="px-4 py-3">
-                        {client.mp_connected ? (
-                          <span
-                            className={cn(
-                              "label-mono rounded-md px-2 py-1 whitespace-nowrap",
-                              client.mp_live
-                                ? "bg-success/15 text-success"
-                                : "bg-warning/30 text-warning-foreground"
-                            )}
-                          >
-                            {client.mp_live ? "Conectado" : "Modo prueba"}
-                          </span>
-                        ) : (
-                          <span className="label-mono rounded-md bg-muted px-2 py-1 whitespace-nowrap text-muted-foreground">
-                            Sin conectar
-                          </span>
-                        )}
-                        {Number(client.deposit_pct) === 0 && (
-                          <p className="mt-1.5 text-xs text-muted-foreground">Sin seña configurada</p>
-                        )}
+                        <Health failed={client.email_failed_30d} stuck={client.email_stuck} />
                       </td>
 
                       <td className="px-4 py-3 font-mono text-xs whitespace-nowrap text-muted-foreground tabular-nums">
-                        {new Date(client.created_at).toLocaleDateString("es-AR", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {shortDate(client.created_at)}
                       </td>
                     </tr>
                   )
@@ -246,16 +253,61 @@ export default async function ClientesPage() {
   )
 }
 
-function Stat({ label, value, of }: { label: string; value: number; of?: number }) {
+function Health({ failed, stuck }: { failed: number; stuck: number }) {
+  if (failed === 0 && stuck === 0) {
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
+        <span aria-hidden className="size-2 rounded-full bg-success" />
+        OK
+      </span>
+    )
+  }
+  return (
+    <div className="space-y-0.5 text-xs whitespace-nowrap">
+      {failed > 0 && (
+        <p className="inline-flex items-center gap-1.5 text-destructive">
+          <span aria-hidden className="size-2 rounded-full bg-destructive" />
+          {failed} mail{failed === 1 ? "" : "s"} sin enviar
+        </p>
+      )}
+      {stuck > 0 && (
+        <p className="flex items-center gap-1.5 text-warning-foreground">
+          <span aria-hidden className="size-2 rounded-full bg-warning" />
+          {stuck} trabado{stuck === 1 ? "" : "s"}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function Stat({
+  label,
+  value,
+  of,
+  note,
+  tone,
+}: {
+  label: string
+  value: number
+  of?: number
+  note?: string
+  tone?: "warning"
+}) {
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-sm">
       <p className="label-mono text-muted-foreground">{label}</p>
-      <p className="mt-2 font-heading text-3xl font-semibold tracking-tight tabular-nums">
+      <p
+        className={cn(
+          "mt-2 font-heading text-3xl font-semibold tracking-tight tabular-nums",
+          tone === "warning" && "text-destructive"
+        )}
+      >
         {value}
         {of !== undefined && (
           <span className="ml-1.5 text-sm font-normal text-muted-foreground">de {of}</span>
         )}
       </p>
+      {note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}
     </div>
   )
 }

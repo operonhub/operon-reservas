@@ -1,18 +1,11 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { cookies } from "next/headers"
-import { createClient } from "@/lib/supabase/server"
 import { generateToken, hashToken } from "@/lib/invitations"
+import { operonClient } from "@/lib/operon/client"
 import { siteUrl } from "@/lib/site-url"
 
 export type CreateInvitationState = { link?: string; note?: string; error?: string } | null
-
-/** Las RPC verifican is_platform_admin(); la demo no tiene Auth real. */
-async function operonClient() {
-  if ((await cookies()).get("operon_demo")?.value === "1") return null
-  return createClient()
-}
 
 export async function createInvitation(
   _prev: CreateInvitationState,

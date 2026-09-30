@@ -20,11 +20,14 @@ export type ActiveContext = {
   tourCompleted: boolean
   /** Alguien del equipo ocultó la lista de primeros pasos de Inicio. */
   checklistDismissed: boolean
+  /** Es admin de Operon (Santiago o Tomás): ve el acceso al panel interno. */
+  isPlatformAdmin: boolean
 }
 
 /**
  * Exige sesión + membership. Redirige a /login si no hay sesión,
- * o a /sin-acceso si el usuario no pertenece a ninguna organización.
+ * a /sin-acceso si el usuario no pertenece a ninguna organización, y a
+ * /suspendida si su complejo está suspendido desde el panel de Operon.
  * (Etapa 1: se toma la primera membership. El switcher multi-org es futuro.)
  *
  * Rendimiento — esta función corre en CADA navegación del panel, así que su
@@ -58,19 +61,21 @@ export const requireContext = cache(async function requireContext(): Promise<Act
   const userId = claims.sub
   const email = typeof claims.email === "string" ? claims.email : null
 
-  // El estado del tour y de la lista de primeros pasos viaja en estas mismas
-  // dos consultas: el onboarding no le suma viajes a la navegación normal.
-  const [{ data: membership }, { data: profile }] = await Promise.all([
+  // El estado del tour, de la lista de primeros pasos y de la suspensión viaja
+  // en estas mismas consultas: no le suman viajes a la navegación normal. La
+  // de platform admin va en paralelo, así que tampoco suma latencia.
+  const [{ data: membership }, { data: profile }, { data: isPlatformAdmin }] = await Promise.all([
     supabase
       .from("memberships")
-      .select("role, organization_id, organizations(name, slug, checklist_dismissed_at)")
+      .select("role, organization_id, organizations(name, slug, checklist_dismissed_at, suspended_at)")
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle(),
     supabase.from("profiles").select("full_name, tour_completed_at").eq("id", userId).maybeSingle(),
+    supabase.rpc("is_platform_admin"),
   ])
 
-  type Org = { name: string; slug: string; checklist_dismissed_at: string | null }
+  type Org = { name: string; slug: string; checklist_dismissed_at: string | null; suspended_at: string | null }
   const org = membership?.organizations as Org | Org[] | null
   const orgObj = Array.isArray(org) ? org[0] : org
 
@@ -78,13 +83,13 @@ export const requireContext = cache(async function requireContext(): Promise<Act
     // Sin organización: si canjeó una invitación, le falta el asistente; si es
     // de Operon, su lugar es el panel interno. Este viaje extra solo lo paga
     // quien todavía no tiene complejo.
-    const [{ data: onboarding }, { data: isPlatformAdmin }] = await Promise.all([
-      supabase.rpc("my_onboarding_status"),
-      supabase.rpc("is_platform_admin"),
-    ])
+    const { data: onboarding } = await supabase.rpc("my_onboarding_status")
     if ((onboarding as { has_grant?: boolean } | null)?.has_grant) redirect("/bienvenida")
     redirect(isPlatformAdmin ? "/operon" : "/sin-acceso")
   }
+
+  // Los admins de Operon entran igual, para poder revisar su complejo de pruebas.
+  if (orgObj.suspended_at && !isPlatformAdmin) redirect("/suspendida")
 
   return {
     userId,
@@ -96,5 +101,6 @@ export const requireContext = cache(async function requireContext(): Promise<Act
     role: membership.role,
     tourCompleted: Boolean(profile?.tour_completed_at),
     checklistDismissed: Boolean(orgObj.checklist_dismissed_at),
+    isPlatformAdmin: Boolean(isPlatformAdmin),
   }
 })

@@ -11,6 +11,7 @@ export const DEMO_CONTEXT = {
   // En la demo el tour se recuerda por visitante en su navegador, no en la base.
   tourCompleted: false,
   checklistDismissed: false,
+  isPlatformAdmin: false,
 }
 
 /** El nombre de la cookie que lleva lo que cada visitante creó en la demo. */

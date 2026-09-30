@@ -1,6 +1,6 @@
 /**
- * Panel interno de Operon (migración 0027): listado de clientes, contra el
- * esquema real en PGlite.
+ * Panel interno de Operon (migraciones 0027 y 0033): listado de clientes,
+ * contra el esquema real en PGlite. Desde 0033 el listado no trae plata.
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
@@ -22,7 +22,7 @@ test("solo un platform admin ve el listado de clientes", async () => {
   await db.close()
 })
 
-test("cada cliente trae dueño, unidades, reservas del mes y cobros", async () => {
+test("cada cliente trae dueño, unidades, reservas del mes y configuración, sin montos", async () => {
   const { db, ids } = await fresh()
 
   await as(db, "postgres")
@@ -58,16 +58,18 @@ test("cada cliente trae dueño, unidades, reservas del mes y cobros", async () =
   assert.equal(a.units, 1)
   assert.equal(a.reservations_total, 3)
   assert.equal(a.reservations_month, 1)
-  assert.equal(Number(a.paid_month), 150000)
-  assert.equal(a.currency, "ARS")
-  assert.equal(Number(a.deposit_pct), 50)
+  assert.equal(a.deposit_configured, true)
+  assert.equal(a.suspended_at, null)
   assert.equal(a.mp_connected, false)
+  assert.equal(a.email_failed_30d, 0)
+  assert.equal(a.email_stuck, 0)
+  // La plata del cliente es privada: no sale del listado.
+  for (const key of ["paid_month", "currency", "deposit_pct"]) assert.ok(!(key in a), key)
   assert.equal(a.link_shared, true)
   assert.ok(a.last_reservation_at)
 
   const b = list.find((c) => c.slug === "otra-cabana")
   assert.equal(b.reservations_total, 0)
-  assert.equal(Number(b.paid_month), 0)
   assert.equal(b.link_shared, false)
   await db.close()
 })

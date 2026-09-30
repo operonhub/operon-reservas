@@ -17,12 +17,14 @@ export function AppShellMobile({
   role,
   publicUrl,
   showZoneMonth,
+  isPlatformAdmin,
 }: {
   userName: string
   orgName: string
   role: string
   publicUrl: string
   showZoneMonth: boolean
+  isPlatformAdmin: boolean
 }) {
   const [open, setOpen] = React.useState(false)
 
@@ -59,6 +61,7 @@ export function AppShellMobile({
           role={role}
           publicUrl={publicUrl}
           showZoneMonth={showZoneMonth}
+          isPlatformAdmin={isPlatformAdmin}
           onNavigate={() => setOpen(false)}
         />
       </SheetContent>

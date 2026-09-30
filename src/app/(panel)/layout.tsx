@@ -29,6 +29,7 @@ export default async function PanelLayout({
         role={ctx.role}
         publicUrl={publicUrl}
         showZoneMonth={showZoneMonth}
+        isPlatformAdmin={ctx.isPlatformAdmin}
       />
       {/* `min-w-0`: sin esto el grid ancho del calendario estira la columna y
           reaparece el scroll horizontal de toda la página. */}
@@ -39,6 +40,7 @@ export default async function PanelLayout({
           role={ctx.role}
           publicUrl={publicUrl}
           showZoneMonth={showZoneMonth}
+          isPlatformAdmin={ctx.isPlatformAdmin}
         />
         {/* `min-h-0`: acá el alto lo da `flex-1`, y el `min-height: auto` que
             traen los flex items impediría achicarse -> <main> crecería con el
