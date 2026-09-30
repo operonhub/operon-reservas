@@ -8,6 +8,8 @@
  * Docs: https://www.mercadopago.com.ar/developers/es/docs/security/oauth
  */
 
+import { configuredOrigin } from "@/lib/site-origin"
+
 const OAUTH_TOKEN_URL = "https://api.mercadopago.com/oauth/token"
 // Dominio de autorización de Argentina.
 const AUTH_BASE = "https://auth.mercadopago.com.ar/authorization"
@@ -37,9 +39,9 @@ function clientSecret(): string {
 
 /** URL pública del sitio (sin barra final). */
 export function siteUrl(): string {
-  const site = process.env.NEXT_PUBLIC_SITE_URL
+  const site = configuredOrigin()
   if (!site) throw new Error("NEXT_PUBLIC_SITE_URL no configurada")
-  return site.replace(/\/$/, "")
+  return site
 }
 
 /** URI de retorno del OAuth. Debe coincidir EXACTO con la registrada en MP. */
