@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto"
 import { runZoneMonth } from "@/lib/zone-month/worker"
 
 export const runtime = "nodejs"
-export const maxDuration = 60
+export const maxDuration = 300
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {

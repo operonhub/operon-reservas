@@ -41,6 +41,15 @@ export type Database = {
         Update: { status?: string }
         Relationships: []
       }
+      zone_month_feedback: {
+        Row: {
+          organization_id: string; month: string; interests: string[]; done: string[];
+          updated_by: string | null; updated_at: string;
+        }
+        Insert: { organization_id: string; month: string; interests?: string[]; done?: string[] }
+        Update: { interests?: string[]; done?: string[] }
+        Relationships: []
+      }
       guests: {
         Row: {
           created_at: string
@@ -795,6 +804,14 @@ export type Database = {
       }
       zone_month_finish: {
         Args: { p_zone: string; p_month: string; p_lease: string; p_edition: Json | null; p_error: string | null }
+        Returns: boolean
+      }
+      zone_month_interests: {
+        Args: { p_zone: string; p_month: string }
+        Returns: Json
+      }
+      zone_month_save_feedback: {
+        Args: { p_org: string; p_month: string; p_interests: string[]; p_done: string[] }
         Returns: boolean
       }
       _book: {

@@ -35,10 +35,12 @@ export function editionStatus(edition: ZoneEdition | null, now: number): { label
   return { label: "En cola", tone: "muted" }
 }
 
-/** Se puede pedir desde el panel: todo menos lo publicado o lo que se está generando ahora. */
+/**
+ * Se puede pedir desde el panel: todo menos lo que se está generando ahora.
+ * Una edición publicada se puede volver a generar (0037).
+ */
 export function canQueue(edition: ZoneEdition | null, now: number) {
   if (!edition) return true
-  if (edition.status === "published") return false
   if (edition.status === "processing") return interrupted(edition, now)
   return true
 }

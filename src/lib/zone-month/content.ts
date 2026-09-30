@@ -38,3 +38,45 @@ export const ERRORS: Record<string, string> = {
 export function monthLabel(month: string) {
   return new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month.slice(0, 7)}-01T12:00:00Z`))
 }
+
+// ---------- Edición v2 (0037): investigación real del destino ----------
+// La redacta Claude a partir de búsquedas web; cada dato fechado cita fuentes
+// que salen de las citas reales de la búsqueda (índices en `sources`), nunca
+// URLs escritas por el modelo. Las ediciones v1 se siguen mostrando.
+
+export const INTERESTS = {
+  tarifas: "Tarifas y números",
+  reservas: "Conseguir reservas",
+  turismo: "Turismo de la zona",
+  gestion: "Gestión del alojamiento",
+} as const
+export type InterestId = keyof typeof INTERESTS
+
+export const CALENDAR_KINDS = {
+  feriado: "Feriado",
+  finde_largo: "Fin de semana largo",
+  vacaciones: "Vacaciones",
+  temporada: "Temporada",
+  otro: "Fecha clave",
+} as const
+export type CalendarKind = keyof typeof CALENDAR_KINDS
+
+export type Source = { url: string; title: string }
+export type PlaceScope = "localidad" | "departamento" | "provincia"
+export type ZoneEvent = {
+  id: string; title: string; start: string; end: string; place: string | null;
+  summary: string; forHosts: string; sources: number[];
+}
+export type CalendarItem = { kind: CalendarKind; title: string; start: string; end: string; summary: string; sources: number[] }
+export type PracticalItem = { title: string; text: string; sources: number[] }
+export type Idea = { title: string; text: string; eventId: string | null }
+export type ReadyMessage = { eventId: string | null; channel: "whatsapp" | "instagram"; text: string }
+export type EditionV2 = {
+  version: 2; zone: string; month: string; collectedAt: string; model: string;
+  place: { locality: string; department: string | null; province: string | null; scope: PlaceScope };
+  headline: string; overview: string[];
+  events: ZoneEvent[]; calendar: CalendarItem[]; practical: PracticalItem[];
+  ideas: Idea[]; messages: ReadyMessage[]; sources: Source[];
+}
+/** Marcadores que el panel completa con los datos del complejo al copiar un mensaje. */
+export const MESSAGE_PLACEHOLDERS = { name: "{alojamiento}", link: "{link}" } as const

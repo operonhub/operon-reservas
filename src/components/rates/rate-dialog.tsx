@@ -26,6 +26,7 @@ export function RateDialog({
   propertyId,
   defaultUnitId,
   defaultPreset,
+  defaults,
   triggerLabel,
   triggerVariant = "default",
   triggerSize = "default",
@@ -38,6 +39,8 @@ export function RateDialog({
   propertyId: string
   defaultUnitId?: string | null
   defaultPreset?: RulePreset
+  /** Valores sugeridos para una regla nueva (por ejemplo, desde Tu zona). */
+  defaults?: { label?: string; start_date?: string; end_date?: string; min_nights?: number }
   triggerLabel: string
   triggerVariant?: "default" | "outline" | "ghost" | "secondary"
   triggerSize?: "default" | "sm"
@@ -151,7 +154,7 @@ export function RateDialog({
               <Input
                 id="label"
                 name="label"
-                defaultValue={rate?.label ?? ""}
+                defaultValue={rate?.label ?? defaults?.label ?? ""}
                 placeholder="Vacaciones de invierno"
               />
             </div>
@@ -304,7 +307,7 @@ export function RateDialog({
                   id="start_date"
                   name="start_date"
                   type="date"
-                  defaultValue={rate?.start_date ?? ""}
+                  defaultValue={rate?.start_date ?? defaults?.start_date ?? ""}
                 />
               </div>
               <div className="grid gap-1.5">
@@ -315,7 +318,7 @@ export function RateDialog({
                   id="end_date"
                   name="end_date"
                   type="date"
-                  defaultValue={rate?.end_date ?? ""}
+                  defaultValue={rate?.end_date ?? defaults?.end_date ?? ""}
                 />
               </div>
             </div>
@@ -331,7 +334,7 @@ export function RateDialog({
                 name="min_nights"
                 type="number"
                 min={1}
-                defaultValue={rate?.min_nights ?? 1}
+                defaultValue={rate?.min_nights ?? defaults?.min_nights ?? 1}
               />
               <p className="text-[11px] text-muted-foreground">
                 Se rechaza toda reserva más corta, tanto desde la web como

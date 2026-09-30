@@ -4,14 +4,21 @@ import { readFileSync } from 'node:fs'
 import { createDb, as, attempt } from './harness.mjs'
 import { seed } from './seed.mjs'
 
-// Única sustitución para fijar el reloj: conserva el cuerpo real de cada RPC.
-const migration = readFileSync(new URL('../../supabase/migrations/0034_zone_month_por_cliente.sql', import.meta.url), 'utf8')
+// Única sustitución para fijar el reloj: conserva el cuerpo real de cada RPC,
+// tomado de la migración más nueva que la define (0037 reemplaza la cola).
+const read = (file) => readFileSync(new URL(`../../supabase/migrations/${file}`, import.meta.url), 'utf8')
+const migrations = [read('0037_tu_zona_v2.sql'), read('0034_zone_month_por_cliente.sql')]
 const CLOCKED = ['zone_month_claim_enabled', 'zone_month_claim_edition', 'operon_zone_month_queue', 'operon_zone_month_overview']
+function definition(name) {
+  const pattern = new RegExp(`create (?:or replace )?function public\\.${name}\\([\\s\\S]+?end; \\$\\$;`)
+  for (const sql of migrations) { const m = sql.match(pattern); if (m) return m[0] }
+  throw new Error('sin definición: ' + name)
+}
 async function clock(db, timestamp = '2026-09-28 12:00:00+00') {
   await as(db, 'postgres')
   for (const name of CLOCKED) {
-    const fn = migration.match(new RegExp(`create function public\\.${name}\\([\\s\\S]+?end; \\$\\$;`))[0]
-    await db.query(fn.replace('create function', 'create or replace function').replaceAll('now()', `('${timestamp}'::timestamptz)`))
+    const fn = definition(name)
+    await db.query(fn.replace(/^create (?:or replace )?function/, 'create or replace function').replaceAll('now()', `('${timestamp}'::timestamptz)`))
   }
 }
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0]
@@ -163,7 +170,7 @@ test('panel: activar y desactivar un cliente, con registro; suspendido no se act
   } finally { await db.close() }
 })
 
-test('panel: tope de 10 zonas para cuidar la cuota de Gemini', async () => {
+test('panel: tope de 10 zonas para cuidar el costo de la investigación', async () => {
   const {db, ids} = await fresh()
   try {
     await as(db, 'postgres')
@@ -182,7 +189,7 @@ test('panel: tope de 10 zonas para cuidar la cuota de Gemini', async () => {
   } finally { await db.close() }
 })
 
-test('panel: generar ahora crea la edición, reintentar da un intento más y respeta lo publicado', async () => {
+test('panel: generar ahora crea la edición, reintentar da un intento más y una publicada se puede rehacer', async () => {
   const {db, ids} = await fresh()
   try {
     await as(db, 'authenticated', {uid: ids.admin})
@@ -217,9 +224,22 @@ test('panel: generar ahora crea la edición, reintentar da un intento más y res
     assert.equal(again.attempts, 3)
     await db.query("select zone_month_finish('AR:ushuaia', '2026-09-01', $1, $2, null)", [again.lease, {version: 1, zone: 'AR:ushuaia', month: '2026-09-01'}])
 
-    // Publicada: no se regenera.
+    // Publicada: se puede rehacer (0037). Deja de verse y vuelve con tres intentos.
     await as(db, 'authenticated', {uid: ids.admin})
-    assert.match((await queue('AR:ushuaia', '2026-09-01')).error, /ALREADY_PUBLISHED/)
+    assert.equal((await queue('AR:ushuaia', '2026-09-01')).rows[0].q.previous_status, 'published')
+    await as(db, 'postgres')
+    assert.deepEqual(await one(db, "select status, attempts, edition, published_at from zone_month_editions where zone='AR:ushuaia'"),
+      {status: 'pending', attempts: 0, edition: null, published_at: null})
+    await as(db, 'service_role')
+    const redo = (await one(db, "select zone_month_claim_edition('AR:ushuaia', '2026-09-01') j")).j
+    assert.equal(redo.attempts, 1)
+    await db.query("select zone_month_finish('AR:ushuaia', '2026-09-01', $1, $2, null)", [redo.lease, {version: 2, zone: 'AR:ushuaia', month: '2026-09-01'}])
+    // Solo versiones conocidas: una v3 no se publica.
+    await as(db, 'postgres')
+    await db.query("update zone_month_editions set status='processing', lease=gen_random_uuid(), edition=null, published_at=null where zone='AR:ushuaia'")
+    const lease = (await one(db, "select lease from zone_month_editions where zone='AR:ushuaia'")).lease
+    await as(db, 'service_role')
+    assert.ok((await attempt(db, "select zone_month_finish('AR:ushuaia', '2026-09-01', $1, $2, null)", [lease, {version: 3, zone: 'AR:ushuaia', month: '2026-09-01'}])).error)
 
     // Una zona que no está habilitada no se puede reclamar a mano.
     await as(db, 'service_role')
@@ -227,7 +247,7 @@ test('panel: generar ahora crea la edición, reintentar da un intento más y res
 
     await as(db, 'postgres')
     const log = (await db.query("select detail from app_private.admin_audit_log where action = 'zone_month.queue' order by id")).rows
-    assert.deepEqual(log.map((r) => [r.detail.previous_status, r.detail.previous_error]), [['pending', null], ['failed', 'quota']])
+    assert.deepEqual(log.map((r) => [r.detail.previous_status, r.detail.previous_error]), [['pending', null], ['failed', 'quota'], ['published', null]])
   } finally { await db.close() }
 })
 
@@ -252,5 +272,40 @@ test('panel: resumen por cliente con el estado del mes actual y el próximo', as
     assert.deepEqual(b.zones, [])
 
     assert.equal((await db.query('select * from operon_zone_month_overview($1)', [ids.org_b])).rows.length, 1)
+  } finally { await db.close() }
+})
+
+test('respuestas del dueño: solo su complejo, valores válidos, y a la IA solo llega la cuenta de la zona', async () => {
+  const {db, ids} = await fresh()
+  try {
+    const save = async (uid, org, interests, done = []) => {
+      await as(db, 'authenticated', {uid})
+      return attempt(db, "select zone_month_save_feedback($1, '2026-10-01', $2, $3) ok", [org, interests, done])
+    }
+    assert.equal((await save(ids.owner_a, ids.org_a, ['tarifas', 'turismo', 'tarifas'], ['idea-0'])).rows[0].ok, true)
+    assert.equal((await save(ids.staff_a, ids.org_a, ['reservas'], ['idea-0', 'idea-2'])).rows[0].ok, true)
+    // Otro complejo, no; valores fuera de lista, no; meses que no empiezan el 1, no.
+    assert.match((await save(ids.owner_b, ids.org_a, ['tarifas'])).error, /FORBIDDEN/)
+    assert.match((await save(ids.owner_a, ids.org_a, ['precios'])).error, /INVALID_INTERESTS/)
+    assert.match((await save(ids.owner_a, ids.org_a, [], ['Idea 1'])).error, /INVALID_DONE/)
+    await as(db, 'authenticated', {uid: ids.owner_a})
+    assert.match((await attempt(db, "select zone_month_save_feedback($1, '2026-10-02', '{}', '{}')", [ids.org_a])).error, /INVALID_MONTH/)
+
+    // Cada uno ve solo lo suyo; nadie escribe directo en la tabla.
+    assert.deepEqual((await db.query('select interests, done from zone_month_feedback')).rows, [{interests: ['reservas'], done: ['idea-0', 'idea-2']}])
+    assert.ok((await attempt(db, "insert into zone_month_feedback(organization_id, month) values ($1, '2026-11-01')", [ids.org_a])).error)
+    await as(db, 'authenticated', {uid: ids.owner_b})
+    assert.equal((await db.query('select * from zone_month_feedback')).rows.length, 0)
+
+    // La edición de noviembre de Ushuaia recibe los intereses de octubre, contados por complejo.
+    await as(db, 'postgres')
+    await db.query("update properties set city = 'Ushuaia' where id = $1", [ids.prop_b])
+    await as(db, 'authenticated', {uid: ids.owner_b})
+    await db.query("select zone_month_save_feedback($1, '2026-10-01', '{reservas,gestion}', '{}')", [ids.org_b])
+    assert.ok((await attempt(db, "select zone_month_interests('AR:ushuaia', '2026-11-01')")).error)
+    await as(db, 'service_role')
+    assert.deepEqual((await one(db, "select zone_month_interests('AR:ushuaia', '2026-11-01') j")).j, {reservas: 2, gestion: 1})
+    assert.deepEqual((await one(db, "select zone_month_interests('AR:salta', '2026-11-01') j")).j, {})
+    assert.deepEqual((await one(db, "select zone_month_interests('AR:ushuaia', '2026-12-01') j")).j, {})
   } finally { await db.close() }
 })

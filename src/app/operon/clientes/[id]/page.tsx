@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 }
 
 // "Generar ahora" corre la IA dentro de la acción de esta página.
-export const maxDuration = 60
+export const maxDuration = 300
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 

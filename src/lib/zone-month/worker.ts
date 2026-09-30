@@ -1,14 +1,21 @@
 import "server-only"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Json } from "@/lib/supabase/types"
-import { ERRORS, type Edition } from "./content"
+import { ERRORS, INTERESTS, type EditionV2, type InterestId } from "./content"
 import { collectMaterial, GenerationError, targetMonth } from "./validation"
-import { geminiTimeoutMs, modelName, selectWithGemini } from "./gemini"
+import { researchModel, researchZone, type ResearchInput } from "@/lib/zone-month/research"
 import { cordobaEvents } from "./cordoba-feed"
 import defaultPack from "./sources.json"
 
 type Job = { zone: string; month: string; lease: string }
 type AdminDb = ReturnType<typeof createAdminClient>
+
+/**
+ * Pueblos por ejecución del cron. Cada investigación tarda 1-2 minutos y
+ * corren en paralelo dentro del límite de la función (maxDuration 300 s):
+ * con el tope de 10 zonas y 5 días de ventana sobran oportunidades.
+ */
+export const JOBS_PER_RUN = 4
 
 /**
  * Cron diario: genera la edición del mes siguiente en los últimos cinco días
@@ -18,19 +25,19 @@ type AdminDb = ReturnType<typeof createAdminClient>
 export async function runZoneMonth(now = new Date()) {
   if (!targetMonth(now)) return { processed: 0, published: 0, failed: 0, outsideWindow: true }
   const db = createAdminClient()
-  const result = { processed: 0, published: 0, failed: 0, outsideWindow: false }
-  // Dos zonas por cron; limitar a una si el feed más Gemini pueden consumir
-  // casi el minuto completo de esta función.
-  const limit = process.env.ZONE_CORDOBA_FEED_ZONES?.trim() && geminiTimeoutMs() > 18000 ? 1 : 2
-  for (let i = 0; i < limit; i++) {
+  const jobs: Job[] = []
+  for (let i = 0; i < JOBS_PER_RUN; i++) {
     const { data, error } = await db.rpc("zone_month_claim_enabled")
     if (error) throw new Error("database")
     if (!data) break
-    const published = await processJob(db, data as Job, now)
-    result.processed++
-    if (published) result.published++; else result.failed++
+    jobs.push(data as Job)
   }
-  return result
+  const results = await Promise.allSettled(jobs.map(job => processJob(db, job, now)))
+  // Un error de base en cualquier trabajo corta la corrida: el lease queda para recuperación.
+  const broken = results.find((r): r is PromiseRejectedResult => r.status === "rejected")
+  if (broken) throw broken.reason
+  const published = results.filter(r => r.status === "fulfilled" && r.value).length
+  return { processed: jobs.length, published, failed: jobs.length - published, outsideWindow: false }
 }
 
 /**
@@ -49,9 +56,32 @@ export async function runZoneMonthEdition(zone: string, month: string, now = new
   return { status: "failed" as const, code: row?.error_code ?? null }
 }
 
-/** Arma el material, llama a Gemini y cierra la edición. Devuelve si se publicó. */
+/** Provincia y departamento oficiales de la zona (0036), si algún alojamiento los tiene. */
+async function zonePlace(db: AdminDb, zone: string): Promise<ResearchInput["place"]> {
+  const [country, city] = [zone.slice(0, 2), zone.slice(3)]
+  const { data } = await db.from("properties")
+    .select("city, province_name, department_name")
+    .eq("country", country).ilike("city", city).eq("is_active", true)
+    .order("located_at", { ascending: false, nullsFirst: false }).limit(1)
+  const row = data?.[0]
+  const name = row?.city?.trim() || city.replace(/(^|\s)\S/g, part => part.toLocaleUpperCase("es-AR"))
+  return { locality: name, department: row?.department_name ?? null, province: row?.province_name ?? null }
+}
+
+/** Qué pidieron profundizar los dueños de la zona en la edición anterior (solo cuentas). */
+async function zoneInterests(db: AdminDb, zone: string, month: string): Promise<ResearchInput["interests"]> {
+  const { data, error } = await db.rpc("zone_month_interests", { p_zone: zone, p_month: month })
+  if (error || !data || typeof data !== "object") return {}
+  const counts: Partial<Record<InterestId, number>> = {}
+  for (const [id, n] of Object.entries(data as Record<string, unknown>)) {
+    if (Object.hasOwn(INTERESTS, id) && Number.isInteger(n) && (n as number) > 0) counts[id as InterestId] = n as number
+  }
+  return counts
+}
+
+/** Arma el material, investiga con Claude y cierra la edición. Devuelve si se publicó. */
 async function processJob(db: AdminDb, job: Job, now: Date) {
-  let edition: Edition | null = null
+  let edition: EditionV2 | null = null
   let code: string | null = null
   try {
     let pack: unknown = defaultPack
@@ -68,14 +98,30 @@ async function processJob(db: AdminDb, job: Job, now: Date) {
     const material = selectedEvents.length
       ? collectMaterial({ version: 1, facts: [...curated.facts, ...selectedEvents] }, job.zone, job.month, now, hosts)
       : curated
-    const model = modelName()
+    const model = researchModel()
+    // Evidencia curada guardada antes de llamar a la IA, como en v1.
     const saved = await db.rpc("zone_month_material", { p_zone: job.zone, p_month: job.month, p_lease: job.lease, p_material: material as unknown as Json, p_model: model })
     if (saved.error || !saved.data) throw new Error("database")
-    const selection = await selectWithGemini(job.zone, job.month, material, model)
-    edition = { version: 1, zone: job.zone, month: job.month, material, selection }
+
+    const input: ResearchInput = {
+      zone: job.zone, month: job.month,
+      place: await zonePlace(db, job.zone),
+      facts: material.facts,
+      interests: await zoneInterests(db, job.zone, job.month),
+    }
+    const result = await researchZone(input, now)
+    edition = result.edition
+    // Dossier, fuentes y consumo real: para auditar el contenido y medir el costo.
+    const evidence = {
+      version: 2, collectedAt: now.toISOString(), facts: material.facts, warnings: material.warnings,
+      dossier: result.dossier.text.slice(0, 60000), sources: result.dossier.sources, usage: result.usage,
+    }
+    const kept = await db.rpc("zone_month_material", { p_zone: job.zone, p_month: job.month, p_lease: job.lease, p_material: evidence as unknown as Json, p_model: result.model })
+    if (kept.error || !kept.data) throw new Error("database")
   } catch (error) {
     if (!(error instanceof GenerationError)) throw error
     code = Object.hasOwn(ERRORS, error.code) ? error.code : "provider"
+    edition = null
   }
   const finished = await db.rpc("zone_month_finish", {
     p_zone: job.zone, p_month: job.month, p_lease: job.lease,

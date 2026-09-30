@@ -1,4 +1,45 @@
-# Edición mensual por zona: operación del piloto
+# Tu zona este mes
+
+## Versión 2 (migración 0037, 30/09/2026) — la vigente
+
+La v1 (Gemini eligiendo entre 7 consejos fijos, con 3 datos cargados a mano) no le servía al dueño.
+La v2 investiga el destino de verdad y lo cruza con el complejo:
+
+- **Investigación (compartida por zona):** `src/lib/zone-month/research.ts`, Claude Sonnet 5.5
+  (`ZONE_MODEL` para cambiarlo) con `ANTHROPIC_API_KEY`. Dos pasos:
+  1. *Investigar*: búsqueda web básica (`web_search_20250305`, máx. 8 búsquedas, localizada en la
+     ciudad/provincia) y un dossier. La API pega a cada frase las citas reales de la búsqueda; las
+     convertimos en marcadores `[n]` y armamos nosotros la lista de fuentes.
+  2. *Ordenar*: otra llamada, sin herramientas y con JSON estricto, pasa el dossier al formato del
+     informe. Solo puede citar números de esa lista: **ningún link sale del modelo**.
+  Se usa búsqueda *básica* (sin filtrado dinámico) porque es la que garantiza citas en el texto,
+  y JSON estricto e citas no se pueden pedir en la misma llamada.
+- **Qué viaja al modelo:** localidad, departamento y provincia (0036), mes, feriados curados de
+  `sources.json` / feed de Córdoba y la cuenta agregada de intereses de la zona. Nunca datos de
+  alojamientos, huéspedes ni nombres.
+- **Formato v2** (`src/lib/zone-month/edition-v2.ts`): panorama, agenda (con "para tu
+  alojamiento"), calendario (feriados, findes largos, vacaciones), info práctica, ideas y mensajes
+  listos con `{alojamiento}`/`{link}`, fuentes. `normalizeEditionV2` descarta datos sin fuente o con
+  fechas fuera del mes (±7 días) y recorta textos; `validateEditionV2` es estricta y se aplica antes
+  de publicar y al leer. Si del pueblo hay poco, amplía a departamento/provincia (`place.scope`).
+- **Tu complejo en {mes}** (`src/lib/zone-month/your-property.ts`): sin IA, al abrir la página y
+  con RLS + filtro por organización. Ocupación del mes, reservas sin seña y, por fecha clave,
+  unidades libres y precio por noche (`simulate_price`) contra un martes normal; si cobra lo mismo,
+  ofrece crear una tarifa "Temporada" con las fechas precargadas.
+- **Respuestas del dueño** (`zone_month_feedback`): intereses para la próxima edición y tildes de
+  "hecho" en las ideas. `zone_month_interests` le da al worker solo la cuenta por tema de la zona.
+- **Cuándo:** igual que antes, últimos cinco días del mes para el siguiente (cron diario). Hasta 4
+  pueblos por corrida en paralelo (`JOBS_PER_RUN`), `maxDuration = 300` en el cron y en la ficha de
+  `/operon`. Desde `/operon` se puede **volver a generar** una edición publicada (deja de verse
+  hasta que sale la nueva).
+- **Costo real:** el material guardado (`zone_month_editions.material`) incluye el dossier y
+  `usage` (tokens y búsquedas) de cada edición, para medirlo.
+- Las ediciones v1 publicadas se siguen mostrando con su diseño.
+
+Lo que sigue documenta la v1 y la operación general (ventana, reintentos, RLS), que no cambió.
+
+## Versión 1 (histórico)
+
 
 **Estado de esta rama (no activar en producción):** cron, lector, generación estructurada
 y un conector de agenda oficial de Córdoba están implementados. El conector se probó

@@ -6,7 +6,11 @@ import { canManageSettings } from "@/lib/roles"
 import { createClient } from "@/lib/supabase/server"
 import { ZONE_MONTH_LABEL, ERRORS, monthLabel } from "@/lib/zone-month/content"
 import { targetMonth, validateEdition, zoneKey } from "@/lib/zone-month/validation"
+import { validateEditionV2 } from "@/lib/zone-month/edition-v2"
+import { propertyMonth } from "@/lib/zone-month/your-property"
+import { publicReservationUrl } from "@/lib/site-url"
 import { EditionSlides } from "@/components/zone-month/edition-slides"
+import { EditionV2Slides } from "@/components/zone-month/edition-v2"
 import { isZoneMonthEnabled } from "@/lib/zone-month/flag"
 
 export const dynamic = "force-dynamic"
@@ -37,10 +41,10 @@ export default async function ZoneMonthPage({ searchParams }: { searchParams: Pr
     <div className="relative">
       <p className="label-mono text-primary">Operon Reservas · {ctx.organizationName}</p>
       <h1 className="mt-3 max-w-2xl font-heading text-4xl leading-[1.04] font-semibold text-balance sm:text-5xl">{ZONE_MONTH_LABEL}</h1>
-      <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">Una edición mensual compartida para los alojamientos de la zona. Se prepara en la última semana del mes anterior y aparece cuando está lista.</p>
+      <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">Qué va a pasar en tu destino el mes que viene y qué significa para tu complejo. Se investiga en los últimos días de cada mes y aparece cuando está lista.</p>
       <div className="mt-6 flex flex-wrap gap-2">
-        <span className="label-mono rounded-full bg-primary/10 px-3 py-1.5 text-primary">Destino compartido</span>
-        <span className="label-mono rounded-full bg-warning/15 px-3 py-1.5 text-foreground">Fuentes públicas</span>
+        <span className="label-mono rounded-full bg-primary/10 px-3 py-1.5 text-primary">Investigado en la web</span>
+        <span className="label-mono rounded-full bg-warning/15 px-3 py-1.5 text-foreground">Cada dato con su fuente</span>
       </div>
     </div>
   </header>
@@ -62,10 +66,23 @@ export default async function ZoneMonthPage({ searchParams }: { searchParams: Pr
   const waitingMonth = targetMonth(new Date()) || new Date().toISOString().slice(0, 7) + "-01"
   const selected = reports.find(r => r.month === (params.month || waitingMonth))
   let edition = null
+  let editionV2 = null
   let invalid = false
   if (selected?.status === "published") {
-    try { edition = validateEdition(selected.edition, zone, selected.month) } catch { invalid = true }
+    try {
+      const version = (selected.edition as { version?: unknown } | null)?.version
+      if (version === 2) editionV2 = validateEditionV2(selected.edition, zone, selected.month)
+      else edition = validateEdition(selected.edition, zone, selected.month)
+    } catch { invalid = true }
   }
+  // Lo de este complejo (sin IA) y lo que ya contestó en esta edición.
+  const [property, feedbackRow, publicUrl] = editionV2 ? await Promise.all([
+    propertyMonth(db, ctx.organizationId, editionV2).catch(() => null),
+    db.from("zone_month_feedback").select("interests, done").eq("organization_id", ctx.organizationId).eq("month", editionV2.month).maybeSingle().then(r => r.data),
+    publicReservationUrl(ctx.organizationSlug),
+  ]) : [null, null, ""]
+  const available = edition || editionV2
+  const collectedAt = editionV2?.collectedAt ?? edition?.material.collectedAt ?? ""
   const stale = selected?.status === "processing" && processingWasInterrupted(selected.started_at)
   return wrap(<>
     {missing && configure}
@@ -76,11 +93,13 @@ export default async function ZoneMonthPage({ searchParams }: { searchParams: Pr
           <p className="label-mono text-primary">Estado de la edición</p>
           <h2 className="mt-1 font-heading text-2xl font-semibold">{selected ? monthLabel(selected.month) : monthLabel(waitingMonth)}</h2>
         </div>
-        {edition && <span className="label-mono rounded-full bg-success/15 px-3 py-1.5 text-success">Disponible</span>}
+        {available && <span className="label-mono rounded-full bg-success/15 px-3 py-1.5 text-success">Disponible</span>}
       </div>
-      {edition ? <p className="mt-2 text-sm text-muted-foreground">Disponible desde {selected?.published_at?.slice(0, 10)} · Fuentes recopiladas el {edition.material.collectedAt.slice(0, 10)}. Gemini priorizó prácticas de un catálogo editorial; los hechos provienen de las fuentes citadas.</p> : <p role="status" className="mt-2 text-sm">{invalid ? "La edición guardada no pasó la validación y no se puede mostrar." : params.month && !selected ? "La edición solicitada no está disponible para esta zona." : stale ? "La generación se interrumpió. Se recuperará automáticamente dentro de la ventana de reintentos, si quedan intentos." : selected?.status === "failed" ? `${ERRORS[selected.error_code || ""] || "No se pudo completar la edición."} ${selected.attempts >= 3 ? "Se agotaron los tres intentos automáticos de esta edición." : "Se reintentará automáticamente dentro de la ventana mensual."}` : selected?.status === "processing" ? "La edición se está preparando." : process.env.ZONE_MONTH_ENABLED !== "1" ? "La generación automática todavía no está activada." : "Todavía no hay una edición lista. La preparación es automática; no tenés que solicitarla."}</p>}
+      {available ? <p className="mt-2 text-sm text-muted-foreground">Disponible desde {selected?.published_at?.slice(0, 10)} · Investigado el {collectedAt.slice(0, 10)}. {editionV2 ? "Cada evento, fecha y dato práctico enlaza a la fuente de donde salió." : "Edición anterior: prácticas de un catálogo editorial y fechas de fuentes oficiales."}</p> : <p role="status" className="mt-2 text-sm">{invalid ? "La edición guardada no pasó la validación y no se puede mostrar." : params.month && !selected ? "La edición solicitada no está disponible para esta zona." : stale ? "La generación se interrumpió. Se recuperará automáticamente dentro de la ventana de reintentos, si quedan intentos." : selected?.status === "failed" ? `${ERRORS[selected.error_code || ""] || "No se pudo completar la edición."} ${selected.attempts >= 3 ? "Se agotaron los tres intentos automáticos de esta edición." : "Se reintentará automáticamente dentro de la ventana mensual."}` : selected?.status === "processing" ? "La edición se está preparando." : process.env.ZONE_MONTH_ENABLED !== "1" ? "La generación automática todavía no está activada." : "Todavía no hay una edición lista. La preparación es automática; no tenés que solicitarla."}</p>}
     </div>
     {edition && <EditionSlides edition={edition} />}
+    {editionV2 && <EditionV2Slides edition={editionV2} property={property} feedback={{ interests: feedbackRow?.interests ?? [], done: feedbackRow?.done ?? [] }}
+      organizationName={ctx.organizationName} publicUrl={publicUrl} canEditRates={canManageSettings(ctx.role)} />}
     {reports.length > 0 && <details className="mt-6 rounded-2xl border bg-card p-4 shadow-sm sm:p-5"><summary className="cursor-pointer font-heading font-semibold">Archivo de ediciones</summary><ul className="mt-3 space-y-2">{reports.map(r => <li key={r.month}><Link className="underline" href={`/tu-zona?zone=${encodeURIComponent(zone)}&month=${r.month}`}>{monthLabel(r.month)}</Link><span className="ml-2 text-sm text-muted-foreground">{r.status === "published" ? "Disponible" : r.status === "failed" ? "No publicada" : "En preparación"}</span></li>)}</ul></details>}
   </>)
 }

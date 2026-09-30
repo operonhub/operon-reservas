@@ -86,8 +86,8 @@ export function ZoneMonthCard({
 
       {enabled && overview && overview.zones.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          La edición es por ciudad: la comparten todos los clientes de esa zona. Generar tarda hasta
-          un minuto.
+          La edición es por ciudad: la comparten todos los clientes de esa zona. Generar tarda uno o
+          dos minutos (investiga en la web) y cuesta unos centavos de dólar.
         </p>
       )}
     </div>
@@ -143,6 +143,7 @@ function EditionRow({
     return result
   }, null)
   const retry = edition?.status === "failed" || edition?.status === "processing"
+  const published = edition?.status === "published"
 
   return (
     <li className="flex flex-wrap items-center justify-between gap-2">
@@ -156,13 +157,16 @@ function EditionRow({
         )}
       </div>
       {canQueue(edition, now) && (
-        <form action={formAction}>
+        <form action={formAction} onSubmit={(event) => {
+          // Rehacer una publicada la saca de la vista hasta que salga la nueva.
+          if (published && !window.confirm("¿Volver a generar esta edición? La actual deja de verse hasta que termine la nueva (uno o dos minutos).")) event.preventDefault()
+        }}>
           <input type="hidden" name="org" value={orgId} />
           <input type="hidden" name="zone" value={zone} />
           <input type="hidden" name="month" value={month} />
           <Button type="submit" size="sm" variant="ghost" disabled={pending || disabled}>
-            {pending ? <LoaderCircle className="animate-spin" /> : retry ? <RefreshCw /> : <Sparkles />}
-            {pending ? "Generando…" : retry ? "Reintentar" : "Generar ahora"}
+            {pending ? <LoaderCircle className="animate-spin" /> : retry || published ? <RefreshCw /> : <Sparkles />}
+            {pending ? "Generando…" : published ? "Volver a generar" : retry ? "Reintentar" : "Generar ahora"}
           </Button>
         </form>
       )}
