@@ -62,16 +62,21 @@ function parsePhotoPath(
   return path.startsWith(`${organizationId}/`) ? path : null
 }
 
-/** Verifica que la property pertenezca a la org del usuario (defensa en profundidad). */
+/**
+ * Verifica que la property pertenezca a la org del usuario (defensa en
+ * profundidad). Con filtro explícito: un admin de Operon ve todas por RLS.
+ */
 async function assertProperty(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  propertyId: string
+  propertyId: string,
+  organizationId: string
 ) {
   const { data } = await supabase
     .from("properties")
     .select("id")
     .eq("id", propertyId)
-    .maybeSingle() // RLS: solo devuelve si es de la org del usuario
+    .eq("organization_id", organizationId)
+    .maybeSingle()
   return !!data
 }
 
@@ -86,7 +91,7 @@ export async function createUnit(formData: FormData): Promise<ActionResult> {
   const capacity = parseCapacity(formData.get("capacity"))
 
   if (!name) return { ok: false, error: "El nombre es obligatorio." }
-  if (!property_id || !(await assertProperty(supabase, property_id)))
+  if (!property_id || !(await assertProperty(supabase, property_id, ctx.organizationId)))
     return { ok: false, error: "Propiedad inválida." }
 
   const icalUrls = parseIcalUrls(formData)

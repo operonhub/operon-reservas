@@ -125,33 +125,39 @@ export default async function InicioPage() {
     supabase
       .from("properties")
       .select("currency, checkin_time, checkout_time")
+      .eq("organization_id", ctx.organizationId)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle(),
     supabase
       .from("reservations")
       .select("*", { count: "exact", head: true })
+      .eq("organization_id", ctx.organizationId)
       .in("status", ["inquiry", "pending", "pending_payment"]),
     supabase
       .from("units")
       .select("id, name, capacity")
+      .eq("organization_id", ctx.organizationId)
       .eq("is_active", true)
       .order("position", { ascending: true }),
     supabase
       .from("reservations")
       .select(resSelect)
+      .eq("organization_id", ctx.organizationId)
       .in("status", HOLDING_STATUSES)
       .eq("check_in", today)
       .order("code", { ascending: true }),
     supabase
       .from("reservations")
       .select(resSelect)
+      .eq("organization_id", ctx.organizationId)
       .in("status", HOLDING_STATUSES)
       .eq("check_out", today)
       .order("code", { ascending: true }),
     supabase
       .from("reservations")
       .select(resSelect)
+      .eq("organization_id", ctx.organizationId)
       .in("status", HOLDING_STATUSES)
       .gte("check_in", tomorrow)
       .lte("check_in", horizon)
@@ -160,10 +166,12 @@ export default async function InicioPage() {
     supabase
       .from("unit_occupancy")
       .select("unit_id, kind")
+      .eq("organization_id", ctx.organizationId)
       .overlaps("during", `[${today},${tomorrow})`),
     supabase
       .from("payments")
       .select("amount, currency")
+      .eq("organization_id", ctx.organizationId)
       .eq("status", "paid")
       .gte("paid_at", `${monthStart}T00:00:00`)
       .lt("paid_at", `${monthEnd}T00:00:00`),

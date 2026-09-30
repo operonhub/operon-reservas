@@ -19,15 +19,17 @@ export default async function TarifasPage() {
     supabase
       .from("properties")
       .select("id, currency")
+      .eq("organization_id", ctx.organizationId)
       .order("created_at")
       .limit(1)
       .maybeSingle(),
-    supabase.from("units").select("id, name, capacity").eq("is_active", true).order("position"),
+    supabase.from("units").select("id, name, capacity").eq("organization_id", ctx.organizationId).eq("is_active", true).order("position"),
     supabase
       .from("rates")
       .select(
         "id, unit_id, kind, label, price_per_night, discount_pct, weekdays, min_guests, max_guests, min_nights, min_nights_rule, priority, start_date, end_date, is_active, currency"
       )
+      .eq("organization_id", ctx.organizationId)
       .order("priority", { ascending: false }),
   ])
 

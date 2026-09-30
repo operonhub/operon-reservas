@@ -58,6 +58,7 @@ export default async function CalendarioPage() {
     supabase
       .from("units")
       .select("id, name, capacity")
+      .eq("organization_id", ctx.organizationId)
       .eq("is_active", true)
       .order("position", { ascending: true }),
     supabase
@@ -67,8 +68,9 @@ export default async function CalendarioPage() {
       .select(
         "id, unit_id, during, kind, block_reason, reservations(id, code, status, guests_count, total_amount, deposit_amount, currency, guests(full_name, email, phone), payments(amount, status, kind))"
       )
+      .eq("organization_id", ctx.organizationId)
       .overlaps("during", `[${start},${end})`),
-    supabase.from("properties").select("currency").limit(1).maybeSingle(),
+    supabase.from("properties").select("currency").eq("organization_id", ctx.organizationId).limit(1).maybeSingle(),
   ])
 
   const unitById = new Map((units ?? []).map((u) => [u.id, u]))

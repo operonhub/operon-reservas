@@ -26,18 +26,20 @@ export default async function UnidadesPage() {
 
   // Todo acotado a la org del usuario por RLS.
   const [{ data: properties }, { data: units }, { data: occ }] = await Promise.all([
-    supabase.from("properties").select("id, name").order("name"),
+    supabase.from("properties").select("id, name").eq("organization_id", ctx.organizationId).order("name"),
     supabase
       .from("units")
       .select(
         "id, name, description, capacity, is_active, photo_path, amenities, airbnb_ical_url, booking_ical_url, ical_token, properties(name)"
       )
+      .eq("organization_id", ctx.organizationId)
       .order("position", { ascending: true }),
     // Ocupación del horizonte: alimenta el estado de "ahora", la próxima
     // llegada y el porcentaje de ocupación de cada unidad.
     supabase
       .from("unit_occupancy")
       .select("unit_id, during, kind, block_reason, reservations(guests(full_name))")
+      .eq("organization_id", ctx.organizationId)
       .overlaps("during", `[${today},${horizon})`),
   ])
 

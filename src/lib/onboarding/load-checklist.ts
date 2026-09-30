@@ -9,15 +9,16 @@ type Client = Awaited<ReturnType<typeof createClient>>
  */
 export async function loadChecklist(supabase: Client, organizationId: string): Promise<Checklist> {
   const [units, rates, property, reservations, mp, org] = await Promise.all([
-    supabase.from("units").select("id").eq("is_active", true),
-    supabase.from("rates").select("unit_id").eq("kind", "base").eq("is_active", true),
+    supabase.from("units").select("id").eq("organization_id", organizationId).eq("is_active", true),
+    supabase.from("rates").select("unit_id").eq("organization_id", organizationId).eq("kind", "base").eq("is_active", true),
     supabase
       .from("properties")
       .select("deposit_pct")
+      .eq("organization_id", organizationId)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle(),
-    supabase.from("reservations").select("*", { count: "exact", head: true }),
+    supabase.from("reservations").select("*", { count: "exact", head: true }).eq("organization_id", organizationId),
     supabase.rpc("mp_connection_status"),
     supabase.from("organizations").select("link_shared_at").eq("id", organizationId).maybeSingle(),
   ])

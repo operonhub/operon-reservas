@@ -327,6 +327,9 @@ function query(rows: unknown[]) {
   }
   const resolve = () => ({ data: wantsSingle ? (currentRows[0] ?? null) : currentRows, count: wantsCount ? currentRows.length : null, error: null })
   builder.eq = (column: string, value: unknown) => {
+    // La demo tiene un solo complejo y sus filas no llevan organization_id:
+    // el filtro por organización del panel siempre coincide.
+    if (column === "organization_id" && value === DEMO_CONTEXT.organizationId) return builder
     currentRows = currentRows.filter((row) => valueAt(row, column) === value)
     return builder
   }

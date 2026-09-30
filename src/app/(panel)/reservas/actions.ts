@@ -47,7 +47,7 @@ function mapBookingError(message: string): string {
 export async function getGuestProfile(
   guestId: string
 ): Promise<GuestProfileResult> {
-  await requireContext()
+  const ctx = await requireContext()
   const supabase = await createClient()
 
   if (!guestId) {
@@ -58,6 +58,7 @@ export async function getGuestProfile(
     supabase
       .from("guests")
       .select("full_name, email, phone, notes")
+      .eq("organization_id", ctx.organizationId)
       .eq("id", guestId)
       .maybeSingle(),
     supabase
@@ -65,6 +66,7 @@ export async function getGuestProfile(
       .select(
         "id, code, check_in, check_out, status, total_amount, currency, units(name)"
       )
+      .eq("organization_id", ctx.organizationId)
       .eq("guest_id", guestId)
       .order("check_in", { ascending: false }),
   ])
@@ -117,6 +119,7 @@ export async function createManualReservation(
   const { data: unit } = await supabase
     .from("units")
     .select("id, property_id, capacity")
+    .eq("organization_id", ctx.organizationId)
     .eq("id", unit_id)
     .maybeSingle()
   if (!unit) return { ok: false, error: "Unidad inválida." }
@@ -213,11 +216,12 @@ export async function recordReservationMovement(
     return { ok: true }
   }
 
-  await requireContext()
+  const ctx = await requireContext()
   const supabase = await createClient()
   const { data: reservation, error: readError } = await supabase
     .from("reservations")
     .select("status, checked_in_at, checked_out_at")
+    .eq("organization_id", ctx.organizationId)
     .eq("id", id)
     .maybeSingle()
 

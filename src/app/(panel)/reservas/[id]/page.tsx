@@ -60,11 +60,13 @@ export default async function ReservaDetailPage({
       .select(
         "id, code, check_in, check_out, checked_in_at, checked_out_at, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, method, paid_at, created_at)"
       )
+      .eq("organization_id", ctx.organizationId)
       .eq("id", id)
       .maybeSingle(),
     supabase
       .from("properties")
       .select("name, phone, whatsapp, email, address, city, checkin_time, checkout_time")
+      .eq("organization_id", ctx.organizationId)
       .limit(1)
       .maybeSingle(),
   ])

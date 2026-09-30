@@ -23,6 +23,7 @@ export default async function ReservasPage({
     .select(
       "id, code, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, updated_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, paid_at)"
     )
+    .eq("organization_id", ctx.organizationId)
 
   switch (f) {
     case "pendientes":
@@ -51,6 +52,7 @@ export default async function ReservasPage({
     supabase
       .from("units")
       .select("id, name, capacity")
+      .eq("organization_id", ctx.organizationId)
       .eq("is_active", true)
       .order("position"),
   ])
