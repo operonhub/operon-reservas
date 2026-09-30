@@ -88,6 +88,7 @@ test("toSetupPayload arma exactamente lo que espera complete_setup", () => {
     name: "Cabañas del Lago",
     slug: "cabanas-del-lago",
     city: null,
+    location: null,
     currency: "ARS",
     timezone: "America/Argentina/Cordoba",
     checkin_time: "14:00",

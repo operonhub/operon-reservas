@@ -30,8 +30,10 @@ export default async function ConfiguracionPage() {
       supabase
         .from("properties")
         .select(
-          "id, name, description, phone, whatsapp, email, address, city, currency, checkin_time, checkout_time, deposit_pct"
+          "id, name, description, phone, whatsapp, email, address, city, currency, checkin_time, checkout_time, deposit_pct, lat, lng, place_id, province_id, province_name, department_id, department_name, locality_id"
         )
+        // Explícito: un admin de Operon ve todas las propiedades por RLS.
+        .eq("organization_id", ctx.organizationId)
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle(),

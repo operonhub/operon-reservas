@@ -7,6 +7,8 @@ import { canManageSettings, SETTINGS_READ_ONLY_MESSAGE } from "@/lib/roles"
 import { isCurrencyCode } from "@/lib/currencies"
 import { applyDemoPropertyPatch } from "@/lib/demo/fixtures"
 import { isDemoRequest, readDemoState, writeDemoState } from "@/lib/demo/session"
+import { resolvePickedPlace } from "@/lib/location/georef"
+import { parseLocation } from "@/lib/location/types"
 
 export type ActionResult = { ok: boolean; error?: string }
 
@@ -40,6 +42,48 @@ export async function updateProperty(formData: FormData): Promise<ActionResult> 
   const checkin_time = parseTime(formData.get("checkin_time"), "14:00")
   const checkout_time = parseTime(formData.get("checkout_time"), "10:00")
 
+  // Ubicación (0036). Con el buscador de Google, el formulario manda
+  // `location` (JSON o "null") y no manda ciudad ni dirección: salen de ahí.
+  // Sin buscador, llegan `city` y `address` como texto, igual que antes.
+  const rawLocation = formData.get("location")
+  let place: Record<string, string | number | null> = {
+    city: String(formData.get("city") ?? "").trim() || null,
+    address: String(formData.get("address") ?? "").trim() || null,
+  }
+  if (typeof rawLocation === "string") {
+    if (rawLocation === "null") {
+      place = {
+        lat: null, lng: null, place_id: null, province_id: null, province_name: null,
+        department_id: null, department_name: null, locality_id: null, located_at: null,
+      }
+    } else {
+      let parsed: unknown = null
+      try {
+        parsed = JSON.parse(rawLocation)
+      } catch {}
+      const picked = parseLocation(parsed)
+      if (!picked) return { ok: false, error: "Revisá la ubicación: elegila de nuevo en el buscador." }
+      // Lo oficial se vuelve a pedir acá con el punto: no se confía en el navegador.
+      const location = await resolvePickedPlace({
+        ...picked,
+        googleLocality: picked.localityId ? null : picked.city,
+      })
+      place = {
+        city: location.city,
+        address: location.address,
+        lat: location.lat,
+        lng: location.lng,
+        place_id: location.placeId,
+        province_id: location.provinceId,
+        province_name: location.provinceName,
+        department_id: location.departmentId,
+        department_name: location.departmentName,
+        locality_id: location.localityId,
+        located_at: new Date().toISOString(),
+      }
+    }
+  }
+
   if (await isDemoRequest()) {
     await writeDemoState(
       applyDemoPropertyPatch(await readDemoState(), {
@@ -48,8 +92,8 @@ export async function updateProperty(formData: FormData): Promise<ActionResult> 
         phone: String(formData.get("phone") ?? "").trim() || null,
         whatsapp: String(formData.get("whatsapp") ?? "").trim() || null,
         email: String(formData.get("email") ?? "").trim() || null,
-        address: String(formData.get("address") ?? "").trim() || null,
-        city: String(formData.get("city") ?? "").trim() || null,
+        ...("city" in place ? { city: place.city as string | null } : {}),
+        ...("address" in place ? { address: place.address as string | null } : {}),
         currency,
         checkin_time,
         checkout_time,
@@ -71,8 +115,7 @@ export async function updateProperty(formData: FormData): Promise<ActionResult> 
       phone: String(formData.get("phone") ?? "").trim() || null,
       whatsapp: String(formData.get("whatsapp") ?? "").trim() || null,
       email: String(formData.get("email") ?? "").trim() || null,
-      address: String(formData.get("address") ?? "").trim() || null,
-      city: String(formData.get("city") ?? "").trim() || null,
+      ...place,
       // El <select> sólo restringe en el navegador: un código inválido rompe
       // Intl.NumberFormat y con él todos los importes de la app.
       currency,

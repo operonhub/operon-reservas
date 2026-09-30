@@ -5,7 +5,6 @@ import { Check, LoaderCircle, Plus, Trash2, TriangleAlert, Users } from "lucide-
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { CURRENCIES } from "@/lib/currencies"
 import { formatCurrency } from "@/lib/format"
 import {
   MAX_UNITS,
@@ -17,6 +16,8 @@ import {
   type SetupUnit,
 } from "@/lib/onboarding/setup-draft"
 import { toSlugInput } from "@/lib/slug"
+import { LocationPicker, locationPickerAvailable } from "@/components/location/location-picker"
+import { locationLabel } from "@/lib/location/types"
 import { cn } from "@/lib/utils"
 
 export type SlugStatus = "idle" | "checking" | "available" | "taken" | "invalid" | "unknown"
@@ -155,6 +156,21 @@ export function StepLink({ draft, update, slugStatus, publicBase }: StepProps) {
 
 /* ------------------------------ 3. Detalles ------------------------------ */
 
+/** Texto libre: sin clave de Google, o si Google no carga. */
+function CityInput({ draft, update }: Pick<StepProps, "draft" | "update">) {
+  return (
+    <Input
+      id="city"
+      autoFocus
+      placeholder="Villa Traful"
+      maxLength={80}
+      value={draft.city}
+      onChange={(e) => update({ city: e.target.value, location: null })}
+      className={BIG_INPUT}
+    />
+  )
+}
+
 export function StepDetails({ draft, update }: StepProps) {
   return (
     <>
@@ -163,46 +179,23 @@ export function StepDetails({ draft, update }: StepProps) {
       </Question>
 
       <div className="mt-8 grid gap-5">
-        <Field label="Ciudad o localidad (opcional)" htmlFor="city">
-          <Input
-            id="city"
-            autoFocus
-            placeholder="Villa Traful, Neuquén"
-            maxLength={80}
-            value={draft.city}
-            onChange={(e) => update({ city: e.target.value })}
-            className={BIG_INPUT}
-          />
-        </Field>
-
-        <fieldset className="grid gap-1.5">
-          <legend className="mb-1.5 text-sm font-medium">Moneda en la que cobrás</legend>
-          {/* Con dos opciones, un botón por moneda se decide de un toque; un
-              desplegable escondía la elección detrás de un clic más. */}
-          <div className="grid grid-cols-2 gap-3">
-            {CURRENCIES.map((c) => {
-              const selected = draft.currency === c.code
-              return (
-                <button
-                  key={c.code}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => update({ currency: c.code })}
-                  className={cn(
-                    "flex h-12 items-center justify-between gap-2 rounded-lg border px-3.5 text-left text-base transition-colors",
-                    "focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-                    selected
-                      ? "border-primary bg-accent text-accent-foreground"
-                      : "border-input hover:bg-muted"
-                  )}
-                >
-                  <span className="truncate font-medium">{c.label}</span>
-                  <span className="label-mono shrink-0 text-muted-foreground">{c.code}</span>
-                </button>
-              )
-            })}
-          </div>
-        </fieldset>
+        {locationPickerAvailable ? (
+          <Field label="Dónde queda tu complejo (opcional)" htmlFor="location">
+            {/* Con la ubicación exacta, la app sabe la localidad oficial (0036):
+                de ahí sale la zona del informe mensual. */}
+            <LocationPicker
+              autoFocus
+              value={draft.location}
+              onChange={(location) => update({ location, city: location?.city ?? "" })}
+              inputClassName={BIG_INPUT}
+              fallback={<CityInput draft={draft} update={update} />}
+            />
+          </Field>
+        ) : (
+          <Field label="Ciudad o localidad (opcional)" htmlFor="city">
+            <CityInput draft={draft} update={update} />
+          </Field>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Check-in desde" htmlFor="checkin">
@@ -385,7 +378,7 @@ export function StepSummary({ draft, goTo, publicBase }: StepProps) {
 
         <SummaryCard title="Detalles" onEdit={() => goTo(2)}>
           <p className="text-sm">
-            {[draft.city.trim(), draft.currency, `Check-in ${draft.checkinTime} · Check-out ${draft.checkoutTime}`]
+            {[draft.location ? locationLabel(draft.location) : draft.city.trim(), `Check-in ${draft.checkinTime} · Check-out ${draft.checkoutTime}`]
               .filter(Boolean)
               .join(" · ")}
           </p>

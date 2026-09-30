@@ -1,5 +1,6 @@
 import { CURRENCY_CODES } from "@/lib/currencies"
 import { isValidSlug } from "@/lib/slug"
+import { parseLocation, type PropertyLocation } from "@/lib/location/types"
 
 /**
  * Borrador del asistente de configuración. Lo usan el navegador (para avisar
@@ -18,6 +19,8 @@ export type SetupDraft = {
   /** Si el dueño tocó el link a mano, cambiar el nombre ya no lo pisa. */
   slugEdited: boolean
   city: string
+  /** Elegida con el buscador y el mapa (0036). Sin clave de Google queda null y se usa `city`. */
+  location: PropertyLocation | null
   currency: string
   checkinTime: string
   checkoutTime: string
@@ -49,6 +52,7 @@ export function emptyDraft(): SetupDraft {
     slug: "",
     slugEdited: false,
     city: "",
+    location: null,
     currency: "ARS",
     checkinTime: "14:00",
     checkoutTime: "10:00",
@@ -78,6 +82,7 @@ export function normalizeDraft(raw: unknown): SetupDraft {
     slug: text(r.slug, 48),
     slugEdited: r.slugEdited === true,
     city: text(r.city, 80),
+    location: parseLocation(r.location),
     currency: (CURRENCY_CODES as readonly string[]).includes(text(r.currency, 3)) ? text(r.currency, 3) : base.currency,
     checkinTime: TIME_RE.test(checkin) ? checkin : base.checkinTime,
     checkoutTime: TIME_RE.test(checkout) ? checkout : base.checkoutTime,
@@ -171,11 +176,32 @@ export function firstIncompleteStep(draft: SetupDraft): number {
   return LAST_STEP
 }
 
-export function toSetupPayload(draft: SetupDraft) {
+/** La ubicación como la espera complete_setup (0036). */
+export function toLocationPayload(location: PropertyLocation) {
+  return {
+    address: location.address,
+    lat: location.lat,
+    lng: location.lng,
+    place_id: location.placeId,
+    province_id: location.provinceId,
+    province_name: location.provinceName,
+    department_id: location.departmentId,
+    department_name: location.departmentName,
+    locality_id: location.localityId,
+    city: location.city,
+  }
+}
+
+/**
+ * `location` se pasa aparte: el servidor la vuelve a resolver con Georef en
+ * vez de confiar en la del borrador.
+ */
+export function toSetupPayload(draft: SetupDraft, location: PropertyLocation | null = draft.location) {
   return {
     name: draft.name.trim(),
     slug: draft.slug,
-    city: draft.city.trim() || null,
+    city: location?.city ?? (draft.city.trim() || null),
+    location: location ? toLocationPayload(location) : null,
     currency: draft.currency,
     timezone: "America/Argentina/Cordoba",
     checkin_time: draft.checkinTime,

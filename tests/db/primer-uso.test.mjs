@@ -261,3 +261,55 @@ test("primeros pasos: el link lo marca cualquier miembro, ocultar la lista solo 
   assert.equal((await one(db, "select tour_completed_at is not null done from profiles where id = $1", [ids.owner_a])).done, true)
   await db.close()
 })
+
+// ---------- Ubicación estructurada (0036) ----------
+const LOCATION = {
+  address: "Villa Traful, Neuquén", lat: -40.655, lng: -71.405, place_id: "ChIJ-traful",
+  province_id: "58", province_name: "Neuquén", department_id: "58070", department_name: "Los Lagos",
+  locality_id: "585070", city: "Villa Traful",
+}
+
+test("con ubicación: se guarda el punto y lo oficial, y la ciudad es la localidad oficial", async () => {
+  const { db } = await fresh()
+  await ownerWithGrant(db)
+  const { rows: [{ org }] } = await complete(db, { ...PAYLOAD, city: "texto del borrador", location: LOCATION })
+  await as(db, "postgres")
+  const p = await one(db, "select * from properties where organization_id = $1", [org])
+  assert.equal(p.city, "Villa Traful")
+  assert.equal(p.address, "Villa Traful, Neuquén")
+  assert.equal(p.lat, -40.655)
+  assert.equal(p.lng, -71.405)
+  assert.equal(p.province_id, "58")
+  assert.equal(p.department_name, "Los Lagos")
+  assert.equal(p.locality_id, "585070")
+  assert.ok(p.located_at)
+  // La zona de "Tu zona" sale de la localidad oficial.
+  assert.equal((await one(db, "select zone_month_key(country, city) z from properties where id = $1", [p.id])).z, "AR:villa traful")
+  await db.close()
+})
+
+test("sin ubicación, el alta queda igual que antes", async () => {
+  const { db } = await fresh()
+  await ownerWithGrant(db)
+  const { rows: [{ org }] } = await complete(db, { ...PAYLOAD, location: null })
+  await as(db, "postgres")
+  const p = await one(db, "select city, lat, located_at from properties where organization_id = $1", [org])
+  assert.deepEqual(p, { city: "Villa Traful", lat: null, located_at: null })
+  await db.close()
+})
+
+test("ubicación inválida: fuera de la Argentina, sin dirección o mal formada", async () => {
+  const { db } = await fresh()
+  await ownerWithGrant(db)
+  for (const location of [
+    { ...LOCATION, lat: 48.85, lng: 2.35 },
+    { ...LOCATION, address: "" },
+    { ...LOCATION, lat: "no" },
+    "Villa Traful",
+  ]) {
+    assert.match((await complete(db, { ...PAYLOAD, location })).error, /INVALID_LOCATION/, JSON.stringify(location))
+  }
+  // Nada quedó a medias: el permiso sigue sin usar y se puede terminar bien.
+  assert.ok((await complete(db, { ...PAYLOAD, location: LOCATION })).rows)
+  await db.close()
+})

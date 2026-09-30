@@ -351,14 +351,23 @@ export type Database = {
           country: string | null
           created_at: string
           currency: string
+          department_id: string | null
+          department_name: string | null
           deposit_pct: number
           description: string | null
           email: string | null
           id: string
           is_active: boolean
+          lat: number | null
+          lng: number | null
+          locality_id: string | null
+          located_at: string | null
           name: string
           organization_id: string
           phone: string | null
+          place_id: string | null
+          province_id: string | null
+          province_name: string | null
           slug: string
           timezone: string
           updated_at: string
@@ -372,14 +381,23 @@ export type Database = {
           country?: string | null
           created_at?: string
           currency?: string
+          department_id?: string | null
+          department_name?: string | null
           deposit_pct?: number
           description?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
+          lat?: number | null
+          lng?: number | null
+          locality_id?: string | null
+          located_at?: string | null
           name: string
           organization_id: string
           phone?: string | null
+          place_id?: string | null
+          province_id?: string | null
+          province_name?: string | null
           slug: string
           timezone?: string
           updated_at?: string
@@ -393,14 +411,23 @@ export type Database = {
           country?: string | null
           created_at?: string
           currency?: string
+          department_id?: string | null
+          department_name?: string | null
           deposit_pct?: number
           description?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
+          lat?: number | null
+          lng?: number | null
+          locality_id?: string | null
+          located_at?: string | null
           name?: string
           organization_id?: string
           phone?: string | null
+          place_id?: string | null
+          province_id?: string | null
+          province_name?: string | null
           slug?: string
           timezone?: string
           updated_at?: string

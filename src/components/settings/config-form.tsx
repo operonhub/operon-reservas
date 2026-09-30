@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { SettingsSection, IconField } from "@/components/settings/settings-section"
 import { updateProperty } from "@/app/(panel)/configuracion/actions"
 import { CURRENCIES } from "@/lib/currencies"
+import { LocationPicker, locationPickerAvailable } from "@/components/location/location-picker"
+import type { PropertyLocation } from "@/lib/location/types"
 import {
   Building2, Phone, MessageCircle, Mail, SlidersHorizontal, Clock,
   Wallet, Info, MapPin,
@@ -28,6 +30,47 @@ type Property = {
   checkin_time: string
   checkout_time: string
   deposit_pct: number
+  lat?: number | null
+  lng?: number | null
+  place_id?: string | null
+  province_id?: string | null
+  province_name?: string | null
+  department_id?: string | null
+  department_name?: string | null
+  locality_id?: string | null
+}
+
+/** La ubicación guardada (0036), si el dueño ya la marcó en el mapa. */
+function savedLocation(p: Property): PropertyLocation | null {
+  if (typeof p.lat !== "number" || typeof p.lng !== "number") return null
+  return {
+    address: p.address ?? "",
+    lat: p.lat,
+    lng: p.lng,
+    placeId: p.place_id ?? null,
+    provinceId: p.province_id ?? null,
+    provinceName: p.province_name ?? null,
+    departmentId: p.department_id ?? null,
+    departmentName: p.department_name ?? null,
+    localityId: p.locality_id ?? null,
+    city: p.city,
+  }
+}
+
+/** Texto libre de siempre: sin clave de Google, o si Google no carga. */
+function CityAddressFields({ property }: { property: Property }) {
+  return (
+    <Pair>
+      <Field htmlFor="city" label="Ciudad">
+        <IconField icon={MapPin}>
+          <Input id="city" name="city" className="pl-8" defaultValue={property.city ?? ""} />
+        </IconField>
+      </Field>
+      <Field htmlFor="address" label="Dirección">
+        <Input id="address" name="address" defaultValue={property.address ?? ""} />
+      </Field>
+    </Pair>
+  )
 }
 
 function Pair({ children }: { children: React.ReactNode }) {
@@ -63,6 +106,7 @@ export function ConfigForm({
 }) {
   const router = useRouter()
   const [pending, setPending] = React.useState(false)
+  const [location, setLocation] = React.useState<PropertyLocation | null>(() => savedLocation(property))
 
   async function handle(formData: FormData) {
     setPending(true)
@@ -105,21 +149,25 @@ export function ConfigForm({
                 placeholder="Breve descripción del lugar y sus comodidades…"
               />
             </Field>
-            <Pair>
-              <Field htmlFor="city" label="Ciudad">
-                <IconField icon={MapPin}>
-                  <Input
-                    id="city"
-                    name="city"
-                    className="pl-8"
-                    defaultValue={property.city ?? ""}
-                  />
-                </IconField>
+            {locationPickerAvailable ? (
+              <Field htmlFor="location" label="Ubicación">
+                {/* Viaja entera; el servidor vuelve a pedir la localidad oficial. */}
+                <input type="hidden" name="location" value={location ? JSON.stringify(location) : "null"} />
+                <LocationPicker
+                  value={location}
+                  onChange={setLocation}
+                  fallback={<CityAddressFields property={property} />}
+                />
+                {!location && property.city && (
+                  <p className="text-xs text-muted-foreground">
+                    Hoy figura como &quot;{property.city}&quot;. Marcala en el mapa para que la app sepa
+                    la localidad exacta.
+                  </p>
+                )}
               </Field>
-              <Field htmlFor="address" label="Dirección">
-                <Input id="address" name="address" defaultValue={property.address ?? ""} />
-              </Field>
-            </Pair>
+            ) : (
+              <CityAddressFields property={property} />
+            )}
           </div>
         </SettingsSection>
 
@@ -200,22 +248,15 @@ export function ConfigForm({
             </Pair>
             <Pair>
               <Field htmlFor="currency" label="Moneda principal">
+                {/* Una sola moneda (pesos): se muestra, no se elige. */}
+                <input type="hidden" name="currency" value={CURRENCIES[0].code} />
                 <IconField icon={Wallet}>
-                  {/* Lista cerrada: antes era texto libre de 3 caracteres y
-                      aceptaba cualquier cosa, que después rompe el formato de
-                      los importes. */}
-                  <select
+                  <Input
                     id="currency"
-                    name="currency"
-                    defaultValue={property.currency}
-                    className="h-8 w-full rounded-lg border border-input bg-transparent pr-2.5 pl-8 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                  >
-                    {CURRENCIES.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.label} ({c.code})
-                      </option>
-                    ))}
-                  </select>
+                    readOnly
+                    value={`${CURRENCIES[0].label} (${CURRENCIES[0].code})`}
+                    className="pl-8 text-muted-foreground"
+                  />
                 </IconField>
               </Field>
               <Field htmlFor="deposit_pct" label="Porcentaje de seña (%)">

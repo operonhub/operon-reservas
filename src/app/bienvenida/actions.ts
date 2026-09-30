@@ -4,6 +4,7 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isValidSlug } from "@/lib/slug"
+import { resolvePickedPlace } from "@/lib/location/georef"
 import {
   LAST_STEP,
   normalizeDraft,
@@ -39,6 +40,7 @@ const SETUP_ERRORS: [code: string, message: string, step: number][] = [
   ["INVALID_CURRENCY", "Elegí una moneda.", 2],
   ["INVALID_TIME", "Revisá los horarios de check-in y check-out.", 2],
   ["INVALID_CITY", "Revisá la ciudad.", 2],
+  ["INVALID_LOCATION", "Revisá la ubicación: elegila de nuevo en el buscador.", 2],
   ["DUPLICATE_UNIT_NAME", "Hay dos unidades con el mismo nombre.", 3],
   ["INVALID_CAPACITY", "Revisá cuántas personas entran en cada unidad.", 3],
   ["INVALID_UNIT_NAME", "Revisá los nombres de las unidades.", 3],
@@ -54,8 +56,18 @@ export async function finishSetup(raw: SetupDraft): Promise<{ error: string; ste
     if (message) return { error: message, step }
   }
 
+  // Lo oficial (provincia, localidad) se vuelve a pedir acá con el punto: no
+  // se confía en lo que traiga el borrador del navegador.
+  const location = draft.location
+    ? await resolvePickedPlace({
+        ...draft.location,
+        // Sin municipio oficial, la ciudad del borrador vino de Google: queda de respaldo.
+        googleLocality: draft.location.localityId ? null : draft.location.city,
+      })
+    : null
+
   const supabase = await setupClient()
-  const { error } = await supabase.rpc("complete_setup", { p_payload: toSetupPayload(draft) })
+  const { error } = await supabase.rpc("complete_setup", { p_payload: toSetupPayload(draft, location) })
   if (error) {
     // Ya tiene complejo (doble click, otra pestaña): el panel es su lugar.
     if (/NO_GRANT|ALREADY_MEMBER/.test(error.message)) redirect("/")
