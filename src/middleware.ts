@@ -1,8 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { updateSession } from "@/lib/supabase/middleware"
+import { canonicalRedirect } from "@/lib/site-origin"
 
 // Convención `middleware` (estable en Next 16). Refresca sesión y protege el panel.
 export async function middleware(request: NextRequest) {
+  // Dominios técnicos de Vercel (no se pueden redirigir desde el panel): al propio.
+  const canonical = canonicalRedirect(request.nextUrl, request.method)
+  if (canonical) return NextResponse.redirect(canonical, 307)
   // La ruta cron valida CRON_SECRET en su handler, sin sesión de usuario.
   if (request.nextUrl.pathname === "/api/cron/zone-month") return NextResponse.next()
   const isDemoSession = request.cookies.get("operon_demo")?.value === "1"
