@@ -49,3 +49,6 @@ skills-lock.json
 next-env.d.ts
 
 .vercel
+
+# Previsualizaciones de Tu zona (scripts/zone-month-preview.mjs)
+zone-preview-*.json
