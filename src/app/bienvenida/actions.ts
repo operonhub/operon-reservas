@@ -61,8 +61,9 @@ export async function finishSetup(raw: SetupDraft): Promise<{ error: string; ste
   const location = draft.location
     ? await resolvePickedPlace({
         ...draft.location,
-        // Sin municipio oficial, la ciudad del borrador vino de Google: queda de respaldo.
-        googleLocality: draft.location.localityId ? null : draft.location.city,
+        // La ciudad del borrador es la pista para buscar la localidad oficial;
+        // si el pin quedó lejos de ella, se usa la más cercana.
+        googleLocality: draft.location.city,
       })
     : null
 

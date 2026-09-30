@@ -66,7 +66,7 @@ export async function updateProperty(formData: FormData): Promise<ActionResult> 
       // Lo oficial se vuelve a pedir acá con el punto: no se confía en el navegador.
       const location = await resolvePickedPlace({
         ...picked,
-        googleLocality: picked.localityId ? null : picked.city,
+        googleLocality: picked.city,
       })
       place = {
         city: location.city,

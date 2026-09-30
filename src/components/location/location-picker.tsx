@@ -48,6 +48,7 @@ export function LocationPicker({
   const [failed, setFailed] = React.useState(false)
   const session = React.useRef<object | null>(null)
   const requestId = React.useRef(0)
+  const searchId = React.useRef(0)
   // Estable: el mapa se crea en un efecto que depende de esta función.
   const fail = React.useCallback(() => setFailed(true), [])
 
@@ -67,11 +68,17 @@ export function LocationPicker({
   async function search(input: string) {
     setQuery(input)
     setActive(-1)
+    // Solo cuenta la última búsqueda: espera a que se deje de escribir y
+    // descarta respuestas viejas que lleguen tarde.
+    const id = ++searchId.current
     if (input.trim().length < 3) {
       setSuggestions([])
+      setSearching(false)
       return
     }
     setSearching(true)
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    if (id !== searchId.current) return
     try {
       const google = await loadGoogleMaps()
       const places = await google.maps.importLibrary("places")
@@ -83,6 +90,7 @@ export function LocationPicker({
         language: "es",
         region: "ar",
       })
+      if (id !== searchId.current) return
       setSuggestions(
         found
           .map((s) => s.placePrediction)
@@ -98,7 +106,7 @@ export function LocationPicker({
     } catch {
       setFailed(true)
     } finally {
-      setSearching(false)
+      if (id === searchId.current) setSearching(false)
     }
   }
 
@@ -209,7 +217,7 @@ export function LocationPicker({
                 lat,
                 lng,
                 placeId: value.placeId,
-                googleLocality: value.localityId ? null : value.city,
+                googleLocality: value.city,
               })
             }
             onFail={fail}
