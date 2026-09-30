@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { normalizeIcalUrl } from "../_shared/ical-url.ts"
+import { errorCode, toReport } from "./sync-status.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 // A diferencia de notify-reservations (que usa la publishable key), acá las
@@ -193,12 +194,8 @@ async function syncPlatform(
     return { unit_id: unitId, source, ok: true, ...summary }
   } catch (error) {
     // Una URL rota/caída de un cliente no debe tumbar el sync de las demás.
-    return {
-      unit_id: unitId,
-      source,
-      ok: false,
-      error: error instanceof Error ? error.message : "SYNC_FAILED",
-    }
+    // Solo el código: el mensaje crudo puede traer el link con su token.
+    return { unit_id: unitId, source, ok: false, error: errorCode(error) }
   }
 }
 
@@ -233,6 +230,17 @@ Deno.serve(async (request: Request) => {
       }
     }
 
+    // El panel de Operon muestra estos resultados (0035). Si guardarlos falla,
+    // el sync ya está hecho: no se tira abajo por eso.
+    try {
+      await rpc<number>("report_ical_sync_results", {
+        p_worker_token: workerToken,
+        p_results: toReport(results),
+      })
+    } catch {
+      // Sin reporte esta corrida; la próxima lo vuelve a intentar.
+    }
+
     const totals = results.reduce(
       (acc, r) => ({
         inserted: acc.inserted + (r.inserted ?? 0),
@@ -249,7 +257,7 @@ Deno.serve(async (request: Request) => {
       platforms_error: results.filter((r) => !r.ok).length,
       errors: results
         .filter((r) => !r.ok)
-        .map((r) => ({ unit_id: r.unit_id, source: r.source, error: r.error })),
+        .map((r) => ({ unit_id: r.unit_id, source: r.source, error: errorCode(r.error ?? "") })),
       totals,
     })
   } catch (error) {

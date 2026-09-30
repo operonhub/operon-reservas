@@ -6,6 +6,7 @@ import { buttonVariants } from "@/components/ui/button"
 import { activity, relative, shortDate } from "@/lib/operon/format"
 import type { ClientRow } from "@/lib/operon/types"
 import { TONE_CLASSES, overviewSummary, type ZoneOverview } from "@/lib/operon/zone"
+import { isIcalProblem, type IcalStatusRow } from "@/lib/operon/ical"
 import { siteUrl } from "@/lib/site-url"
 import { createClient } from "@/lib/supabase/server"
 import { cn } from "@/lib/utils"
@@ -30,9 +31,7 @@ const FILTERS = [
 ] as const
 type Filter = (typeof FILTERS)[number]["key"]
 
-const hasProblems = (c: ClientRow) => c.email_failed_30d > 0 || c.email_stuck > 0
-
-function matches(filter: Filter, c: ClientRow) {
+function matches(filter: Filter, c: ClientRow, hasProblems: (c: ClientRow) => boolean) {
   if (filter === "activos") return !c.suspended_at
   if (filter === "suspendidos") return Boolean(c.suspended_at)
   if (filter === "problemas") return hasProblems(c)
@@ -45,18 +44,25 @@ export default async function ClientesPage({
   searchParams: Promise<{ estado?: string }>
 }) {
   const supabase = await createClient()
-  const [{ data, error }, { data: zoneData }] = await Promise.all([
+  const [{ data, error }, { data: zoneData }, { data: icalData }] = await Promise.all([
     supabase.rpc("operon_clients"),
     supabase.rpc("operon_zone_month_overview"),
+    supabase.rpc("operon_ical_overview"),
   ])
   if (error) notFound()
   const zones = new Map(((zoneData ?? []) as unknown as ZoneOverview[]).map((z) => [z.organization_id, z]))
+  const icalProblems = new Map<string, number>()
+  for (const row of (icalData ?? []) as IcalStatusRow[]) {
+    if (isIcalProblem(row)) icalProblems.set(row.organization_id, (icalProblems.get(row.organization_id) ?? 0) + 1)
+  }
 
   const { estado } = await searchParams
   const filter: Filter = FILTERS.some((f) => f.key === estado) ? (estado as Filter) : "todos"
 
+  const hasProblems = (c: ClientRow) =>
+    c.email_failed_30d > 0 || c.email_stuck > 0 || (icalProblems.get(c.organization_id) ?? 0) > 0
   const all = (data ?? []) as ClientRow[]
-  const clients = all.filter((c) => matches(filter, c))
+  const clients = all.filter((c) => matches(filter, c, hasProblems))
   const now = currentTime()
   const base = await siteUrl()
 
@@ -93,13 +99,13 @@ export default async function ClientesPage({
           label="Con problemas"
           value={withProblems}
           tone={withProblems > 0 ? "warning" : undefined}
-          note={withProblems > 0 ? "Mails que no salen" : "Todo en orden"}
+          note={withProblems > 0 ? "Mails o calendarios con fallas" : "Todo en orden"}
         />
       </section>
 
       <nav aria-label="Filtrar clientes" className="mt-6 flex flex-wrap gap-1.5">
         {FILTERS.map((f) => {
-          const count = all.filter((c) => matches(f.key, c)).length
+          const count = all.filter((c) => matches(f.key, c, hasProblems)).length
           const current = f.key === filter
           return (
             <Link
@@ -240,7 +246,11 @@ export default async function ClientesPage({
                       </td>
 
                       <td className="px-4 py-3">
-                        <Health failed={client.email_failed_30d} stuck={client.email_stuck} />
+                        <Health
+                          failed={client.email_failed_30d}
+                          stuck={client.email_stuck}
+                          calendars={icalProblems.get(client.organization_id) ?? 0}
+                        />
                       </td>
 
                       <td className="px-4 py-3">
@@ -270,8 +280,8 @@ function ZoneBadge({ summary }: { summary: ReturnType<typeof overviewSummary> })
   )
 }
 
-function Health({ failed, stuck }: { failed: number; stuck: number }) {
-  if (failed === 0 && stuck === 0) {
+function Health({ failed, stuck, calendars }: { failed: number; stuck: number; calendars: number }) {
+  if (failed === 0 && stuck === 0 && calendars === 0) {
     return (
       <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
         <span aria-hidden className="size-2 rounded-full bg-success" />
@@ -285,6 +295,12 @@ function Health({ failed, stuck }: { failed: number; stuck: number }) {
         <p className="inline-flex items-center gap-1.5 text-destructive">
           <span aria-hidden className="size-2 rounded-full bg-destructive" />
           {failed} mail{failed === 1 ? "" : "s"} sin enviar
+        </p>
+      )}
+      {calendars > 0 && (
+        <p className="flex items-center gap-1.5 text-destructive">
+          <span aria-hidden className="size-2 rounded-full bg-destructive" />
+          {calendars} calendario{calendars === 1 ? "" : "s"} con fallas
         </p>
       )}
       {stuck > 0 && (

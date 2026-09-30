@@ -756,6 +756,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      report_ical_sync_results: {
+        Args: { p_results: Json; p_worker_token: string }
+        Returns: number
+      }
       zone_month_claim_edition: { Args: { p_month: string; p_zone: string }; Returns: Json }
       zone_month_claim_enabled: { Args: never; Returns: Json }
       zone_month_material: {
@@ -1053,6 +1057,20 @@ export type Database = {
           slug: string
           suspended_at: string
           units: number
+        }[]
+      }
+      operon_ical_overview: {
+        Args: { p_org?: string }
+        Returns: {
+          failures: number
+          last_error: string
+          last_error_at: string
+          last_ok_at: string
+          organization_id: string
+          source: string
+          state: string
+          unit_id: string
+          unit_name: string
         }[]
       }
       operon_prepare_recovery: {

@@ -1,0 +1,50 @@
+/**
+ * Salud de los calendarios de Airbnb/Booking de cada cliente (0035): lo que
+ * reporta el sync de cada hora, traducido para el panel de Operon.
+ */
+
+export type IcalState = "ok" | "error" | "stale" | "pending" | "paused"
+
+export type IcalStatusRow = {
+  organization_id: string
+  unit_id: string
+  unit_name: string
+  source: "airbnb" | "booking"
+  state: IcalState
+  last_ok_at: string | null
+  last_error_at: string | null
+  last_error: string | null
+  failures: number
+}
+
+export const SOURCE_LABELS: Record<IcalStatusRow["source"], string> = { airbnb: "Airbnb", booking: "Booking" }
+
+export const STATE_LABELS: Record<IcalState, string> = {
+  ok: "Sincroniza bien",
+  error: "Falla",
+  stale: "Sin sincronizar hace horas",
+  pending: "Todavía no sincronizó",
+  paused: "Pausado (complejo suspendido)",
+}
+
+/** Lo que cuenta como problema: falló o dejó de sincronizar. */
+export const isIcalProblem = (row: Pick<IcalStatusRow, "state">) => row.state === "error" || row.state === "stale"
+
+/** Qué le pasa y qué tiene que hacer el cliente, en criollo. */
+export function icalErrorLabel(code: string | null) {
+  if (!code) return "No se pudo sincronizar."
+  if (code === "HTTP_404" || code === "HTTP_410") {
+    return "El link del calendario ya no existe: el cliente lo regeneró o lo borró en la plataforma. Tiene que copiar el nuevo."
+  }
+  if (code === "HTTP_401" || code === "HTTP_403") return "La plataforma rechaza el link. Hay que copiarlo de nuevo."
+  if (code === "HTTP_429") return "La plataforma limitó las consultas. Suele resolverse solo."
+  if (/^HTTP_5\d\d$/.test(code)) return "La plataforma no respondió bien. Suele resolverse solo."
+  if (code.startsWith("HTTP_")) return `La plataforma respondió con un error (${code.slice(5)}).`
+  if (code === "NOT_ICAL") return "El link no devuelve un calendario: puede estar vencido o pedir iniciar sesión."
+  if (code.startsWith("BAD_URL_")) return "El link cargado no es válido."
+  if (code.startsWith("REDIRECT_BLOCKED_") || code === "TOO_MANY_REDIRECTS") {
+    return "El link redirige a un lugar no permitido."
+  }
+  if (code === "TIMEOUT") return "La plataforma tardó demasiado en responder."
+  return "No se pudo sincronizar."
+}

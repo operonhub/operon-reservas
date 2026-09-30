@@ -18,6 +18,7 @@ import { MemberActions } from "./member-actions"
 import { OrgStatusAction } from "./org-actions"
 import { ZoneMonthCard } from "./zone-month-card"
 import type { ZoneOverview } from "@/lib/operon/zone"
+import { SOURCE_LABELS, STATE_LABELS, icalErrorLabel, isIcalProblem, type IcalStatusRow } from "@/lib/operon/ical"
 import { isZoneMonthEnabled } from "@/lib/zone-month/flag"
 import { ZONE_MONTH_LABEL } from "@/lib/zone-month/content"
 
@@ -47,16 +48,18 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
   if (!UUID.test(id)) notFound()
 
   const supabase = await createClient()
-  const [{ data, error }, { data: logData }, { data: zoneData }] = await Promise.all([
+  const [{ data, error }, { data: logData }, { data: zoneData }, { data: icalData }] = await Promise.all([
     supabase.rpc("operon_client_detail", { p_org: id }),
     supabase.rpc("operon_audit_log", { p_org: id, p_limit: 20 }),
     supabase.rpc("operon_zone_month_overview", { p_org: id }),
+    supabase.rpc("operon_ical_overview", { p_org: id }),
   ])
   if (error || !data) notFound()
 
   const d = data as unknown as ClientDetail
   const log = (logData ?? []) as AuditEntry[]
   const zoneOverview = ((zoneData ?? []) as unknown as ZoneOverview[])[0] ?? null
+  const calendars = (icalData ?? []) as IcalStatusRow[]
   const now = currentTime()
   const publicUrl = `${await siteUrl()}/reservar/${d.org.slug}`
   const owners = d.members.filter((m) => m.role === "owner").length
@@ -225,6 +228,7 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
 
         <Section title="Salud">
           <EmailHealth health={d.email_health} now={now} />
+          <CalendarHealth rows={calendars} now={now} />
         </Section>
 
         <Section title={ZONE_MONTH_LABEL} className="lg:col-span-3">
@@ -323,6 +327,43 @@ function Figure({ label, value, text }: { label: string; value?: number; text?: 
     <div>
       <p className="label-mono text-muted-foreground">{label}</p>
       <p className="mt-1 font-heading text-2xl font-semibold tabular-nums">{text ?? value}</p>
+    </div>
+  )
+}
+
+/** Calendarios de Airbnb/Booking que importa cada unidad (0035). */
+function CalendarHealth({ rows, now }: { rows: IcalStatusRow[]; now: number }) {
+  if (rows.length === 0) {
+    return <p className="mt-4 border-t pt-3 text-sm text-muted-foreground">No tiene calendarios de Airbnb o Booking conectados.</p>
+  }
+  const problems = rows.filter(isIcalProblem).length
+  return (
+    <div className="mt-4 space-y-2 border-t pt-3 text-sm">
+      <p className="flex items-center gap-2">
+        {problems === 0 ? (
+          <CircleCheck className="size-4 text-success" />
+        ) : (
+          <CircleAlert className="size-4 text-destructive" />
+        )}
+        {problems === 0 ? "Los calendarios sincronizan bien." : "Hay calendarios que no sincronizan."}
+      </p>
+      <ul className="space-y-2">
+        {rows.map((r) => (
+          <li key={`${r.unit_id}-${r.source}`}>
+            <p>
+              {r.unit_name} · {SOURCE_LABELS[r.source]}{" "}
+              <span className={cn("text-xs", isIcalProblem(r) ? "text-destructive" : "text-muted-foreground")}>
+                {STATE_LABELS[r.state]}
+                {r.state === "error" && r.failures > 1 && ` (${r.failures} veces seguidas)`}
+              </span>
+            </p>
+            {r.state === "error" && <p className="text-xs text-muted-foreground">{icalErrorLabel(r.last_error)}</p>}
+            {r.last_ok_at && (
+              <p className="text-xs text-muted-foreground">Última vez que anduvo: {relative(r.last_ok_at, now)}</p>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
