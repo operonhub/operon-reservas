@@ -1,3 +1,4 @@
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { logout } from "@/app/login/actions"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,9 @@ export const metadata = { title: "Cuenta suspendida", robots: { index: false } }
  * requireContext. El motivo no se muestra: es interno de Operon.
  */
 export default async function SuspendidaPage() {
+  // La demo no tiene Auth real ni complejos suspendidos.
+  if ((await cookies()).get("operon_demo")?.value === "1") redirect("/")
+
   const supabase = await createClient()
   const { data } = await supabase.auth.getClaims()
   if (!data?.claims?.sub) redirect("/login")
