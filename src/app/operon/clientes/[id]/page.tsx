@@ -16,11 +16,18 @@ import { cn } from "@/lib/utils"
 import { MpBadge } from "../../badges"
 import { MemberActions } from "./member-actions"
 import { OrgStatusAction } from "./org-actions"
+import { ZoneMonthCard } from "./zone-month-card"
+import type { ZoneOverview } from "@/lib/operon/zone"
+import { isZoneMonthEnabled } from "@/lib/zone-month/flag"
+import { ZONE_MONTH_LABEL } from "@/lib/zone-month/content"
 
 export const metadata: Metadata = {
   title: "Ficha de cliente · Operon",
   robots: { index: false, follow: false },
 }
+
+// "Generar ahora" corre la IA dentro de la acción de esta página.
+export const maxDuration = 60
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -28,19 +35,28 @@ function currentTime() {
   return Date.now()
 }
 
+/** Mes actual y próximo en UTC, igual que las RPC de Tu zona. */
+function zoneMonths(now: number) {
+  const d = new Date(now)
+  const iso = (y: number, m: number) => new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10)
+  return { current: iso(d.getUTCFullYear(), d.getUTCMonth()), next: iso(d.getUTCFullYear(), d.getUTCMonth() + 1) }
+}
+
 export default async function ClientePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   if (!UUID.test(id)) notFound()
 
   const supabase = await createClient()
-  const [{ data, error }, { data: logData }] = await Promise.all([
+  const [{ data, error }, { data: logData }, { data: zoneData }] = await Promise.all([
     supabase.rpc("operon_client_detail", { p_org: id }),
     supabase.rpc("operon_audit_log", { p_org: id, p_limit: 20 }),
+    supabase.rpc("operon_zone_month_overview", { p_org: id }),
   ])
   if (error || !data) notFound()
 
   const d = data as unknown as ClientDetail
   const log = (logData ?? []) as AuditEntry[]
+  const zoneOverview = ((zoneData ?? []) as unknown as ZoneOverview[])[0] ?? null
   const now = currentTime()
   const publicUrl = `${await siteUrl()}/reservar/${d.org.slug}`
   const owners = d.members.filter((m) => m.role === "owner").length
@@ -209,6 +225,17 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
 
         <Section title="Salud">
           <EmailHealth health={d.email_health} now={now} />
+        </Section>
+
+        <Section title={ZONE_MONTH_LABEL} className="lg:col-span-3">
+          <ZoneMonthCard
+            orgId={d.org.id}
+            overview={zoneOverview}
+            suspended={suspended}
+            globalEnabled={isZoneMonthEnabled()}
+            months={zoneMonths(now)}
+            now={now}
+          />
         </Section>
 
         <Section title="Alojamiento" className="lg:col-span-2">

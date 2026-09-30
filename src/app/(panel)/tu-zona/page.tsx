@@ -10,8 +10,9 @@ import { EditionSlides } from "@/components/zone-month/edition-slides"
 import { isZoneMonthEnabled } from "@/lib/zone-month/flag"
 
 export const dynamic = "force-dynamic"
-export function generateMetadata() {
-  return isZoneMonthEnabled() ? { title: ZONE_MONTH_LABEL } : {}
+export async function generateMetadata() {
+  if (!isZoneMonthEnabled()) return {}
+  return (await requireContext()).zoneMonthEnabled ? { title: ZONE_MONTH_LABEL } : {}
 }
 
 function processingWasInterrupted(startedAt: string | null | undefined) {
@@ -27,6 +28,8 @@ function zoneLabel(zone: string) {
 export default async function ZoneMonthPage({ searchParams }: { searchParams: Promise<{ zone?: string; month?: string }> }) {
   if (!isZoneMonthEnabled()) notFound()
   const ctx = await requireContext()
+  // Operon la activa por cliente desde el panel interno.
+  if (!ctx.zoneMonthEnabled) notFound()
   const params = await searchParams
   const header = <header className="relative mb-8 overflow-hidden rounded-3xl border bg-card p-6 shadow-sm sm:p-8">
     <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-28 size-80 rounded-full bg-primary/15 blur-3xl" />

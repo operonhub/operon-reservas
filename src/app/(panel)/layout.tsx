@@ -14,7 +14,8 @@ export default async function PanelLayout({
   const ctx = await requireContext()
   const isDemo = (await cookies()).get("operon_demo")?.value === "1"
   const publicUrl = await publicReservationUrl(ctx.organizationSlug)
-  const showZoneMonth = isZoneMonthEnabled()
+  // Interruptor general (Vercel) + activado para este cliente desde /operon.
+  const showZoneMonth = isZoneMonthEnabled() && ctx.zoneMonthEnabled
 
   return (
     <TourProvider autoStart={!ctx.tourCompleted} isDemo={isDemo}>

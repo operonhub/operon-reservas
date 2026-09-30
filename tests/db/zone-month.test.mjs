@@ -4,39 +4,55 @@ import { readFileSync } from 'node:fs'
 import { createDb, as, attempt } from './harness.mjs'
 import { seed } from './seed.mjs'
 
-// Única sustitución para fijar el reloj: conserva el cuerpo real de la RPC.
-const migration = readFileSync(new URL('../../supabase/migrations/0032_zone_month_pilot_allowlist.sql', import.meta.url), 'utf8')
+// Única sustitución para fijar el reloj: conserva el cuerpo real de cada RPC.
+const migration = readFileSync(new URL('../../supabase/migrations/0034_zone_month_por_cliente.sql', import.meta.url), 'utf8')
+const CLOCKED = ['zone_month_claim_enabled', 'zone_month_claim_edition', 'operon_zone_month_queue', 'operon_zone_month_overview']
 async function clock(db, timestamp = '2026-09-28 12:00:00+00') {
   await as(db, 'postgres')
-  const fn = migration.match(/create function public.zone_month_claim\(p_allowed_zones text\[\]\)[\s\S]+?end; \$\$;/)[0]
-  await db.exec(fn.replace('create function', 'create or replace function').replaceAll('now()', `('${timestamp}'::timestamptz)`))
+  for (const name of CLOCKED) {
+    const fn = migration.match(new RegExp(`create function public\\.${name}\\([\\s\\S]+?end; \\$\\$;`))[0]
+    await db.query(fn.replace('create function', 'create or replace function').replaceAll('now()', `('${timestamp}'::timestamptz)`))
+  }
 }
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0]
-const claim = async (db, zones = ['AR:ushuaia', 'AR:salta']) => (await one(db, 'select zone_month_claim($1::text[]) j', [zones])).j
+const claim = async (db) => (await one(db, 'select zone_month_claim_enabled() j')).j
+async function enable(db, ...orgs) {
+  await as(db, 'postgres')
+  for (const org of orgs) await db.query('update organizations set zone_month_enabled_at = now() where id = $1', [org])
+  await as(db, 'service_role')
+}
 async function fresh() {
   const db = await createDb(); const ids = await seed(db)
   await db.query("update properties set city = case when organization_id = $1 then 'Ushuaia' else 'Salta' end, country = 'AR'", [ids.org_a])
   await clock(db)
+  await as(db, 'postgres')
+  ids.admin = (await one(db, "insert into auth.users (email) values ('santiago@operonhub.test') returning id")).id
+  await db.query('insert into platform_admins (user_id) values ($1)', [ids.admin])
   return {db, ids}
 }
 
 test('RLS: zonas diferentes aisladas, zona compartida y cambio de localización; sin escritura libre', async () => {
   const {db, ids} = await fresh()
   try {
-    await db.exec("insert into zone_month_editions(zone,month) values ('AR:ushuaia','2026-10-01'),('AR:salta','2026-10-01')")
+    await db.query("insert into zone_month_editions(zone,month) values ('AR:ushuaia','2026-10-01'),('AR:salta','2026-10-01')")
     for (const user of [ids.owner_a, ids.admin_a, ids.staff_a]) {
       await as(db, 'authenticated', {uid:user})
       assert.deepEqual((await db.query('select zone from zone_month_editions')).rows, [{zone:'AR:ushuaia'}])
       assert.ok((await attempt(db, "insert into zone_month_editions(zone,month) values ('AR:ushuaia','2026-11-01')")).error)
       assert.equal((await db.query("update zone_month_editions set attempts=3 returning zone")).rows.length,0)
       assert.equal((await db.query('delete from zone_month_editions returning zone')).rows.length,0)
-      assert.ok((await attempt(db, "select zone_month_claim(array['AR:ushuaia'])")).error)
+      assert.ok((await attempt(db, "select zone_month_claim_enabled()")).error)
+      assert.ok((await attempt(db, "select zone_month_claim_edition('AR:ushuaia','2026-10-01')")).error)
       assert.ok((await attempt(db, "select zone_month_material('AR:ushuaia','2026-10-01',gen_random_uuid(),'{}','x')")).error)
       assert.ok((await attempt(db, "select zone_month_finish('AR:ushuaia','2026-10-01',gen_random_uuid(),null,'quota')")).error)
+      // Un cliente no se activa ni se genera solo.
+      assert.ok((await attempt(db, 'select operon_set_zone_month($1, true)', [ids.org_a])).error)
+      assert.ok((await attempt(db, "select operon_zone_month_queue($1,'AR:ushuaia','2026-10-01')", [ids.org_a])).error)
+      assert.ok((await attempt(db, 'select * from operon_zone_month_overview()')).error)
     }
     await as(db,'anon')
     assert.equal((await db.query('select * from zone_month_editions')).rows.length,0)
-    assert.ok((await attempt(db, "select zone_month_claim(array['AR:ushuaia'])")).error)
+    assert.ok((await attempt(db, "select zone_month_claim_enabled()")).error)
     await as(db,'authenticated',{uid:ids.owner_b})
     assert.deepEqual((await db.query('select zone from zone_month_editions')).rows,[{zone:'AR:salta'}])
     await db.query("update properties set city = 'Ushuaia' where id=$1",[ids.prop_b])
@@ -50,7 +66,7 @@ test('worker: una edición por zona/mes, leases, no duplicación, reintentos aco
   const {db, ids} = await fresh()
   try {
     await db.query("update properties set city='Ushuaia' where id=$1",[ids.prop_b])
-    await as(db,'service_role')
+    await enable(db, ids.org_a, ids.org_b)
     const j = await claim(db)
     assert.equal(j.zone,'AR:ushuaia'); assert.equal(j.month,'2026-10-01')
     assert.equal(await claim(db),null)
@@ -71,16 +87,27 @@ test('worker: una edición por zona/mes, leases, no duplicación, reintentos aco
   } finally { await db.close() }
 })
 
-test('allowlist: sólo se encola y reclama la zona autorizada', async () => {
-  const {db} = await fresh()
+test('solo se generan las zonas de clientes habilitados, no suspendidos y con equipo', async () => {
+  const {db, ids} = await fresh()
   try {
     await as(db,'service_role')
-    assert.equal((await claim(db,['AR:salta'])).zone,'AR:salta')
-    assert.equal(await claim(db,['AR:salta']),null)
+    // Nadie habilitado: el cron no hace nada (y no es un error).
+    assert.equal(await claim(db), null)
+    await enable(db, ids.org_b)
+    assert.equal((await claim(db)).zone,'AR:salta')
+    assert.equal(await claim(db),null)
     await as(db,'postgres')
     assert.deepEqual((await db.query('select zone from zone_month_editions')).rows,[{zone:'AR:salta'}])
-    await as(db,'service_role')
-    assert.ok((await attempt(db,"select zone_month_claim(array[]::text[])")).error)
+
+    // Suspendido o sin equipo: su zona sale de la lista.
+    await db.query("update organizations set zone_month_enabled_at = now(), suspended_at = now() where id = $1", [ids.org_a])
+    await as(db,'service_role'); assert.equal(await claim(db), null)
+    await as(db,'postgres')
+    await db.query('update organizations set suspended_at = null where id = $1', [ids.org_a])
+    await db.query('delete from memberships where organization_id = $1', [ids.org_a])
+    await as(db,'service_role'); assert.equal(await claim(db), null)
+    await as(db,'postgres')
+    assert.equal((await one(db,"select count(*)::int n from zone_month_editions where zone = 'AR:ushuaia'")).n, 0)
   } finally { await db.close() }
 })
 
@@ -88,6 +115,7 @@ test('crash final pasa a fallo, tres intentos máximo y ventana cerrada no encol
   const {db,ids} = await fresh()
   try {
     await db.query('update properties set city=null where id=$1',[ids.prop_b])
+    await enable(db, ids.org_a)
     await clock(db,'2026-09-25 12:00:00+00'); await as(db,'service_role'); assert.equal(await claim(db),null)
     await clock(db,'2026-09-26 12:00:00+00'); await as(db,'service_role'); assert.equal((await claim(db)).attempts,1)
     for (const day of [28,29]) {
@@ -103,15 +131,126 @@ test('crash final pasa a fallo, tres intentos máximo y ventana cerrada no encol
 })
 
 test('lease vencido fuera de la ventana se marca fallido sin encolar otro mes', async () => {
-  const {db} = await fresh()
+  const {db, ids} = await fresh()
   try {
-    await as(db,'postgres')
-    await db.exec("insert into zone_month_editions(zone,month,status,attempts,lease,started_at) values ('AR:ushuaia','2026-10-01','processing',3,gen_random_uuid(),'2026-10-07 12:00:00+00')")
+    await enable(db, ids.org_a)
+    await as(db, 'postgres')
+    await db.query("insert into zone_month_editions(zone,month,status,attempts,lease,started_at) values ('AR:ushuaia','2026-10-01','processing',3,gen_random_uuid(),'2026-10-07 12:00:00+00')")
     await clock(db,'2026-10-08 12:00:00+00'); await as(db,'service_role')
     assert.equal(await claim(db),null)
     await as(db,'postgres')
     const row=await one(db,"select status,error_code,lease from zone_month_editions where zone='AR:ushuaia'")
     assert.equal(row.status,'failed');assert.equal(row.error_code,'interrupted');assert.equal(row.lease,null)
     assert.equal((await one(db,'select count(*)::int n from zone_month_editions')).n,1)
+  } finally { await db.close() }
+})
+
+test('panel: activar y desactivar un cliente, con registro; suspendido no se activa', async () => {
+  const {db, ids} = await fresh()
+  try {
+    await as(db, 'authenticated', {uid: ids.admin})
+    assert.equal((await one(db, 'select operon_set_zone_month($1, true) ok', [ids.org_a])).ok, true)
+    // Repetir no cambia nada ni ensucia el registro.
+    assert.equal((await one(db, 'select operon_set_zone_month($1, true) ok', [ids.org_a])).ok, false)
+    assert.equal((await one(db, 'select operon_set_zone_month($1, false) ok', [ids.org_a])).ok, true)
+
+    await db.query("select operon_suspend_org($1, 'No pagó')", [ids.org_b])
+    assert.match((await attempt(db, 'select operon_set_zone_month($1, true)', [ids.org_b])).error, /ORG_SUSPENDED/)
+
+    await as(db, 'postgres')
+    const log = (await db.query("select action from app_private.admin_audit_log where action like 'zone_month.%' order by id")).rows
+    assert.deepEqual(log.map((r) => r.action), ['zone_month.enable', 'zone_month.disable'])
+  } finally { await db.close() }
+})
+
+test('panel: tope de 10 zonas para cuidar la cuota de Gemini', async () => {
+  const {db, ids} = await fresh()
+  try {
+    await as(db, 'postgres')
+    for (let i = 0; i < 10; i++) {
+      const {id: org} = await one(db, "insert into organizations (name, slug, zone_month_enabled_at) values ($1, $2, now()) returning id", [`Org ${i}`, `org-${i}`])
+      await db.query("insert into properties (organization_id, name, slug, city, country) values ($1, 'P', 'p', $2, 'AR')", [org, `Ciudad ${String.fromCharCode(97 + i)}`])
+      await db.query("insert into memberships (organization_id, user_id, role) values ($1, $2, 'owner')", [org, ids.owner_b])
+    }
+    await as(db, 'authenticated', {uid: ids.admin})
+    assert.match((await attempt(db, 'select operon_set_zone_month($1, true)', [ids.org_a])).error, /ZONE_CAP/)
+    // Una ciudad que ya está activa no suma zona.
+    await as(db, 'postgres')
+    await db.query("update properties set city = 'Ciudad a' where id = $1", [ids.prop_a])
+    await as(db, 'authenticated', {uid: ids.admin})
+    assert.equal((await one(db, 'select operon_set_zone_month($1, true) ok', [ids.org_a])).ok, true)
+  } finally { await db.close() }
+})
+
+test('panel: generar ahora crea la edición, reintentar da un intento más y respeta lo publicado', async () => {
+  const {db, ids} = await fresh()
+  try {
+    await as(db, 'authenticated', {uid: ids.admin})
+    const queue = (zone, month) => attempt(db, 'select operon_zone_month_queue($1, $2, $3) q', [ids.org_a, zone, month])
+
+    assert.match((await queue('AR:ushuaia', '2026-10-01')).error, /ZONE_NOT_ENABLED/)
+    await db.query('select operon_set_zone_month($1, true)', [ids.org_a])
+    assert.match((await queue('AR:salta', '2026-10-01')).error, /ZONE_NOT_IN_ORG/)
+    assert.match((await queue('AR:ushuaia', '2026-12-01')).error, /MONTH_OUT_OF_RANGE/)
+
+    // No existía: queda pendiente y el worker la reclama fuera de la ventana de cinco días.
+    await clock(db, '2026-09-10 12:00:00+00')
+    await as(db, 'authenticated', {uid: ids.admin})
+    assert.equal((await queue('AR:ushuaia', '2026-09-01')).rows[0].q.previous_status, 'pending')
+    await as(db, 'service_role')
+    const job = (await one(db, "select zone_month_claim_edition('AR:ushuaia', '2026-09-01') j")).j
+    assert.equal(job.attempts, 1)
+    // Mientras se genera, no se puede volver a pedir.
+    await as(db, 'authenticated', {uid: ids.admin})
+    assert.match((await queue('AR:ushuaia', '2026-09-01')).error, /ALREADY_RUNNING/)
+
+    // Falló tres veces: reintentar da exactamente un intento más.
+    await as(db, 'postgres')
+    await db.query("update zone_month_editions set status='failed', attempts=3, error_code='quota', lease=null where zone='AR:ushuaia'")
+    await as(db, 'authenticated', {uid: ids.admin})
+    assert.equal((await queue('AR:ushuaia', '2026-09-01')).rows[0].q.previous_status, 'failed')
+    await as(db, 'postgres')
+    const row = await one(db, "select status, attempts, error_code from zone_month_editions where zone='AR:ushuaia'")
+    assert.deepEqual(row, {status: 'pending', attempts: 2, error_code: null})
+    await as(db, 'service_role')
+    const again = (await one(db, "select zone_month_claim_edition('AR:ushuaia', '2026-09-01') j")).j
+    assert.equal(again.attempts, 3)
+    await db.query("select zone_month_finish('AR:ushuaia', '2026-09-01', $1, $2, null)", [again.lease, {version: 1, zone: 'AR:ushuaia', month: '2026-09-01'}])
+
+    // Publicada: no se regenera.
+    await as(db, 'authenticated', {uid: ids.admin})
+    assert.match((await queue('AR:ushuaia', '2026-09-01')).error, /ALREADY_PUBLISHED/)
+
+    // Una zona que no está habilitada no se puede reclamar a mano.
+    await as(db, 'service_role')
+    assert.match((await attempt(db, "select zone_month_claim_edition('AR:salta', '2026-09-01')")).error, /ZONE_NOT_ENABLED/)
+
+    await as(db, 'postgres')
+    const log = (await db.query("select detail from app_private.admin_audit_log where action = 'zone_month.queue' order by id")).rows
+    assert.deepEqual(log.map((r) => [r.detail.previous_status, r.detail.previous_error]), [['pending', null], ['failed', 'quota']])
+  } finally { await db.close() }
+})
+
+test('panel: resumen por cliente con el estado del mes actual y el próximo', async () => {
+  const {db, ids} = await fresh()
+  try {
+    await as(db, 'postgres')
+    await db.query("insert into zone_month_editions(zone, month, status, attempts, error_code) values ('AR:ushuaia', '2026-10-01', 'failed', 3, 'quota')")
+    await db.query("update properties set city = null where id = $1", [ids.prop_b])
+    await as(db, 'authenticated', {uid: ids.admin})
+    await db.query('select operon_set_zone_month($1, true)', [ids.org_a])
+
+    const rows = (await db.query('select * from operon_zone_month_overview()')).rows
+    const a = rows.find((r) => r.organization_id === ids.org_a)
+    assert.ok(a.enabled_at)
+    assert.equal(a.missing_location, false)
+    assert.deepEqual(a.zones, [{zone: 'AR:ushuaia', current: null, next: {status: 'failed', attempts: 3, error_code: 'quota', published_at: null, started_at: null}}])
+
+    const b = rows.find((r) => r.organization_id === ids.org_b)
+    assert.equal(b.enabled_at, null)
+    assert.equal(b.missing_location, true)
+    assert.deepEqual(b.zones, [])
+
+    assert.equal((await db.query('select * from operon_zone_month_overview($1)', [ids.org_b])).rows.length, 1)
   } finally { await db.close() }
 })

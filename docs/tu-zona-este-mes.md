@@ -141,11 +141,13 @@ y señal a medir. El orden asigna semana 1, semana 2 y semanas 3–4.
 2. En el servidor, configurar `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`,
    `ZONE_GEMINI_MODEL` y un `CRON_SECRET` aleatorio largo. Nunca `NEXT_PUBLIC_` para secretos.
    No escribir claves en archivos versionados ni en el navegador.
-3. Verificar localizaciones y el paquete público para el mes piloto. Para estos
-   dos clientes configurar `ZONE_MONTH_ALLOWED_ZONES=AR:purmamarca,AR:huacalera`
-   sólo si ambas propiedades y membresías existen. La lista se lee sólo en el
-   servidor; vacía o inválida detiene el worker. Configurar `ZONE_MONTH_ENABLED=1`
-   sólo al activar. `DEMO_ONLY=1` impide ejecutar el worker.
+3. Verificar localizaciones y el paquete público para el mes piloto. Desde la
+   migración 0034 no hay lista de zonas en el entorno: cada cliente se activa desde
+   su ficha en `/operon/clientes/<id>` ("Tu zona este mes" → Activar). Las zonas que
+   se generan son las ciudades de los clientes activados, no suspendidos y con
+   equipo, con un tope de 10 (`operon_set_zone_month` rechaza con `ZONE_CAP`).
+   Configurar `ZONE_MONTH_ENABLED=1` sólo al activar: es el interruptor general del
+   cron, de la página y del link del menú. `DEMO_ONLY=1` impide ejecutar el worker.
 4. El cron diario UTC ya está declarado en `vercel.json` en esta rama local. No se
    ejecuta hasta un despliegue autorizado y `ZONE_MONTH_ENABLED=1`:
 
@@ -156,7 +158,11 @@ y señal a medir. El orden asigna semana 1, semana 2 y semanas 3–4.
 Vercel adjunta `Authorization: Bearer <CRON_SECRET>` al cron configurado. La
 ruta exacta evita el middleware de sesión y exige ese secreto con comparación
 constante; nunca basta una sesión de usuario.
-No hay endpoint de generación para el panel, botón Generar ni aprobación.
+Desde la ficha del cliente en `/operon`, "Generar ahora" / "Reintentar" deja la
+edición pendiente con `operon_zone_month_queue` (registrado en Actividad; a una
+edición fallida le da un intento más, sin superar tres) y, con `ZONE_MONTH_ENABLED=1`,
+la genera en el momento con `runZoneMonthEdition`, fuera de la ventana de cinco días.
+Sólo el mes actual o el próximo. No hay aprobación manual del contenido.
 Cron funciona en producción de Vercel, no en previews. Confirmar límites/duración del
 plan antes de activar: https://vercel.com/docs/cron-jobs/manage-cron-jobs
 

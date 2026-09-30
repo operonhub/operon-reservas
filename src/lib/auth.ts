@@ -22,6 +22,8 @@ export type ActiveContext = {
   checklistDismissed: boolean
   /** Es admin de Operon (Santiago o Tomás): ve el acceso al panel interno. */
   isPlatformAdmin: boolean
+  /** Operon le activó "Tu zona este mes" desde el panel interno (0034). */
+  zoneMonthEnabled: boolean
 }
 
 /**
@@ -67,7 +69,7 @@ export const requireContext = cache(async function requireContext(): Promise<Act
   const [{ data: membership }, { data: profile }, { data: isPlatformAdmin }] = await Promise.all([
     supabase
       .from("memberships")
-      .select("role, organization_id, organizations(name, slug, checklist_dismissed_at, suspended_at)")
+      .select("role, organization_id, organizations(name, slug, checklist_dismissed_at, suspended_at, zone_month_enabled_at)")
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle(),
@@ -75,7 +77,13 @@ export const requireContext = cache(async function requireContext(): Promise<Act
     supabase.rpc("is_platform_admin"),
   ])
 
-  type Org = { name: string; slug: string; checklist_dismissed_at: string | null; suspended_at: string | null }
+  type Org = {
+    name: string
+    slug: string
+    checklist_dismissed_at: string | null
+    suspended_at: string | null
+    zone_month_enabled_at: string | null
+  }
   const org = membership?.organizations as Org | Org[] | null
   const orgObj = Array.isArray(org) ? org[0] : org
 
@@ -102,5 +110,6 @@ export const requireContext = cache(async function requireContext(): Promise<Act
     tourCompleted: Boolean(profile?.tour_completed_at),
     checklistDismissed: Boolean(orgObj.checklist_dismissed_at),
     isPlatformAdmin: Boolean(isPlatformAdmin),
+    zoneMonthEnabled: Boolean(orgObj.zone_month_enabled_at),
   }
 })

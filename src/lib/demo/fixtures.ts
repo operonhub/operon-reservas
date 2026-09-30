@@ -12,6 +12,8 @@ export const DEMO_CONTEXT = {
   tourCompleted: false,
   checklistDismissed: false,
   isPlatformAdmin: false,
+  // La demo muestra Tu zona si el interruptor general está prendido.
+  zoneMonthEnabled: true,
 }
 
 /** El nombre de la cookie que lleva lo que cada visitante creó en la demo. */

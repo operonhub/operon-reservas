@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache"
 import { operonClient, rpcErrorCode } from "@/lib/operon/client"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { siteUrl } from "@/lib/site-url"
+import { ERRORS as ZONE_ERRORS } from "@/lib/zone-month/content"
+import { isZoneMonthEnabled } from "@/lib/zone-month/flag"
+import { runZoneMonthEdition } from "@/lib/zone-month/worker"
 
 /**
  * Acciones de la ficha de un cliente. Todas pasan por RPC con la sesión del
@@ -116,4 +119,68 @@ export async function createRecoveryLink(_prev: RecoveryState, formData: FormDat
   refresh(orgId)
   const params = new URLSearchParams({ token_hash: hashedToken, type: "recovery" })
   return { link: `${await siteUrl()}/actualizar-contrasena?${params}`, email }
+}
+
+export type ZoneMonthState = { ok?: boolean; message?: string; error?: string } | null
+
+const ZONE_MESSAGES: Record<string, string> = {
+  ...MESSAGES,
+  ORG_SUSPENDED: "El complejo está suspendido: reactivalo primero.",
+  ZONE_CAP: "Ya hay 10 ciudades activas, que es el tope para cuidar la cuota de la IA. Desactivá otra primero.",
+  ZONE_NOT_ENABLED: "Tu zona no está activada para este cliente.",
+  ZONE_NOT_IN_ORG: "Esa ciudad ya no es la del complejo. Recargá la página.",
+  MONTH_OUT_OF_RANGE: "Solo se puede generar el mes actual o el próximo.",
+  ALREADY_PUBLISHED: "Esa edición ya está publicada.",
+  ALREADY_RUNNING: "Esa edición se está generando ahora mismo.",
+}
+
+function toZoneError(message: string | undefined) {
+  const code = rpcErrorCode(message, Object.keys(ZONE_MESSAGES))
+  return code ? ZONE_MESSAGES[code] : "No se pudo completar. Probá de nuevo."
+}
+
+export async function setZoneMonth(_prev: ZoneMonthState, formData: FormData): Promise<ZoneMonthState> {
+  const supabase = await operonClient()
+  if (!supabase) return { error: "No disponible en la demo." }
+  const orgId = field(formData, "org")
+  const enabled = field(formData, "enabled") === "1"
+
+  const { error } = await supabase.rpc("operon_set_zone_month", { p_org: orgId, p_enabled: enabled })
+  if (error) return { error: toZoneError(error.message) }
+  refresh(orgId)
+  return { ok: true, message: enabled ? "Tu zona quedó activada." : "Tu zona quedó desactivada." }
+}
+
+/**
+ * "Generar ahora" / "Reintentar". Primero la RPC deja la edición pendiente
+ * (verifica al admin y lo registra); después, si el interruptor general está
+ * prendido, se genera en el momento con el mismo worker del cron.
+ */
+export async function generateZoneMonth(_prev: ZoneMonthState, formData: FormData): Promise<ZoneMonthState> {
+  const supabase = await operonClient()
+  if (!supabase) return { error: "No disponible en la demo." }
+  const orgId = field(formData, "org")
+  const zone = field(formData, "zone")
+  const month = field(formData, "month")
+
+  const { error } = await supabase.rpc("operon_zone_month_queue", { p_org: orgId, p_zone: zone, p_month: month })
+  if (error) return { error: toZoneError(error.message) }
+  refresh(orgId)
+
+  if (!isZoneMonthEnabled() || process.env.DEMO_ONLY === "1") {
+    return {
+      ok: true,
+      message: "Quedó en cola. El interruptor general de Tu zona está apagado en Vercel: se genera cuando se prenda.",
+    }
+  }
+  try {
+    const result = await runZoneMonthEdition(zone, month)
+    refresh(orgId)
+    if (result.status === "published") return { ok: true, message: "Listo: la edición quedó publicada." }
+    if (result.status === "busy") return { ok: true, message: "Ya se estaba generando. Recargá en un minuto." }
+    return { error: `Volvió a fallar: ${ZONE_ERRORS[result.code ?? ""] ?? "error del proveedor de IA."}` }
+  } catch {
+    refresh(orgId)
+    return { ok: true, message: "Quedó en cola: no se pudo generar ahora y lo reintenta el proceso automático." }
+  }
 }

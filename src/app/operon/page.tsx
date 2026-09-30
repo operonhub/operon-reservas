@@ -5,6 +5,7 @@ import { ChevronRight, UserPlus } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
 import { activity, relative, shortDate } from "@/lib/operon/format"
 import type { ClientRow } from "@/lib/operon/types"
+import { TONE_CLASSES, overviewSummary, type ZoneOverview } from "@/lib/operon/zone"
 import { siteUrl } from "@/lib/site-url"
 import { createClient } from "@/lib/supabase/server"
 import { cn } from "@/lib/utils"
@@ -44,8 +45,12 @@ export default async function ClientesPage({
   searchParams: Promise<{ estado?: string }>
 }) {
   const supabase = await createClient()
-  const { data, error } = await supabase.rpc("operon_clients")
+  const [{ data, error }, { data: zoneData }] = await Promise.all([
+    supabase.rpc("operon_clients"),
+    supabase.rpc("operon_zone_month_overview"),
+  ])
   if (error) notFound()
+  const zones = new Map(((zoneData ?? []) as unknown as ZoneOverview[]).map((z) => [z.organization_id, z]))
 
   const { estado } = await searchParams
   const filter: Filter = FILTERS.some((f) => f.key === estado) ? (estado as Filter) : "todos"
@@ -132,10 +137,10 @@ export default async function ClientesPage({
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] text-sm">
+            <table className="w-full min-w-[1040px] text-sm">
               <thead className="border-b bg-muted/40 text-left">
                 <tr>
-                  {["Complejo", "Dueño", "Actividad", "Unidades", "Reservas", "Configuración", "Salud", "Alta"].map(
+                  {["Complejo", "Dueño", "Actividad", "Unidades", "Reservas", "Configuración", "Salud", "Tu zona", "Alta"].map(
                     (heading) => (
                       <th
                         key={heading}
@@ -238,6 +243,10 @@ export default async function ClientesPage({
                         <Health failed={client.email_failed_30d} stuck={client.email_stuck} />
                       </td>
 
+                      <td className="px-4 py-3">
+                        <ZoneBadge summary={overviewSummary(zones.get(client.organization_id), now)} />
+                      </td>
+
                       <td className="px-4 py-3 font-mono text-xs whitespace-nowrap text-muted-foreground tabular-nums">
                         {shortDate(client.created_at)}
                       </td>
@@ -250,6 +259,14 @@ export default async function ClientesPage({
         )}
       </section>
     </>
+  )
+}
+
+function ZoneBadge({ summary }: { summary: ReturnType<typeof overviewSummary> }) {
+  return (
+    <span className={cn("label-mono rounded-md px-2 py-1 whitespace-nowrap", TONE_CLASSES[summary.tone])}>
+      {summary.label}
+    </span>
   )
 }
 

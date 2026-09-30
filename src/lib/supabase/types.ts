@@ -208,6 +208,7 @@ export type Database = {
           slug: string
           suspended_at: string | null
           updated_at: string
+          zone_month_enabled_at: string | null
         }
         Insert: {
           checklist_dismissed_at?: string | null
@@ -218,6 +219,7 @@ export type Database = {
           slug: string
           suspended_at?: string | null
           updated_at?: string
+          zone_month_enabled_at?: string | null
         }
         Update: {
           checklist_dismissed_at?: string | null
@@ -228,6 +230,7 @@ export type Database = {
           slug?: string
           suspended_at?: string | null
           updated_at?: string
+          zone_month_enabled_at?: string | null
         }
         Relationships: []
       }
@@ -753,7 +756,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      zone_month_claim: { Args: { p_allowed_zones: string[] }; Returns: Json }
+      zone_month_claim_edition: { Args: { p_month: string; p_zone: string }; Returns: Json }
+      zone_month_claim_enabled: { Args: never; Returns: Json }
       zone_month_material: {
         Args: { p_zone: string; p_month: string; p_lease: string; p_material: Json; p_model: string }
         Returns: boolean
@@ -1063,9 +1067,26 @@ export type Database = {
         Args: { p_org: string; p_reason: string; p_user: string }
         Returns: boolean
       }
+      operon_set_zone_month: {
+        Args: { p_enabled: boolean; p_org: string }
+        Returns: boolean
+      }
       operon_suspend_org: {
         Args: { p_org: string; p_reason: string }
         Returns: string
+      }
+      operon_zone_month_overview: {
+        Args: { p_org?: string }
+        Returns: {
+          enabled_at: string
+          missing_location: boolean
+          organization_id: string
+          zones: Json
+        }[]
+      }
+      operon_zone_month_queue: {
+        Args: { p_month: string; p_org: string; p_zone: string }
+        Returns: Json
       }
       org_onboarding_mark: {
         Args: { p_event: string; p_org: string }

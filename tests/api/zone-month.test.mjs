@@ -8,7 +8,7 @@ const root = fileURLToPath(new URL('../../', import.meta.url))
 const mocks = fileURLToPath(new URL('./mocks-zone/', import.meta.url))
 const alias = {'server-only': mocks+'empty.mjs', '@/lib/supabase/admin': mocks+'admin.mjs', '@/':root+'src/'}
 const jiti = createJiti(import.meta.url,{alias})
-const {runZoneMonth} = await jiti.import(root+'src/lib/zone-month/worker.ts')
+const {runZoneMonth, runZoneMonthEdition} = await jiti.import(root+'src/lib/zone-month/worker.ts')
 const {selectWithGemini} = await jiti.import(root+'src/lib/zone-month/gemini.ts')
 const routeJiti = createJiti(import.meta.url,{alias:{...alias,'@/lib/zone-month/worker':mocks+'worker.mjs'},moduleCache:false})
 const {GET} = await routeJiti.import(root+'src/app/api/cron/zone-month/route.ts')
@@ -16,9 +16,8 @@ const selection = {version:1,factIds:['ar-2026-oct-12'],commercial:'conditions',
 const good = () => Response.json({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(selection)}]}}]})
 const date = new Date('2026-09-28T12:00:00Z')
 function reset() {
-  state.jobs=[{zone:'AR:ushuaia',month:'2026-10-01',lease:'test-lease'}];state.calls=[];state.failMaterial=false;state.failFinish=false
+  state.jobs=[{zone:'AR:ushuaia',month:'2026-10-01',lease:'test-lease'}];state.calls=[];state.failMaterial=false;state.failFinish=false;state.editionRow=null
   delete process.env.GEMINI_API_KEY;delete process.env.ZONE_SOURCE_PACK_JSON;delete process.env.ZONE_GEMINI_MODEL;delete process.env.ZONE_SOURCE_HOSTS;delete process.env.ZONE_CORDOBA_FEED_ZONES
-  process.env.ZONE_MONTH_ALLOWED_ZONES='AR:ushuaia,AR:salta,AR:villa general belgrano'
 }
 
 test('cron fail-closed, sin autorización ni activación no llama worker; errores no filtran datos',async()=>{
@@ -59,7 +58,8 @@ test('payload Gemini solo zona/mes/fuentes públicas/catálogo; publicación tra
   try {
     assert.equal((await runZoneMonth(date)).published,2)
     assert.equal(requests.length,2);assert.equal(state.jobs.length,2)
-    assert.deepEqual(state.calls.find(c=>c.fn==='zone_month_claim').args.p_allowed_zones,['AR:ushuaia','AR:salta','AR:villa general belgrano'])
+    // Las zonas salen de la base: el worker no le pasa ninguna lista.
+    assert.equal(state.calls.find(c=>c.fn==='zone_month_claim_enabled').args,undefined)
     const body=JSON.parse(requests[0].options.body)
     assert.deepEqual(Object.keys(JSON.parse(body.contents[0].parts[0].text)).sort(),['catalog','month','sources','zone'])
     assert.equal(body.tools,undefined)
@@ -93,10 +93,35 @@ test('fuentes mal configuradas y fuera de ventana no llaman Gemini; fallo DB no 
   await assert.rejects(()=>runZoneMonth(date),/database/)
   assert.ok(!state.calls.some(c=>c.fn==='zone_month_finish'))
 })
-test('sin zonas autorizadas el cron falla cerrado antes de reclamar trabajo',async()=>{
-  reset();delete process.env.ZONE_MONTH_ALLOWED_ZONES
-  await assert.rejects(()=>runZoneMonth(date),/zone allowlist/)
-  assert.equal(state.calls.length,0)
+test('sin clientes habilitados el cron no llama a Gemini ni falla',async()=>{
+  reset();state.jobs=[]
+  const original=globalThis.fetch;let calls=0
+  globalThis.fetch=async()=>{calls++;return good()}
+  try {
+    assert.deepEqual(await runZoneMonth(date),{processed:0,published:0,failed:0,outsideWindow:false})
+    assert.equal(calls,0)
+    assert.deepEqual(state.calls.map(c=>c.fn),['zone_month_claim_enabled'])
+  } finally {globalThis.fetch=original}
+})
+
+test('generar ahora: una sola edición fuera de la ventana, y avisa si falló o si ya estaba en curso',async()=>{
+  const original=globalThis.fetch
+  try {
+    reset();process.env.GEMINI_API_KEY='test-only';globalThis.fetch=async()=>good()
+    const outside=new Date('2026-10-10T12:00:00Z')
+    state.jobs=[{zone:'AR:ushuaia',month:'2026-10-01',lease:'l1'},{zone:'AR:ushuaia',month:'2026-10-01',lease:'l2'}]
+    assert.deepEqual(await runZoneMonthEdition('AR:ushuaia','2026-10-01',outside),{status:'published'})
+    assert.deepEqual(state.calls[0],{fn:'zone_month_claim_edition',args:{p_zone:'AR:ushuaia',p_month:'2026-10-01'}})
+    // Una sola edición por click, aunque haya más trabajo pendiente.
+    assert.equal(state.calls.filter(c=>c.fn==='zone_month_finish').length,1)
+
+    reset();process.env.GEMINI_API_KEY='test-only';globalThis.fetch=async()=>new Response('',{status:429})
+    state.editionRow={error_code:'quota'}
+    assert.deepEqual(await runZoneMonthEdition('AR:ushuaia','2026-10-01',outside),{status:'failed',code:'quota'})
+
+    reset();state.jobs=[]
+    assert.deepEqual(await runZoneMonthEdition('AR:ushuaia','2026-10-01',outside),{status:'busy'})
+  } finally {globalThis.fetch=original;delete process.env.GEMINI_API_KEY}
 })
 
 test('proveedor truncado, IDs falsos y prosa extra se rechazan',async()=>{
