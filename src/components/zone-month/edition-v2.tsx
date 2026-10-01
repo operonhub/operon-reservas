@@ -103,9 +103,13 @@ export function EditionV2Slides({ edition, property, feedback, organizationName,
             {e.end !== e.start && <span className="text-xs text-muted-foreground">al {day(e.end)}</span>}
           </div>
           <div className="min-w-0">
-            {e.place && <p className="label-mono text-muted-foreground">{e.place}</p>}
+            <div className="flex flex-wrap items-center gap-2">
+              {e.status === "a_confirmar" && <span className="label-mono rounded-full bg-warning/25 px-2 py-0.5 text-foreground">A confirmar</span>}
+              {e.place && <p className="label-mono text-muted-foreground">{e.place}</p>}
+            </div>
             <h3 className="mt-1 font-heading text-xl font-semibold">{e.title}</h3>
             <p className="mt-2 text-sm leading-relaxed">{e.summary}</p>
+            {e.status === "a_confirmar" && <p className="mt-2 text-xs text-muted-foreground">Figura en la agenda oficial, pero no pudimos verificar que sea de este año: confirmá la fecha antes de anunciarlo.</p>}
             <p className="mt-3 rounded-xl bg-primary/10 p-3 text-sm leading-relaxed"><strong>Para tu alojamiento:</strong> {e.forHosts}</p>
             <Sources ids={e.sources} sources={edition.sources} className="mt-3" />
           </div>

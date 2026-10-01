@@ -108,6 +108,7 @@ async function processJob(db: AdminDb, job: Job, now: Date) {
       place: await zonePlace(db, job.zone),
       facts: material.facts,
       interests: await zoneInterests(db, job.zone, job.month),
+      today: now.toISOString().slice(0, 10),
     }
     const result = await researchZone(input, now)
     edition = result.edition

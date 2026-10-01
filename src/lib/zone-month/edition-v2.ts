@@ -97,7 +97,8 @@ export function normalizeEditionV2(raw: unknown, meta: EditionMeta): EditionV2 {
     if (!title || !summary || !forHosts) return null
     const id = typeof x.id === "string" && EVENT_ID.test(x.id) ? x.id : `evento-${i + 1}`
     return { id, title, start: String(x.start ?? ""), end: String(x.end ?? x.start ?? ""),
-      place: clip(x.place, LIMITS.place), summary, forHosts, sources: refs(x.sources, count) }
+      place: clip(x.place, LIMITS.place), status: x.status === "confirmado" ? "confirmado" : "a_confirmar",
+      summary, forHosts, sources: refs(x.sources, count) }
   }).filter(dated).filter((e, i, all) => all.findIndex(o => o.id === e.id) === i).slice(0, LIMITS.events)
 
   const calendar = (Array.isArray(r.calendar) ? r.calendar : []).map((raw): CalendarItem | null => {
@@ -118,6 +119,7 @@ export function normalizeEditionV2(raw: unknown, meta: EditionMeta): EditionV2 {
   }).filter((p): p is PracticalItem => p !== null).slice(0, LIMITS.practical)
 
   const eventIds = new Set(events.map(e => e.id))
+  const unconfirmed = new Set(events.filter(e => e.status !== "confirmado").map(e => e.id))
   const linked = (value: unknown) => typeof value === "string" && eventIds.has(value) ? value : null
 
   const ideas = (Array.isArray(r.ideas) ? r.ideas : []).map((raw): Idea | null => {
@@ -131,7 +133,8 @@ export function normalizeEditionV2(raw: unknown, meta: EditionMeta): EditionV2 {
     const x = item(raw)
     const text = clip(x.text, LIMITS.text, true)
     const channel = x.channel === "instagram" ? "instagram" : "whatsapp"
-    return text ? { eventId: linked(x.eventId), channel, text } : null
+    const eventId = linked(x.eventId)
+    return text && !(eventId && unconfirmed.has(eventId)) ? { eventId, channel, text } : null
   }).filter((m): m is ReadyMessage => m !== null).slice(0, LIMITS.messages)
 
   const overview = (Array.isArray(r.overview) ? r.overview : [])
@@ -194,7 +197,8 @@ export function validateEditionV2(raw: unknown, zone: string, month: string): Ed
   const ids = new Set<string>()
   for (const raw of e.events) {
     const x = obj(raw)
-    exact(x, ["id", "title", "start", "end", "place", "summary", "forHosts", "sources"])
+    exact(x, ["id", "title", "start", "end", "place", "status", "summary", "forHosts", "sources"])
+    check(x.status === "confirmado" || x.status === "a_confirmar")
     check(typeof x.id === "string" && EVENT_ID.test(x.id) && !ids.has(x.id)); ids.add(x.id as string)
     check(isPlain(x.title, LIMITS.title) && isPlain(x.summary, LIMITS.text) && isPlain(x.forHosts, LIMITS.text))
     check(x.place === null || isPlain(x.place, LIMITS.place))

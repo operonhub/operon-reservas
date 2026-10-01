@@ -63,9 +63,11 @@ export type CalendarKind = keyof typeof CALENDAR_KINDS
 
 export type Source = { url: string; title: string }
 export type PlaceScope = "localidad" | "departamento" | "provincia"
+/** "a_confirmar": figura en una agenda oficial pero no se pudo verificar el año. */
+export type EventStatus = "confirmado" | "a_confirmar"
 export type ZoneEvent = {
   id: string; title: string; start: string; end: string; place: string | null;
-  summary: string; forHosts: string; sources: number[];
+  status: EventStatus; summary: string; forHosts: string; sources: number[];
 }
 export type CalendarItem = { kind: CalendarKind; title: string; start: string; end: string; summary: string; sources: number[] }
 export type PracticalItem = { title: string; text: string; sources: number[] }

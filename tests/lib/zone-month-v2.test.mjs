@@ -20,7 +20,7 @@ const meta = {
 }
 const raw = () => ({
   headline: "Un mes con fiesta", overview: ["Primavera en la comarca."], scope: "localidad",
-  events: [{ id: "fiesta", title: "Fiesta", start: "2026-11-14", end: "2026-11-16", place: null, summary: "Feria.", forHosts: "Publicalo antes.", sources: [0] }],
+  events: [{ id: "fiesta", title: "Fiesta", start: "2026-11-14", end: "2026-11-16", place: null, status: "confirmado", summary: "Feria.", forHosts: "Publicalo antes.", sources: [0] }],
   calendar: [{ kind: "finde_largo", title: "Finde largo", start: "2026-11-21", end: "2026-11-23", summary: "Tres días.", sources: [1] }],
   practical: [], ideas: [{ title: "Paquete", text: "Dos noches.", eventId: "fiesta" }],
   messages: [{ eventId: null, channel: "whatsapp", text: "Hola desde {alojamiento}\nReservá en {link}" }],
@@ -49,6 +49,17 @@ test("se limpia lo que no corresponde: HTML, links sueltos, fechas fuera del mes
   assert.deepEqual(e.events.map(x => x.id), ["fiesta"])
   assert.equal(e.ideas[1].eventId, null)
   assert.doesNotThrow(() => v2.validateEditionV2(e, meta.zone, meta.month))
+})
+
+test("un evento sin año verificado queda a confirmar y no se promociona en mensajes", () => {
+  const r = raw()
+  r.events.push({ id: "rugby", title: "Rugby", start: "2026-11-08", end: "2026-11-12", place: null, status: "otro", summary: "x", forHosts: "y", sources: [0] })
+  r.messages.push({ eventId: "rugby", channel: "instagram", text: "Vení al rugby {link}" })
+  const e = build(r)
+  assert.equal(e.events.find(x => x.id === "rugby").status, "a_confirmar")
+  assert.equal(e.messages.length, 1)
+  assert.doesNotThrow(() => v2.validateEditionV2(e, meta.zone, meta.month))
+  assert.throws(() => v2.validateEditionV2({ ...e, events: e.events.map(x => ({ ...x, status: "quizas" })) }, meta.zone, meta.month), /invalid_output/)
 })
 
 test("los textos largos se recortan sin cortar palabras", () => {

@@ -35,8 +35,8 @@ const written = {
   overview:['Primavera plena en la comarca: días templados y mucho turismo de naturaleza.'],
   scope:'localidad',
   events:[
-    {id:'fiesta-del-chocolate',title:'Fiesta del Chocolate',start:'2026-11-14',end:'2026-11-16',place:'Villa Ventana',summary:'Tres días de feria y gastronomía.',forHosts:'Llegan familias de Bahía Blanca: conviene publicar con dos semanas de anticipación.',sources:[1]},
-    {id:'sin-fuente',title:'Evento sin fuente',start:'2026-11-20',end:'2026-11-20',place:null,summary:'x',forHosts:'y',sources:[]},
+    {id:'fiesta-del-chocolate',title:'Fiesta del Chocolate',start:'2026-11-14',end:'2026-11-16',place:'Villa Ventana',status:'confirmado',summary:'Tres días de feria y gastronomía.',forHosts:'Llegan familias de Bahía Blanca: conviene publicar con dos semanas de anticipación.',sources:[1]},
+    {id:'sin-fuente',title:'Evento sin fuente',start:'2026-11-20',end:'2026-11-20',place:null,status:'confirmado',summary:'x',forHosts:'y',sources:[]},
   ],
   calendar:[{kind:'finde_largo',title:'Fin de semana largo de la Soberanía',start:'2026-11-21',end:'2026-11-23',summary:'Tres días seguidos.',sources:[0]}],
   practical:[{title:'Obras en la ruta 76',text:'Demoras en el acceso: avisale a los huéspedes.',sources:[2]}],
@@ -103,7 +103,7 @@ test('investiga y publica: solo datos públicos al modelo, fuentes de las citas 
     // Paso 1: búsqueda web básica (citas garantizadas), localizada y con tope.
     assert.equal(step1.headers.get('x-api-key'),'test-only')
     assert.equal(step1.body.model,'claude-sonnet-5-5')
-    assert.deepEqual(step1.body.tools.map(t=>[t.type,t.max_uses,t.user_location.city,t.user_location.region]),[['web_search_20250305',8,'Villa Ventana','Buenos Aires']])
+    assert.deepEqual(step1.body.tools.map(t=>[t.type,t.max_uses,t.user_location.city,t.user_location.region]),[["web_search_20250305",10,'Villa Ventana','Buenos Aires']])
     assert.equal(step1.body.fallbacks,'default')
     const prompt=step1.body.messages[0].content
     assert.match(prompt,/Villa Ventana/);assert.match(prompt,/Tornquist/);assert.match(prompt,/noviembre de 2026/)

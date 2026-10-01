@@ -19,7 +19,7 @@ import { isSourceUrl, LIMITS, normalizeEditionV2, validateEditionV2 } from "./ed
  */
 
 export const DEFAULT_MODEL = "claude-sonnet-5-5"
-const MAX_SEARCHES = 8
+const MAX_SEARCHES = 10
 const RESEARCH_TIMEOUT_MS = 180_000
 const WRITE_TIMEOUT_MS = 90_000
 
@@ -35,6 +35,8 @@ export type ResearchInput = {
   place: { locality: string; department: string | null; province: string | null }
   facts: Fact[]
   interests: Partial<Record<InterestId, number>>
+  /** AAAA-MM-DD: para que el modelo juzgue qué información es reciente. */
+  today: string
 }
 
 export type Dossier = { text: string; sources: Source[]; searches: number }
@@ -74,7 +76,10 @@ const RESEARCH_SYSTEM = `Sos investigador de turismo para dueños de alojamiento
 
 Reglas:
 - Informá solo lo que respaldan los resultados de búsqueda. Si no encontrás algo, decilo ("No encontré agenda publicada para…"). Nunca completes con suposiciones.
-- Toda fecha tiene que ser exacta (día y mes). Si una fuente no da la fecha exacta, aclaralo.
+- Toda fecha tiene que ser exacta (día, mes y año). Si una fuente no da la fecha exacta, aclaralo.
+- Cuidado con las agendas que agrupan eventos bajo títulos de mes ("Octubre", "Noviembre"): no asumas que todo lo de la página es del mes que buscás. Confirmá cada evento con su propia búsqueda (nombre del evento, localidad y año) y descartá el que no puedas confirmar en el mes y el año pedidos.
+- Fijate el año: una página puede ser de la edición anterior. Si no queda claro que la fecha es de este año, no la des por confirmada.
+- Información práctica (rutas, obras, transporte, servicios): solo novedades publicadas en el último mes o que anuncien algo para el mes pedido. Descartá reportes viejos.
 - Priorizá fuentes oficiales (municipio, secretaría o ente de turismo provincial, argentina.gob.ar) y medios locales. Descartá resultados de lugares con el mismo nombre en otra provincia.
 - Si del pueblo hay poca información, ampliá al departamento o partido, y si hace falta a la provincia; decí explícitamente a qué nivel corresponde cada dato.
 - No inventes precios, ocupación ni estadísticas.
@@ -88,10 +93,11 @@ function researchPrompt(input: ResearchInput) {
 ${placeLine(input.place)}
 País: Argentina
 Mes: ${monthLabel(input.month)} (${monthRange(input.month)})
+Hoy es ${input.today}.
 
 ${facts.length ? `Fechas ya confirmadas por fuentes oficiales (no hace falta buscarlas):\n${facts.join("\n")}\n\n` : ""}${interests.length ? `Los dueños de la zona pidieron profundizar en: ${interests.join(", ")}.\n\n` : ""}Buscá en la web y escribí un dossier con estas secciones:
 
-1. Panorama del mes: qué temporada es, clima típico, qué buscan los turistas que llegan en esa época.
+1. Panorama del mes: qué temporada es, clima típico (temperaturas promedio y lluvias de ese mes en la zona) y qué buscan los turistas que llegan en esa época.
 2. Agenda: fiestas, festivales, eventos deportivos, culturales o religiosos del mes en la localidad y alrededores, con fecha exacta y lugar.
 3. Calendario: feriados y fines de semana largos del mes en Argentina, y vacaciones escolares de las provincias desde donde suelen llegar turistas a este destino, si caen en el mes.
 4. Información práctica: estado de rutas y accesos, obras, transporte, servicios o cambios que afecten al turista ese mes.
@@ -182,7 +188,11 @@ Reglas:
 - Los números entre corchetes [n] del dossier identifican fuentes. Todo evento, fecha del calendario o dato práctico lleva en "sources" los números [n] de las frases de donde sale. Si un dato no tiene número, no lo incluyas.
 - Fechas en formato AAAA-MM-DD. Si el dossier no da el día exacto, no lo pongas en events ni en calendar.
 - "scope": "localidad" si la mayoría de los datos son del pueblo; "departamento" o "provincia" si hubo que ampliar.
-- "headline": una frase que resuma el mes para el alojamiento. "overview": 2 o 3 párrafos cortos (temporada, clima, qué busca el turista, a qué nivel se encontró información).
+- "headline": una frase que resuma el mes para el alojamiento. "overview": 2 o 3 párrafos cortos sobre el destino ese mes: temporada, clima, qué busca el turista y qué fechas concentran el movimiento.
+- El panorama habla del destino, no de la investigación: no escribas "no se encontró", "según lo encontrado" ni menciones informes, sitios o fuentes. Si falta un dato, omitilo. Solo si "scope" no es "localidad", agregá una oración breve aclarando que parte de la información es del departamento o la provincia.
+- "status" de cada evento: "confirmado" si el dossier lo da por confirmado con fecha y año; "a_confirmar" si figura en una agenda oficial (municipio o ente de turismo) pero no se pudo verificar el año. Si el dossier dice que es de otro mes o de otro año, no lo incluyas.
+- No menciones en el panorama eventos que no estén en "events".
+- Los mensajes solo pueden promocionar eventos "confirmado".
 - "forHosts" de cada evento: qué significa para un alojamiento (qué público llega, qué preparar, cuándo publicarlo).
 - "ideas": 3 a 5 acciones concretas para el alojamiento ese mes (estadía mínima, paquetes, horarios, comunicación con huéspedes anteriores), con "eventId" cuando se ligan a un evento.
 - "messages": 2 a 4 textos breves listos para mandar por WhatsApp o publicar en Instagram, en primera persona del alojamiento. Usá {alojamiento} para el nombre y {link} para el link de reservas. Sin emojis de más.
@@ -200,10 +210,11 @@ const WRITE_SCHEMA = {
     scope: { type: "string", enum: ["localidad", "departamento", "provincia"] },
     events: { type: "array", items: {
       type: "object", additionalProperties: false,
-      required: ["id", "title", "start", "end", "place", "summary", "forHosts", "sources"],
+      required: ["id", "title", "start", "end", "place", "status", "summary", "forHosts", "sources"],
       properties: {
         id: { type: "string", description: "minúsculas y guiones, por ejemplo fiesta-del-chocolate" },
         title: { type: "string" }, start: { type: "string" }, end: { type: "string" },
+        status: { type: "string", enum: ["confirmado", "a_confirmar"] },
         place: nullableString, summary: { type: "string" }, forHosts: { type: "string" }, sources: sourceList,
       },
     } },

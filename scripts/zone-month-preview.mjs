@@ -37,7 +37,7 @@ const now = new Date()
 const facts = collectMaterial(pack, zone, month, now, ["www.argentina.travel", "www.argentina.gob.ar", "prensa.jujuy.gob.ar"]).facts
 const started = Date.now()
 const { edition, dossier, usage, model } = await researchZone({
-  zone, month, facts, interests: {},
+  zone, month, facts, interests: {}, today: now.toISOString().slice(0, 10),
   place: { locality, department: department || null, province: province || null },
 }, now)
 

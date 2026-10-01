@@ -124,7 +124,7 @@ export async function propertyMonth(db: Db, organizationId: string, edition: Edi
 
   // Fechas clave: eventos y calendario, sin repetir el mismo rango.
   const candidates = [
-    ...edition.events.map(e => ({ key: e.id, title: e.title, label: "Evento", start: e.start, end: e.end })),
+    ...edition.events.map(e => ({ key: e.id, title: e.title, label: e.status === "confirmado" ? "Evento" : "Evento a confirmar", start: e.start, end: e.end })),
     ...edition.calendar.map((c, i) => ({ key: `cal-${i}`, title: c.title, label: CALENDAR_KINDS[c.kind], start: c.start, end: c.end })),
   ]
   const seen = new Set<string>()
