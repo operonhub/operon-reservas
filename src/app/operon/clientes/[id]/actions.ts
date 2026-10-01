@@ -7,6 +7,8 @@ import { siteUrl } from "@/lib/site-url"
 import { ERRORS as ZONE_ERRORS } from "@/lib/zone-month/content"
 import { isZoneMonthEnabled } from "@/lib/zone-month/flag"
 import { runZoneMonthEdition } from "@/lib/zone-month/worker"
+import { fetchPublicHtml, type FetchFailure } from "@/lib/operon/safe-fetch"
+import { analyzeWidget, normalizeWebsiteUrl, type WebsiteStatus } from "@/lib/operon/website"
 
 /**
  * Acciones de la ficha de un cliente. Todas pasan por RPC con la sesión del
@@ -183,4 +185,68 @@ export async function generateZoneMonth(_prev: ZoneMonthState, formData: FormDat
     refresh(orgId)
     return { ok: true, message: "Quedó en cola: no se pudo generar ahora y lo reintenta el proceso automático." }
   }
+}
+
+// ---------- Web del cliente (0038) ----------
+
+export type WebsiteState = { ok?: boolean; message?: string; error?: string } | null
+
+const WEBSITE_MESSAGES: Record<string, string> = {
+  ...MESSAGES,
+  INVALID_URL: "Esa dirección no es válida. Probá con algo como https://sucomplejo.com.ar",
+  NO_WEBSITE: "Primero cargá la dirección de la web.",
+}
+
+function toWebsiteError(message: string | undefined) {
+  const code = rpcErrorCode(message, Object.keys(WEBSITE_MESSAGES))
+  return code ? WEBSITE_MESSAGES[code] : "No se pudo completar. Probá de nuevo."
+}
+
+const FETCH_NOTES: Record<FetchFailure, string> = {
+  invalid: "La dirección no es válida.",
+  blocked: "Esa dirección no se puede leer desde el servidor.",
+  unreachable: "La página no respondió o dio un error.",
+  not_html: "La dirección no devuelve una página web.",
+  too_many_redirects: "La dirección redirige demasiadas veces.",
+}
+
+/** Guarda (o borra, si va vacía) la dirección de la web donde está el widget. */
+export async function saveWebsite(_prev: WebsiteState, formData: FormData): Promise<WebsiteState> {
+  const supabase = await operonClient()
+  if (!supabase) return { error: "No disponible en la demo." }
+  const orgId = field(formData, "org")
+  const raw = field(formData, "url")
+  const url = raw === "" ? null : normalizeWebsiteUrl(raw)
+  if (raw !== "" && !url) return { error: WEBSITE_MESSAGES.INVALID_URL }
+
+  const { error } = await supabase.rpc("operon_set_website", { p_org: orgId, p_url: url })
+  if (error) return { error: toWebsiteError(error.message) }
+  refresh(orgId)
+  return { ok: true, message: url ? "Web guardada. Verificala para ver si el widget está conectado." : "Se quitó la web." }
+}
+
+/**
+ * Lee la página y busca el widget de ESTE complejo. Guarda solo el estado: el
+ * contenido de la página no se conserva ni se devuelve.
+ */
+export async function verifyWebsite(_prev: WebsiteState, formData: FormData): Promise<WebsiteState> {
+  const supabase = await operonClient()
+  if (!supabase) return { error: "No disponible en la demo." }
+  const orgId = field(formData, "org")
+
+  const { data: org } = await supabase.from("organizations").select("slug, website_url").eq("id", orgId).maybeSingle()
+  if (!org) return { error: WEBSITE_MESSAGES.ORG_NOT_FOUND }
+  if (!org.website_url) return { error: WEBSITE_MESSAGES.NO_WEBSITE }
+
+  const page = await fetchPublicHtml(org.website_url)
+  const result: { status: WebsiteStatus; note: string | null } = page.ok
+    ? analyzeWidget(page.html, org.slug)
+    : { status: "unreachable", note: FETCH_NOTES[page.reason] }
+
+  const { error } = await supabase.rpc("operon_record_website_check", { p_org: orgId, p_status: result.status, p_note: result.note })
+  if (error) return { error: toWebsiteError(error.message) }
+  refresh(orgId)
+  return result.status === "connected"
+    ? { ok: true, message: "Listo: el widget está conectado a este complejo." }
+    : { ok: true, message: "Verificada. Mirá el estado y la nota debajo." }
 }

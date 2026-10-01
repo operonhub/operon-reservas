@@ -1,0 +1,306 @@
+<!--
+  ============================================================
+  WIDGET DE RESERVAS — Operon Reservas (reutilizable)
+  ============================================================
+  Se probó primero en Cabañas La Ponderosa (index.html) y funciona
+  contra el MISMO backend central multi-tenant para CUALQUIER cabaña.
+
+  CÓMO USARLO EN UNA LANDING NUEVA:
+  1) Dar de alta el tenant primero con provision-tenant.sql
+  2) Pegar este bloque completo (style + html + script) dentro de la
+     sección "Reservá" de la landing, reemplazando el formulario de
+     WhatsApp-only que arma normalmente el skill web-hustler.
+  3) Cambiar SOLO 2 líneas en el bloque CONFIG de más abajo:
+       ORG_SLUG   → el slug que le pusiste al negocio en organizations
+       WA_NUMBER  → WhatsApp del negocio, formato 549XXXXXXXXXX (sin +)
+     El resto del CONFIG (Supabase URL/key, RESERVAS_APP) es SIEMPRE
+     el mismo: es el backend central, no cambia por cliente.
+  4) (Opcional) Sobreescribir la paleta: agregar DESPUÉS de este bloque
+     un <style> con las variables --bkw-* para que combine con los
+     colores de la demo (ver sección "PALETA" más abajo).
+  5) Probar: buscar disponibilidad → reservar → ver que aparezca el
+     desglose de seña → si mpEnabled, que el botón de pagar redirija a
+     Mercado Pago de verdad.
+  ============================================================
+-->
+
+<style>
+  /* ---------- PALETA: sobreescribir estas variables después de este
+     bloque para adaptar el widget a la identidad de cada cliente.
+     Los valores de acá son solo el default si no se pisan. ---------- */
+  .bkw{
+    --bkw-primary:#2E4034;     /* botones principales, precios */
+    --bkw-accent:#C46A2E;      /* acentos, seña destacada */
+    --bkw-bg:#F1ECE3;          /* fondo de los inputs */
+    --bkw-bg-2:#E7E0D3;        /* fondo de tarjetas secundarias */
+    --bkw-text:#221E19;
+    --bkw-text-soft:#5c5348;
+    --bkw-white:#FBFAF6;
+    --bkw-line:rgba(0,0,0,.14);   /* bordes: en demos oscuras pasar a rgba(255,255,255,.16) */
+    --bkw-radius:16px;
+    --bkw-font-display:Georgia, 'Times New Roman', serif;
+    --bkw-font-body:system-ui, -apple-system, sans-serif;
+  }
+
+  .bkw{font-family:var(--bkw-font-body);color:var(--bkw-text)}
+  .bkw *{box-sizing:border-box}
+  .bkw h3{font-family:var(--bkw-font-display);font-size:1.35rem;margin-bottom:4px}
+  .bkw .mini{color:var(--bkw-text-soft);font-size:.88rem;margin-bottom:16px}
+  .bkw .field{margin-bottom:14px}
+  .bkw .field label{display:block;font-size:.8rem;font-weight:700;margin-bottom:5px}
+  .bkw .field input,.bkw .field select,.bkw .field textarea{width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--bkw-line);font-family:inherit;font-size:.94rem;background:var(--bkw-bg);color:var(--bkw-text)}
+  .bkw .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .bkw .btn-primary{width:100%;justify-content:center;display:flex;align-items:center;gap:8px;background:var(--bkw-primary);color:var(--bkw-white);border:none;border-radius:100px;padding:14px;font-weight:700;font-size:.95rem;cursor:pointer;transition:transform .2s}
+  .bkw .btn-primary:hover{transform:translateY(-2px)}
+  .bkw .btn-primary:disabled{opacity:.6;cursor:default;transform:none}
+  .bkw .btn-wa{width:100%;justify-content:center;display:flex;align-items:center;gap:8px;background:#25D366;color:#0b3d24;border:none;border-radius:100px;padding:14px;font-weight:700;font-size:.95rem;cursor:pointer;text-decoration:none}
+  .bkw .bk-back{background:none;border:none;color:var(--bkw-text-soft);font-size:.85rem;font-weight:600;cursor:pointer;padding:0;margin-bottom:14px}
+  .bkw .bk-summary{background:var(--bkw-bg-2);border-radius:11px;padding:12px 15px;font-size:.9rem;margin-bottom:16px}
+  .bkw .bk-summary b{font-family:var(--bkw-font-display)}
+  .bkw .bk-unit{display:flex;justify-content:space-between;align-items:center;gap:14px;border:1.5px solid var(--bkw-line);border-radius:13px;padding:15px;margin-bottom:11px;transition:border-color .2s}
+  .bkw .bk-unit:hover{border-color:var(--bkw-accent)}
+  .bkw .bk-unit h4{font-family:var(--bkw-font-display);font-size:1.05rem;margin-bottom:2px}
+  .bkw .bk-unit small{color:var(--bkw-text-soft);font-size:.82rem;display:block}
+  .bkw .bk-unit .price{font-family:var(--bkw-font-display);font-weight:700;color:var(--bkw-primary);font-size:1.1rem;white-space:nowrap}
+  .bkw .bk-unit .btn-primary{padding:9px 16px;font-size:.83rem;width:auto;margin-top:6px}
+  .bkw .bk-empty{text-align:center;color:var(--bkw-text-soft);font-size:.9rem;padding:18px;border:1.5px dashed var(--bkw-line);border-radius:12px}
+  .bkw .bk-done{text-align:center;padding:6px 0}
+  .bkw .bk-done .ok{width:52px;height:52px;border-radius:50%;background:var(--bkw-bg-2);color:var(--bkw-primary);display:grid;place-items:center;margin:0 auto 10px}
+  .bkw .bk-done .ok svg{width:26px;height:26px}
+  .bkw .bk-code{font-family:var(--bkw-font-display);font-size:1.5rem;font-weight:700;background:var(--bkw-bg-2);border-radius:11px;padding:9px 18px;display:inline-block;margin:8px 0;letter-spacing:.03em}
+  .bkw .bk-price{background:var(--bkw-bg-2);border-radius:11px;padding:12px 16px;margin:12px 0 0;text-align:left;font-size:.87rem}
+  .bkw .bk-price div{display:flex;justify-content:space-between;gap:14px;padding:3px 0}
+  .bkw .bk-price dt{color:var(--bkw-text-soft)}
+  .bkw .bk-price dd{font-weight:700;font-family:var(--bkw-font-display)}
+  .bkw .bk-msg{font-size:.85rem;margin-top:10px;min-height:1em}
+  .bkw .bk-msg.err{color:#b3402e}
+  .bkw .bk-spin{opacity:.7;pointer-events:none}
+</style>
+
+<div class="bkw" id="bkw-root">
+
+  <!-- ===== Reserva online (motor central Operon) — único canal ===== -->
+  <div id="bkw-panel-online">
+    <div id="bkw-step-search">
+      <h3>Reservá online</h3>
+      <p class="mini">Disponibilidad en tiempo real — reservá al instante, sin esperar respuesta.</p>
+      <div class="field-row">
+        <div class="field"><label for="bkw-in">Llegada</label><input id="bkw-in" type="date"></div>
+        <div class="field"><label for="bkw-out">Salida</label><input id="bkw-out" type="date"></div>
+      </div>
+      <div class="field"><label for="bkw-pax">Huéspedes</label>
+        <select id="bkw-pax">
+          <option value="1">1 persona</option><option value="2" selected>2 personas</option>
+          <option value="3">3 personas</option><option value="4">4 personas</option>
+          <option value="5">5 personas</option><option value="6">6 personas</option>
+        </select>
+      </div>
+      <button class="btn-primary" id="bkw-search" type="button">Ver disponibilidad</button>
+    </div>
+    <div id="bkw-step-results" style="display:none"></div>
+    <div id="bkw-step-form" style="display:none"></div>
+    <div id="bkw-step-done" style="display:none"></div>
+    <p class="bk-msg" id="bkw-msg"></p>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ============================================================
+  // CONFIG — Lo único que cambia por cliente son ORG_SLUG y WA_NUMBER.
+  // El resto es el backend central de Operon Reservas: es SIEMPRE igual.
+  // ============================================================
+  var CONFIG = {
+    ORG_SLUG:     'CAMBIAR-por-el-slug-del-cliente',   // <<< cambiar
+    WA_NUMBER:    '549XXXXXXXXXX',                      // <<< cambiar (sin +, sin espacios)
+    SUPA_URL:     'https://guoxthaxwdsgwcsnvefq.supabase.co',
+    SUPA_KEY:     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1b3h0aGF4d2RzZ3djc252ZWZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0MDc1MjAsImV4cCI6MjEwMTk4MzUyMH0.s9MrKfQTs1KyzkY6esVZdxm6OwMUNt4y43ZjbgoEDsc',
+    RESERVAS_APP: 'https://www.operonreservas.com'
+  };
+
+  var ORG = CONFIG.ORG_SLUG, WA_NUM = CONFIG.WA_NUMBER;
+  var mpEnabled = false;
+  var depositPct = 0;
+
+  var $ = function(id){ return document.getElementById(id); };
+  function rpc(fn, body){
+    return fetch(CONFIG.SUPA_URL + '/rest/v1/rpc/' + fn, {
+      method:'POST',
+      headers:{ 'apikey':CONFIG.SUPA_KEY, 'Authorization':'Bearer '+CONFIG.SUPA_KEY, 'Content-Type':'application/json' },
+      body: JSON.stringify(body)
+    }).then(function(r){
+      return r.json().then(function(d){ if(!r.ok) throw new Error((d && d.message) || 'Error'); return d; });
+    });
+  }
+  function money(n){ return '$ ' + Number(n).toLocaleString('es-AR', {maximumFractionDigits:0}); }
+  function iso(d){ var z=new Date(d.getTime()-d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10); }
+  function addDays(s,n){ var d=new Date(s+'T00:00:00'); d.setDate(d.getDate()+n); return iso(d); }
+  function nights(a,b){ return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000); }
+
+  var state = { in:'', out:'', pax:2, unit:null };
+
+  // ----- Fechas por defecto -----
+  var today = iso(new Date());
+  $('bkw-in').min = today; $('bkw-out').min = addDays(today,1);
+  $('bkw-in').value = addDays(today,14); $('bkw-out').value = addDays(today,16);
+  $('bkw-in').addEventListener('change', function(){ $('bkw-out').min = addDays($('bkw-in').value||today, 1); });
+
+  var steps = { search:$('bkw-step-search'), results:$('bkw-step-results'), form:$('bkw-step-form'), done:$('bkw-step-done') };
+  function show(step){ for(var k in steps){ steps[k].style.display = (k===step)?'':'none'; } }
+  var msg = $('bkw-msg');
+  function say(text, cls){ msg.textContent = text||''; msg.className = 'bk-msg' + (cls?(' '+cls):''); }
+
+  // ----- Se resuelven una vez al cargar -----
+  var mpStatusReady = rpc('mp_public_status', { p_org_slug: ORG })
+    .then(function(r){ mpEnabled = !!(r && r.enabled); })
+    .catch(function(){ mpEnabled = false; });
+
+  var propertyReady = rpc('public_property', { p_org_slug: ORG, p_property_slug: null })
+    .then(function(p){ depositPct = (p && Number(p.deposit_pct)) || 0; })
+    .catch(function(){ depositPct = 0; });
+
+  // ----- Buscar disponibilidad -----
+  $('bkw-search').addEventListener('click', function(){
+    var ci=$('bkw-in').value, co=$('bkw-out').value, pax=parseInt($('bkw-pax').value,10)||1;
+    say('');
+    if(!ci || !co){ say('Elegí las fechas de llegada y salida.', 'err'); return; }
+    if(co <= ci){ say('La salida tiene que ser posterior a la llegada.', 'err'); return; }
+    state.in=ci; state.out=co; state.pax=pax;
+    this.classList.add('bk-spin'); this.textContent='Buscando…';
+    var btn=this;
+    Promise.all([
+      rpc('public_availability', { p_org_slug:ORG, p_property_slug:null, p_check_in:ci, p_check_out:co, p_guests:pax }),
+      propertyReady
+    ]).then(function(r){ renderResults(r[0]||[]); })
+      .catch(function(){ say('No pudimos consultar la disponibilidad. Probá de nuevo.', 'err'); })
+      .then(function(){ btn.classList.remove('bk-spin'); btn.textContent='Ver disponibilidad'; });
+  });
+
+  function renderResults(units){
+    var n = nights(state.in, state.out);
+    var html = '<button class="bk-back" id="bkw-back1">&larr; Cambiar fechas</button>'
+      + '<div class="bk-summary">'+state.in+' &rarr; '+state.out+' · <b>'+n+' noche'+(n>1?'s':'')+'</b> · '+state.pax+' huésped'+(state.pax>1?'es':'')+'</div>';
+    if(!units.length){
+      html += '<div class="bk-empty">No hay unidades disponibles para esas fechas. Probá con otras o escribinos por WhatsApp.</div>';
+    } else {
+      units.forEach(function(u){
+        var total = Number(u.price_per_night) * n;
+        var deposit = depositPct > 0 ? Math.round(total * depositPct / 100) : null;
+        html += '<div class="bk-unit">'
+          + '<div><h4>'+u.name+'</h4><small>Hasta '+u.capacity+' huéspedes · '+money(u.price_per_night)+'/noche</small></div>'
+          + '<div style="text-align:right"><div class="price">'+money(total)+'</div>'
+          + (deposit!=null ? '<small>Seña ('+depositPct+'%): '+money(deposit)+'</small>' : '')
+          + '<button class="btn-primary" data-unit="'+u.unit_id+'" data-name="'+encodeURIComponent(u.name)+'" data-total="'+total+'">Reservar</button></div>'
+          + '</div>';
+      });
+    }
+    steps.results.innerHTML = html; show('results');
+    $('bkw-back1').addEventListener('click', function(){ show('search'); say(''); });
+    Array.prototype.forEach.call(steps.results.querySelectorAll('button[data-unit]'), function(b){
+      b.addEventListener('click', function(){
+        state.unit = { id:b.getAttribute('data-unit'), name:decodeURIComponent(b.getAttribute('data-name')), total:b.getAttribute('data-total') };
+        renderForm();
+      });
+    });
+  }
+
+  function renderForm(){
+    var n = nights(state.in, state.out);
+    steps.form.innerHTML = '<button class="bk-back" id="bkw-back2">&larr; Ver otras unidades</button>'
+      + '<div class="bk-summary"><b>'+state.unit.name+'</b> · '+state.in+' &rarr; '+state.out+' · '+n+' noche'+(n>1?'s':'')+' · <b>'+money(state.unit.total)+'</b></div>'
+      + '<div class="field"><label for="bkw-name">Nombre y apellido</label><input id="bkw-name" type="text" placeholder="Tu nombre" required></div>'
+      + '<div class="field-row"><div class="field"><label for="bkw-email">Email</label><input id="bkw-email" type="email" placeholder="tu@mail.com"></div>'
+      + '<div class="field"><label for="bkw-phone">Teléfono / WhatsApp</label><input id="bkw-phone" type="text" placeholder="+54 9…"></div></div>'
+      + '<div class="field"><label for="bkw-notes">Comentarios (opcional)</label><textarea id="bkw-notes" placeholder="Llegada aproximada, mascota, etc."></textarea></div>'
+      + '<button class="btn-primary" id="bkw-confirm" type="button">Confirmar reserva</button>'
+      + '<p class="mini" style="text-align:center;margin-top:10px">La disponibilidad se vuelve a validar al confirmar.</p>';
+    show('form'); say('');
+    $('bkw-back2').addEventListener('click', function(){ show('results'); say(''); });
+    $('bkw-confirm').addEventListener('click', doBooking);
+  }
+
+  function doBooking(){
+    var name=$('bkw-name').value.trim();
+    if(!name){ say('Ingresá tu nombre.', 'err'); return; }
+    var btn=$('bkw-confirm'); btn.classList.add('bk-spin'); btn.textContent='Confirmando…';
+    rpc('create_public_reservation', {
+      p_org_slug:ORG, p_property_slug:null, p_unit_id:state.unit.id,
+      p_check_in:state.in, p_check_out:state.out, p_guests:state.pax,
+      p_full_name:name, p_email:$('bkw-email').value.trim()||null,
+      p_phone:$('bkw-phone').value.trim()||null, p_notes:$('bkw-notes').value.trim()||null
+    }).then(function(res){
+      return mpStatusReady.then(function(){ renderDone(res); });
+    }).catch(function(e){
+      var m = (''+e.message).indexOf('UNAVAILABLE')>=0
+        ? 'Esa unidad se acaba de reservar para esas fechas. Probá con otra.'
+        : 'No se pudo generar la reserva. Probá de nuevo o escribinos por WhatsApp.';
+      say(m, 'err');
+    }).then(function(){ btn.classList.remove('bk-spin'); btn.textContent='Confirmar reserva'; });
+  }
+
+  function renderDone(res){
+    var code = res && res.code;
+    var total = res && res.total_amount;
+    var deposit = res && res.deposit_amount;
+    var wa = 'https://wa.me/'+WA_NUM+'?text='+encodeURIComponent('¡Hola! Acabo de reservar online.'+(code?(' Mi código es '+code+'.'):'')+' Quería confirmar los detalles.');
+
+    var priceHtml = '';
+    if(total != null || deposit != null){
+      priceHtml += '<dl class="bk-price">';
+      if(total != null) priceHtml += '<div><dt>Total</dt><dd>'+money(total)+'</dd></div>';
+      if(deposit != null) priceHtml += '<div><dt>Seña a pagar ahora</dt><dd>'+money(deposit)+'</dd></div>';
+      if(total != null && deposit != null) priceHtml += '<div><dt>Saldo (en el alojamiento)</dt><dd>'+money(total-deposit)+'</dd></div>';
+      priceHtml += '</dl>';
+    }
+
+    var introHtml = mpEnabled
+      ? '<p class="mini">Pagá la seña para confirmarla al instante — el resto se abona al llegar.</p>'
+      : '<p class="mini">Guardá tu código. Te vamos a contactar para confirmar la seña y los detalles.</p>';
+
+    var payHtml = mpEnabled
+      ? '<button class="btn-primary" id="bkw-pay" type="button" style="margin-top:14px">Pagar seña con Mercado Pago</button>'
+      : '';
+
+    steps.done.innerHTML = '<div class="bk-done">'
+      + '<div class="ok"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
+      + '<h3>¡Reserva generada!</h3>'
+      + introHtml
+      + (code ? '<div class="bk-code">'+code+'</div>' : '')
+      + '<p class="mini">'+state.unit.name+' · '+state.in+' &rarr; '+state.out+'</p>'
+      + priceHtml
+      + payHtml
+      + '<a class="btn-wa" style="margin-top:10px;text-decoration:none" href="'+wa+'" target="_blank" rel="noopener">Avisar por WhatsApp</a>'
+      + '<button class="bk-back" id="bkw-again" style="margin-top:14px">Hacer otra reserva</button>'
+      + '</div>';
+    show('done'); say('');
+    $('bkw-again').addEventListener('click', function(){ state.unit=null; show('search'); });
+
+    if(mpEnabled && code){
+      var payBtn = $('bkw-pay');
+      payBtn.addEventListener('click', function(){
+        payBtn.disabled = true; payBtn.textContent = 'Redirigiendo a Mercado Pago…';
+        fetch(CONFIG.RESERVAS_APP + '/api/mp/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: code, orgSlug: ORG })
+        }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
+          .then(function(res){
+            if(res.ok && res.data && res.data.init_point){
+              window.location.href = res.data.init_point;
+            } else {
+              payBtn.disabled = false; payBtn.textContent = 'Pagar seña con Mercado Pago';
+              say('No pudimos iniciar el pago. Probá de nuevo o escribinos por WhatsApp.', 'err');
+            }
+          })
+          .catch(function(){
+            payBtn.disabled = false; payBtn.textContent = 'Pagar seña con Mercado Pago';
+            say('No pudimos iniciar el pago. Probá de nuevo o escribinos por WhatsApp.', 'err');
+          });
+      });
+    }
+  }
+
+})();
+</script>

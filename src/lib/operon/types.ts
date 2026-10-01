@@ -45,6 +45,10 @@ export type ClientDetail = {
     suspension: { at: string; reason: string | null; actor_email: string | null } | null
     link_shared_at: string | null
     checklist_dismissed_at: string | null
+    website_url: string | null
+    website_status: string | null
+    website_note: string | null
+    website_checked_at: string | null
   }
   members: ClientMember[]
   properties: {
@@ -116,6 +120,8 @@ export const ACTION_LABELS: Record<string, string> = {
   "zone_month.enable": "Activó Tu zona",
   "zone_month.disable": "Desactivó Tu zona",
   "zone_month.queue": "Pidió generar Tu zona",
+  "website.set": "Cargó la web del cliente",
+  "website.check": "Verificó la web del cliente",
 }
 
 export const ROLE_LABELS: Record<ClientMember["role"], string> = {

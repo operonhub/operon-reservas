@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
@@ -17,6 +19,8 @@ import { MpBadge } from "../../badges"
 import { MemberActions } from "./member-actions"
 import { OrgStatusAction } from "./org-actions"
 import { ZoneMonthCard } from "./zone-month-card"
+import { WebsiteCard } from "./website-card"
+import { buildSnippet } from "@/lib/operon/website"
 import type { ZoneOverview } from "@/lib/operon/zone"
 import { SOURCE_LABELS, STATE_LABELS, icalErrorLabel, isIcalProblem, type IcalStatusRow } from "@/lib/operon/ical"
 import { isZoneMonthEnabled } from "@/lib/zone-month/flag"
@@ -36,6 +40,11 @@ function currentTime() {
   return Date.now()
 }
 
+/** La plantilla del widget vive en el repo (una sola copia): src/lib/widget/booking-widget.html. */
+function widgetTemplate() {
+  return readFileSync(join(process.cwd(), "src", "lib", "widget", "booking-widget.html"), "utf8")
+}
+
 /** Mes actual y próximo en UTC, igual que las RPC de Tu zona. */
 function zoneMonths(now: number) {
   const d = new Date(now)
@@ -48,11 +57,12 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
   if (!UUID.test(id)) notFound()
 
   const supabase = await createClient()
-  const [{ data, error }, { data: logData }, { data: zoneData }, { data: icalData }] = await Promise.all([
+  const [{ data, error }, { data: logData }, { data: zoneData }, { data: icalData }, { data: contact }] = await Promise.all([
     supabase.rpc("operon_client_detail", { p_org: id }),
     supabase.rpc("operon_audit_log", { p_org: id, p_limit: 20 }),
     supabase.rpc("operon_zone_month_overview", { p_org: id }),
     supabase.rpc("operon_ical_overview", { p_org: id }),
+    supabase.from("properties").select("whatsapp").eq("organization_id", id).order("created_at").limit(1).maybeSingle(),
   ])
   if (error || !data) notFound()
 
@@ -66,10 +76,12 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
   const suspended = Boolean(d.org.suspended_at)
 
   const units = d.units.filter((u) => u.is_active)
+  const widget = buildSnippet(widgetTemplate(), { slug: d.org.slug, whatsapp: contact?.whatsapp })
   const setup = [
     { label: "Seña configurada", done: d.properties.some((p) => p.deposit_configured) },
     { label: "Mercado Pago conectado", done: d.mercadopago.connected },
     { label: "Compartió su link de reservas", done: Boolean(d.org.link_shared_at) },
+    { label: "Su web tiene el widget conectado", done: d.org.website_status === "connected", optional: true },
     { label: "Fotos en todas las unidades", done: units.length > 0 && units.every((u) => u.has_photo) },
     { label: "Datos de contacto cargados", done: d.properties.some((p) => p.has_contact) },
     {
@@ -229,6 +241,21 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
         <Section title="Salud">
           <EmailHealth health={d.email_health} now={now} />
           <CalendarHealth rows={calendars} now={now} />
+        </Section>
+
+        <Section title="Web del cliente" className="lg:col-span-3">
+          <WebsiteCard
+            orgId={d.org.id}
+            slug={d.org.slug}
+            url={d.org.website_url}
+            status={d.org.website_status}
+            note={d.org.website_note}
+            checkedAt={d.org.website_checked_at}
+            snippet={widget.code}
+            whatsappOk={widget.whatsappOk}
+            suspended={suspended}
+            now={now}
+          />
         </Section>
 
         <Section title={ZONE_MONTH_LABEL} className="lg:col-span-3">

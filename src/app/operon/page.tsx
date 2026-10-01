@@ -7,6 +7,7 @@ import { activity, relative, shortDate } from "@/lib/operon/format"
 import type { ClientRow } from "@/lib/operon/types"
 import { TONE_CLASSES, overviewSummary, type ZoneOverview } from "@/lib/operon/zone"
 import { isIcalProblem, type IcalStatusRow } from "@/lib/operon/ical"
+import { WEBSITE_STATUS, type WebsiteStatus } from "@/lib/operon/website"
 import { siteUrl } from "@/lib/site-url"
 import { createClient } from "@/lib/supabase/server"
 import { cn } from "@/lib/utils"
@@ -44,12 +45,14 @@ export default async function ClientesPage({
   searchParams: Promise<{ estado?: string }>
 }) {
   const supabase = await createClient()
-  const [{ data, error }, { data: zoneData }, { data: icalData }] = await Promise.all([
+  const [{ data, error }, { data: zoneData }, { data: icalData }, { data: websiteData }] = await Promise.all([
     supabase.rpc("operon_clients"),
     supabase.rpc("operon_zone_month_overview"),
     supabase.rpc("operon_ical_overview"),
+    supabase.rpc("operon_websites"),
   ])
   if (error) notFound()
+  const websites = new Map((websiteData ?? []).map((w) => [w.organization_id, w]))
   const zones = new Map(((zoneData ?? []) as unknown as ZoneOverview[]).map((z) => [z.organization_id, z]))
   const icalProblems = new Map<string, number>()
   for (const row of (icalData ?? []) as IcalStatusRow[]) {
@@ -59,8 +62,13 @@ export default async function ClientesPage({
   const { estado } = await searchParams
   const filter: Filter = FILTERS.some((f) => f.key === estado) ? (estado as Filter) : "todos"
 
+  // Un widget de otro complejo, sin completar o de demostración no manda las reservas al panel.
+  const widgetBroken = (c: ClientRow) => {
+    const status = websites.get(c.organization_id)?.website_status
+    return status === "mismatch" || status === "unconfigured" || status === "demo"
+  }
   const hasProblems = (c: ClientRow) =>
-    c.email_failed_30d > 0 || c.email_stuck > 0 || (icalProblems.get(c.organization_id) ?? 0) > 0
+    c.email_failed_30d > 0 || c.email_stuck > 0 || (icalProblems.get(c.organization_id) ?? 0) > 0 || widgetBroken(c)
   const all = (data ?? []) as ClientRow[]
   const clients = all.filter((c) => matches(filter, c, hasProblems))
   const now = currentTime()
@@ -99,7 +107,7 @@ export default async function ClientesPage({
           label="Con problemas"
           value={withProblems}
           tone={withProblems > 0 ? "warning" : undefined}
-          note={withProblems > 0 ? "Mails o calendarios con fallas" : "Todo en orden"}
+          note={withProblems > 0 ? "Mails, calendarios o webs con fallas" : "Todo en orden"}
         />
       </section>
 
@@ -143,10 +151,10 @@ export default async function ClientesPage({
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1040px] text-sm">
+            <table className="w-full min-w-[1120px] text-sm">
               <thead className="border-b bg-muted/40 text-left">
                 <tr>
-                  {["Complejo", "Dueño", "Actividad", "Unidades", "Reservas", "Configuración", "Salud", "Tu zona", "Alta"].map(
+                  {["Complejo", "Dueño", "Actividad", "Unidades", "Reservas", "Configuración", "Web", "Salud", "Tu zona", "Alta"].map(
                     (heading) => (
                       <th
                         key={heading}
@@ -246,6 +254,10 @@ export default async function ClientesPage({
                       </td>
 
                       <td className="px-4 py-3">
+                        <WebBadge row={websites.get(client.organization_id)} now={now} />
+                      </td>
+
+                      <td className="px-4 py-3">
                         <Health
                           failed={client.email_failed_30d}
                           stuck={client.email_stuck}
@@ -269,6 +281,25 @@ export default async function ClientesPage({
         )}
       </section>
     </>
+  )
+}
+
+function WebBadge({ row, now }: { row: { website_status: string | null; website_checked_at: string | null } | undefined; now: number }) {
+  if (!row) return <span className="text-xs text-muted-foreground">Sin cargar</span>
+  const info = row.website_status && row.website_status in WEBSITE_STATUS ? WEBSITE_STATUS[row.website_status as WebsiteStatus] : null
+  const tones = {
+    success: "bg-success/15 text-success",
+    warning: "bg-warning/30 text-warning-foreground",
+    danger: "bg-destructive/15 text-destructive",
+    muted: "bg-muted text-muted-foreground",
+  } as const
+  return (
+    <div>
+      <span className={cn("label-mono rounded-md px-2 py-1 whitespace-nowrap", tones[info?.tone ?? "muted"])}>
+        {info?.label ?? "Sin verificar"}
+      </span>
+      {row.website_checked_at && <p className="mt-1 text-xs text-muted-foreground">{relative(row.website_checked_at, now)}</p>}
+    </div>
   )
 }
 

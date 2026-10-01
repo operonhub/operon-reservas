@@ -218,6 +218,10 @@ export type Database = {
           suspended_at: string | null
           updated_at: string
           zone_month_enabled_at: string | null
+          website_url: string | null
+          website_status: string | null
+          website_note: string | null
+          website_checked_at: string | null
         }
         Insert: {
           checklist_dismissed_at?: string | null
@@ -229,6 +233,10 @@ export type Database = {
           suspended_at?: string | null
           updated_at?: string
           zone_month_enabled_at?: string | null
+          website_url?: string | null
+          website_status?: string | null
+          website_note?: string | null
+          website_checked_at?: string | null
         }
         Update: {
           checklist_dismissed_at?: string | null
@@ -240,6 +248,10 @@ export type Database = {
           suspended_at?: string | null
           updated_at?: string
           zone_month_enabled_at?: string | null
+          website_url?: string | null
+          website_status?: string | null
+          website_note?: string | null
+          website_checked_at?: string | null
         }
         Relationships: []
       }
@@ -805,6 +817,18 @@ export type Database = {
       zone_month_finish: {
         Args: { p_zone: string; p_month: string; p_lease: string; p_edition: Json | null; p_error: string | null }
         Returns: boolean
+      }
+      operon_set_website: {
+        Args: { p_org: string; p_url: string | null }
+        Returns: Json
+      }
+      operon_record_website_check: {
+        Args: { p_org: string; p_status: string; p_note: string | null }
+        Returns: boolean
+      }
+      operon_websites: {
+        Args: Record<string, never>
+        Returns: { organization_id: string; website_url: string; website_status: string | null; website_note: string | null; website_checked_at: string | null }[]
       }
       zone_month_interests: {
         Args: { p_zone: string; p_month: string }
