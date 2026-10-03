@@ -185,7 +185,7 @@ export function PublicBooking({
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="co">Salida</Label>
-                <DateField id="co" min={addDays(checkIn || todayISO(), 1)} value={checkOut} onValueChange={setCheckOut} required />
+                <DateField id="co" orderNotice={false} min={addDays(checkIn || todayISO(), 1)} value={checkOut} onValueChange={setCheckOut} required />
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="g">Huéspedes</Label>

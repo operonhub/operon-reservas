@@ -54,6 +54,8 @@
      idioma del equipo del visitante (en uno en inglés es mes/día). */
   .bkw .bkw-date{display:block;min-height:1.2em;margin-top:5px;font-size:.78rem;opacity:.75}
   .bkw .bkw-date::first-letter{text-transform:uppercase}
+  /* Aviso solo para equipos que no escriben día/mes/año. */
+  .bkw .bkw-order{margin:-4px 0 14px;padding:8px 10px;border-radius:9px;font-size:.78rem;background:rgba(196,106,46,.14)}
   .bkw .btn-primary{width:100%;justify-content:center;display:flex;align-items:center;gap:8px;background:var(--bkw-primary);color:var(--bkw-white);border:none;border-radius:100px;padding:14px;font-weight:700;font-size:.95rem;cursor:pointer;transition:transform .2s}
   .bkw .btn-primary:hover{transform:translateY(-2px)}
   .bkw .btn-primary:disabled{opacity:.6;cursor:default;transform:none}
@@ -92,6 +94,7 @@
         <div class="field"><label for="bkw-in">Llegada</label><input id="bkw-in" type="date"><span class="bkw-date" id="bkw-in-words" aria-live="polite"></span></div>
         <div class="field"><label for="bkw-out">Salida</label><input id="bkw-out" type="date"><span class="bkw-date" id="bkw-out-words" aria-live="polite"></span></div>
       </div>
+      <p class="bkw-order" id="bkw-order" hidden></p>
       <div class="field"><label for="bkw-pax">Huéspedes</label>
         <select id="bkw-pax">
           <option value="1">1 persona</option><option value="2" selected>2 personas</option>
@@ -167,6 +170,15 @@
   });
   $('bkw-out').addEventListener('change', showDates);
   showDates();
+  // El campo nativo usa el orden del equipo del visitante: si no es día/mes/año, se avisa.
+  (function(){
+    try {
+      var first = new Intl.DateTimeFormat(undefined,{year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(Date.UTC(2026,10,25,12)))
+        .filter(function(p){ return p.type==='day'||p.type==='month'||p.type==='year'; })[0].type;
+      var text = first==='month' ? 'En tu equipo el orden es mes / día / año.' : first==='year' ? 'En tu equipo el orden es año / mes / día.' : '';
+      if (text) { $('bkw-order').textContent = text + ' Tocá el ícono del calendario para elegir el día.'; $('bkw-order').hidden = false; }
+    } catch(e) {}
+  })();
 
   var steps = { search:$('bkw-step-search'), results:$('bkw-step-results'), form:$('bkw-step-form'), done:$('bkw-step-done') };
   function show(step){ for(var k in steps){ steps[k].style.display = (k===step)?'':'none'; } }

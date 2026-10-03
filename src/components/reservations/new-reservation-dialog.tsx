@@ -91,6 +91,7 @@ export function NewReservationDialog({ units }: { units: Unit[] }) {
               <DateField
                 id="check_out"
                 name="check_out"
+                orderNotice={false}
                 min={checkIn ? addDays(checkIn, 1) : undefined}
                 value={checkOut}
                 onValueChange={setCheckOut}

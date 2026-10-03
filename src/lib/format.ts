@@ -91,6 +91,34 @@ export function formatDayLong(iso: string | null | undefined) {
   })
 }
 
+export type DateOrder = "dmy" | "mdy" | "ymd"
+
+/**
+ * En qué orden escribe las fechas el equipo de la persona: es el orden que usa
+ * el campo de fecha nativo, y no se puede cambiar desde la página. Sin `locale`
+ * usa el del navegador. "dmy" (día/mes/año) es el nuestro.
+ */
+export function dateOrder(locale?: string): DateOrder {
+  try {
+    const parts = new Intl.DateTimeFormat(locale, { year: "numeric", month: "2-digit", day: "2-digit" })
+      .formatToParts(new Date(Date.UTC(2026, 10, 25, 12)))
+      .map((p) => p.type)
+      .filter((t) => t === "day" || t === "month" || t === "year")
+    if (parts[0] === "month") return "mdy"
+    if (parts[0] === "year") return "ymd"
+    return "dmy"
+  } catch {
+    return "dmy"
+  }
+}
+
+/** El aviso para quien no tiene día/mes/año. null si no hace falta. */
+export function dateOrderHint(order: DateOrder) {
+  if (order === "mdy") return "En tu equipo el orden es mes / día / año."
+  if (order === "ymd") return "En tu equipo el orden es año / mes / día."
+  return null
+}
+
 /**
  * La salida que corresponde después de cambiar la llegada. Si la salida sigue
  * siendo posterior, queda igual; si quedó el mismo día o antes, se corre

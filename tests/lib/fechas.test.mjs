@@ -4,7 +4,7 @@
  */
 import { test, after } from "node:test"
 import assert from "node:assert/strict"
-import { todayISO, addDays, formatDayLong, checkOutFor } from "../../src/lib/format.ts"
+import { todayISO, addDays, formatDayLong, checkOutFor, dateOrder, dateOrderHint } from "../../src/lib/format.ts"
 
 const RealDate = Date
 const originalTz = process.env.TZ
@@ -70,4 +70,19 @@ test("al cambiar el ingreso, la salida se acomoda sola y conserva las noches", (
   assert.equal(checkOutFor("2026-12-31", "2026-10-13", "2026-10-10"), "2027-01-03")
   // Ingreso borrado: se deja la salida como estaba.
   assert.equal(checkOutFor("", "2026-10-13", "2026-10-10"), "2026-10-13")
+})
+
+test("se detecta el orden de fecha del equipo y solo se avisa si no es día/mes/año", () => {
+  for (const locale of ["es-AR", "es", "es-ES", "pt-BR", "en-GB", "it-IT", "fr-FR", "de-DE"]) {
+    assert.equal(dateOrder(locale), "dmy", locale)
+  }
+  // El caso de la clienta: un equipo en inglés de Estados Unidos.
+  assert.equal(dateOrder("en-US"), "mdy")
+  for (const locale of ["ja-JP", "zh-CN", "sv-SE", "hu-HU", "ko-KR"]) assert.equal(dateOrder(locale), "ymd", locale)
+  // Un idioma que el navegador no reconoce no rompe nada.
+  assert.equal(dateOrder("esto no es un idioma"), "dmy")
+
+  assert.equal(dateOrderHint("dmy"), null)
+  assert.match(dateOrderHint("mdy"), /mes \/ día \/ año/)
+  assert.match(dateOrderHint("ymd"), /año \/ mes \/ día/)
 })

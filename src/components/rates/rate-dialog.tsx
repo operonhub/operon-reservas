@@ -317,6 +317,7 @@ export function RateDialog({
                 <DateField
                   id="end_date"
                   name="end_date"
+                  orderNotice={false}
                   defaultValue={rate?.end_date ?? defaults?.end_date ?? ""}
                 />
               </div>

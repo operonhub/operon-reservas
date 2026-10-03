@@ -94,7 +94,7 @@ export function PriceSimulator({ units }: { units: Unit[] }) {
           <Label htmlFor="sim-out" className="label-mono text-muted-foreground">
             Salida
           </Label>
-          <DateField id="sim-out" value={checkOut} onValueChange={setCheckOut} />
+          <DateField id="sim-out" orderNotice={false} value={checkOut} onValueChange={setCheckOut} />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="sim-guests" className="label-mono text-muted-foreground">

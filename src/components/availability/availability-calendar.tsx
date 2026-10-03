@@ -988,7 +988,7 @@ function BlockDialog({ units, startDate }: { units: Unit[]; startDate: string })
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="end">Hasta (excl.)</Label>
-              <DateField id="end" name="end" min={startDate} required />
+              <DateField id="end" name="end" orderNotice={false} min={startDate} required />
             </div>
           </div>
 
