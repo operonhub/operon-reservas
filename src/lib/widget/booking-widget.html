@@ -50,6 +50,10 @@
   .bkw .field label{display:block;font-size:.8rem;font-weight:700;margin-bottom:5px}
   .bkw .field input,.bkw .field select,.bkw .field textarea{width:100%;padding:12px 14px;border-radius:11px;border:1.5px solid var(--bkw-line);font-family:inherit;font-size:.94rem;background:var(--bkw-bg);color:var(--bkw-text)}
   .bkw .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  /* La fecha elegida, en palabras: el campo nativo ordena día y mes según el
+     idioma del equipo del visitante (en uno en inglés es mes/día). */
+  .bkw .bkw-date{display:block;min-height:1.2em;margin-top:5px;font-size:.78rem;opacity:.75}
+  .bkw .bkw-date::first-letter{text-transform:uppercase}
   .bkw .btn-primary{width:100%;justify-content:center;display:flex;align-items:center;gap:8px;background:var(--bkw-primary);color:var(--bkw-white);border:none;border-radius:100px;padding:14px;font-weight:700;font-size:.95rem;cursor:pointer;transition:transform .2s}
   .bkw .btn-primary:hover{transform:translateY(-2px)}
   .bkw .btn-primary:disabled{opacity:.6;cursor:default;transform:none}
@@ -85,8 +89,8 @@
       <h3>Reservá online</h3>
       <p class="mini">Disponibilidad en tiempo real — reservá al instante, sin esperar respuesta.</p>
       <div class="field-row">
-        <div class="field"><label for="bkw-in">Llegada</label><input id="bkw-in" type="date"></div>
-        <div class="field"><label for="bkw-out">Salida</label><input id="bkw-out" type="date"></div>
+        <div class="field"><label for="bkw-in">Llegada</label><input id="bkw-in" type="date"><span class="bkw-date" id="bkw-in-words" aria-live="polite"></span></div>
+        <div class="field"><label for="bkw-out">Salida</label><input id="bkw-out" type="date"><span class="bkw-date" id="bkw-out-words" aria-live="polite"></span></div>
       </div>
       <div class="field"><label for="bkw-pax">Huéspedes</label>
         <select id="bkw-pax">
@@ -138,6 +142,9 @@
   function iso(d){ var z=new Date(d.getTime()-d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10); }
   function addDays(s,n){ var d=new Date(s+'T00:00:00'); d.setDate(d.getDate()+n); return iso(d); }
   function nights(a,b){ return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000); }
+  // "2026-10-25" -> "domingo, 25 de octubre de 2026" y "25 oct".
+  function dateWords(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s||'') ? new Date(s+'T12:00:00Z').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}) : ''; }
+  function shortDate(s){ return new Date(s+'T12:00:00Z').toLocaleDateString('es-AR',{day:'numeric',month:'short',timeZone:'UTC'}); }
 
   var state = { in:'', out:'', pax:2, unit:null };
 
@@ -145,7 +152,21 @@
   var today = iso(new Date());
   $('bkw-in').min = today; $('bkw-out').min = addDays(today,1);
   $('bkw-in').value = addDays(today,14); $('bkw-out').value = addDays(today,16);
-  $('bkw-in').addEventListener('change', function(){ $('bkw-out').min = addDays($('bkw-in').value||today, 1); });
+  function showDates(){ $('bkw-in-words').textContent = dateWords($('bkw-in').value); $('bkw-out-words').textContent = dateWords($('bkw-out').value); }
+  var lastIn = $('bkw-in').value;
+  $('bkw-in').addEventListener('change', function(){
+    var ci = $('bkw-in').value, co = $('bkw-out').value;
+    $('bkw-out').min = addDays(ci||today, 1);
+    // Si la salida quedó el mismo día o antes, se corre conservando las noches.
+    if (ci && (!co || co <= ci)) {
+      var keep = (co && lastIn && co > lastIn) ? nights(lastIn, co) : 1;
+      $('bkw-out').value = addDays(ci, Math.max(1, keep));
+    }
+    if (ci) lastIn = ci;
+    showDates();
+  });
+  $('bkw-out').addEventListener('change', showDates);
+  showDates();
 
   var steps = { search:$('bkw-step-search'), results:$('bkw-step-results'), form:$('bkw-step-form'), done:$('bkw-step-done') };
   function show(step){ for(var k in steps){ steps[k].style.display = (k===step)?'':'none'; } }
@@ -181,7 +202,7 @@
   function renderResults(units){
     var n = nights(state.in, state.out);
     var html = '<button class="bk-back" id="bkw-back1">&larr; Cambiar fechas</button>'
-      + '<div class="bk-summary">'+state.in+' &rarr; '+state.out+' · <b>'+n+' noche'+(n>1?'s':'')+'</b> · '+state.pax+' huésped'+(state.pax>1?'es':'')+'</div>';
+      + '<div class="bk-summary">'+shortDate(state.in)+' &rarr; '+shortDate(state.out)+' · <b>'+n+' noche'+(n>1?'s':'')+'</b> · '+state.pax+' huésped'+(state.pax>1?'es':'')+'</div>';
     if(!units.length){
       html += '<div class="bk-empty">No hay unidades disponibles para esas fechas. Probá con otras o escribinos por WhatsApp.</div>';
     } else {
@@ -209,7 +230,7 @@
   function renderForm(){
     var n = nights(state.in, state.out);
     steps.form.innerHTML = '<button class="bk-back" id="bkw-back2">&larr; Ver otras unidades</button>'
-      + '<div class="bk-summary"><b>'+state.unit.name+'</b> · '+state.in+' &rarr; '+state.out+' · '+n+' noche'+(n>1?'s':'')+' · <b>'+money(state.unit.total)+'</b></div>'
+      + '<div class="bk-summary"><b>'+state.unit.name+'</b> · '+shortDate(state.in)+' &rarr; '+shortDate(state.out)+' · '+n+' noche'+(n>1?'s':'')+' · <b>'+money(state.unit.total)+'</b></div>'
       + '<div class="field"><label for="bkw-name">Nombre y apellido</label><input id="bkw-name" type="text" placeholder="Tu nombre" required></div>'
       + '<div class="field-row"><div class="field"><label for="bkw-email">Email</label><input id="bkw-email" type="email" placeholder="tu@mail.com"></div>'
       + '<div class="field"><label for="bkw-phone">Teléfono / WhatsApp</label><input id="bkw-phone" type="text" placeholder="+54 9…"></div></div>'
@@ -268,7 +289,7 @@
       + '<h3>¡Reserva generada!</h3>'
       + introHtml
       + (code ? '<div class="bk-code">'+code+'</div>' : '')
-      + '<p class="mini">'+state.unit.name+' · '+state.in+' &rarr; '+state.out+'</p>'
+      + '<p class="mini">'+state.unit.name+' · '+shortDate(state.in)+' &rarr; '+shortDate(state.out)+'</p>'
       + priceHtml
       + payHtml
       + '<a class="btn-wa" style="margin-top:10px;text-decoration:none" href="'+wa+'" target="_blank" rel="noopener">Avisar por WhatsApp</a>'

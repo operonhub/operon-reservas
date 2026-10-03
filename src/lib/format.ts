@@ -76,6 +76,36 @@ export function nightsBetween(checkIn: string, checkOut: string) {
   return Math.round((b - a) / 86400000)
 }
 
+/**
+ * "2026-10-25" -> "domingo, 25 de octubre de 2026". Vacío o inválido -> "".
+ * Se muestra debajo de cada campo de fecha: el control nativo del navegador
+ * ordena día y mes según el idioma del equipo (en uno en inglés es mes/día), y
+ * así la persona ve qué fecha eligió sin depender de ese orden.
+ */
+export function formatDayLong(iso: string | null | undefined) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return ""
+  const d = new Date(iso + "T12:00:00Z")
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso) return ""
+  return d.toLocaleDateString("es-AR", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+  })
+}
+
+/**
+ * La salida que corresponde después de cambiar la llegada. Si la salida sigue
+ * siendo posterior, queda igual; si quedó el mismo día o antes, se corre
+ * conservando la cantidad de noches que había (una, si no había estadía).
+ */
+export function checkOutFor(checkIn: string, checkOut: string, previousCheckIn?: string) {
+  if (!checkIn) return checkOut
+  if (checkOut && checkOut > checkIn) return checkOut
+  const day = (iso: string) => Date.parse(iso + "T00:00:00Z")
+  const nights = previousCheckIn && checkOut && checkOut > previousCheckIn
+    ? Math.round((day(checkOut) - day(previousCheckIn)) / 86400000)
+    : 1
+  return addDays(checkIn, Math.max(1, nights))
+}
+
 /** Link de WhatsApp a partir de un teléfono en cualquier formato. */
 export function whatsappHref(rawPhone: string) {
   return `https://wa.me/${rawPhone.replace(/\D/g, "")}`

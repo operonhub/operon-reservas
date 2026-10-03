@@ -4,7 +4,7 @@
  */
 import { test, after } from "node:test"
 import assert from "node:assert/strict"
-import { todayISO, addDays } from "../../src/lib/format.ts"
+import { todayISO, addDays, formatDayLong, checkOutFor } from "../../src/lib/format.ts"
 
 const RealDate = Date
 const originalTz = process.env.TZ
@@ -41,4 +41,33 @@ test("addDays no se corre un día en husos al este de UTC", () => {
     process.env.TZ = tz
     for (const [iso, n, expected] of cases) assert.equal(addDays(iso, n), expected, `${iso} + ${n} en ${tz}`)
   }
+})
+
+test("la fecha en palabras es la misma en cualquier huso y no depende del idioma del equipo", () => {
+  for (const tz of ZONES) {
+    process.env.TZ = tz
+    assert.equal(formatDayLong("2026-10-25"), "domingo, 25 de octubre de 2026", tz)
+    assert.equal(formatDayLong("2026-02-05"), "jueves, 5 de febrero de 2026", tz)
+    assert.equal(formatDayLong("2027-01-01"), "viernes, 1 de enero de 2027", tz)
+  }
+  // Vacío, a medio escribir o imposible: nada, en vez de una fecha equivocada.
+  for (const bad of ["", null, undefined, "2026-10", "25/10/2026", "2026-02-30", "2026-13-01", "hola"]) {
+    assert.equal(formatDayLong(bad), "", String(bad))
+  }
+})
+
+test("al cambiar el ingreso, la salida se acomoda sola y conserva las noches", () => {
+  // La salida sigue siendo posterior: no se toca.
+  assert.equal(checkOutFor("2026-10-11", "2026-10-13", "2026-10-10"), "2026-10-13")
+  // El ingreso pasó a la salida: se corre conservando las 3 noches que había.
+  assert.equal(checkOutFor("2026-10-25", "2026-10-13", "2026-10-10"), "2026-10-28")
+  // Ingreso el mismo día que la salida: tampoco vale.
+  assert.equal(checkOutFor("2026-10-13", "2026-10-13", "2026-10-10"), "2026-10-16")
+  // Sin estadía previa: una noche.
+  assert.equal(checkOutFor("2026-10-25", "", ""), "2026-10-26")
+  assert.equal(checkOutFor("2026-10-25", "2026-10-20", undefined), "2026-10-26")
+  // Cruza de mes y de año sin correrse.
+  assert.equal(checkOutFor("2026-12-31", "2026-10-13", "2026-10-10"), "2027-01-03")
+  // Ingreso borrado: se deja la salida como estaba.
+  assert.equal(checkOutFor("", "2026-10-13", "2026-10-10"), "2026-10-13")
 })

@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { DateField } from "@/components/ui/date-field"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import {
@@ -983,11 +984,11 @@ function BlockDialog({ units, startDate }: { units: Unit[]; startDate: string })
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="start">Desde</Label>
-              <Input id="start" name="start" type="date" min={startDate} required />
+              <DateField id="start" name="start" min={startDate} required />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="end">Hasta (excl.)</Label>
-              <Input id="end" name="end" type="date" min={startDate} required />
+              <DateField id="end" name="end" min={startDate} required />
             </div>
           </div>
 

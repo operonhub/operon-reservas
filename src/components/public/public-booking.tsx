@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { formatCurrency, formatDay, nightsBetween, todayISO, addDays } from "@/lib/format"
+import { formatCurrency, formatDay, nightsBetween, todayISO, addDays, checkOutFor } from "@/lib/format"
+import { DateField } from "@/components/ui/date-field"
 import { ENTER, ENTER_UP, ENTER_SIDE, ENTER_POP, stagger } from "@/lib/motion"
 import { OperonFooter } from "@/components/public/operon-footer"
 import {
@@ -55,6 +56,13 @@ export function PublicBooking({
     total: number | null
     deposit: number | null
   } | null>(null)
+
+  // Al mover el ingreso, la salida se corre sola conservando las noches: antes
+  // quedaba en una fecha anterior y el formulario se trababa sin explicar por qué.
+  function changeCheckIn(next: string) {
+    setCheckOut((current) => checkOutFor(next, current, checkIn))
+    setCheckIn(next)
+  }
 
   const nights = React.useMemo(
     () => (checkIn && checkOut && checkOut > checkIn ? nightsBetween(checkIn, checkOut) : 0),
@@ -170,14 +178,14 @@ export function PublicBooking({
         {step === "search" && (
           <form onSubmit={onSearch} className={`${ENTER} space-y-4`}>
             <h2 className="text-lg font-medium">Reservá tu estadía</h2>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid items-start gap-4 sm:grid-cols-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="ci">Ingreso</Label>
-                <Input id="ci" type="date" min={todayISO()} value={checkIn} onChange={(e) => setCheckIn(e.target.value)} required />
+                <DateField id="ci" min={todayISO()} value={checkIn} onValueChange={changeCheckIn} required />
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="co">Salida</Label>
-                <Input id="co" type="date" min={addDays(checkIn || todayISO(), 1)} value={checkOut} onChange={(e) => setCheckOut(e.target.value)} required />
+                <DateField id="co" min={addDays(checkIn || todayISO(), 1)} value={checkOut} onValueChange={setCheckOut} required />
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="g">Huéspedes</Label>
@@ -186,7 +194,11 @@ export function PublicBooking({
             </div>
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                {nights > 0 ? `${nights} noche${nights > 1 ? "s" : ""}` : "Elegí las fechas"}
+                {nights > 0
+                  ? `${nights} noche${nights > 1 ? "s" : ""}`
+                  : checkIn && checkOut
+                    ? "La salida tiene que ser después del ingreso"
+                    : "Elegí las fechas"}
               </p>
               <Button type="submit" disabled={pending || nights <= 0}>
                 {pending ? "Buscando…" : "Buscar disponibilidad"}
@@ -201,7 +213,7 @@ export function PublicBooking({
               <div>
                 <h2 className="text-lg font-medium">Unidades disponibles</h2>
                 <p className="text-sm text-muted-foreground">
-                  {checkIn} → {checkOut} · {nights} noche{nights > 1 ? "s" : ""} · {guests}{" "}
+                  {formatDay(checkIn)} → {formatDay(checkOut)} · {nights} noche{nights > 1 ? "s" : ""} · {guests}{" "}
                   <Users className="inline size-3.5" />
                 </p>
               </div>
@@ -282,7 +294,7 @@ export function PublicBooking({
 
             <div className="rounded-xl bg-muted/50 p-3 text-sm">
               <p>
-                <span className="font-medium">{selected.name}</span> · {checkIn} → {checkOut} ·{" "}
+                <span className="font-medium">{selected.name}</span> · {formatDay(checkIn)} → {formatDay(checkOut)} ·{" "}
                 {nights} noche{nights > 1 ? "s" : ""} ·{" "}
                 <span className="font-medium">
                   {formatCurrency(
@@ -350,7 +362,7 @@ export function PublicBooking({
               <p className="mt-4 text-sm text-muted-foreground">
                 {selected.name} ·{" "}
                 <span className="font-mono tabular-nums">
-                  {checkIn} → {checkOut}
+                  {formatDay(checkIn)} → {formatDay(checkOut)}
                 </span>
               </p>
             )}

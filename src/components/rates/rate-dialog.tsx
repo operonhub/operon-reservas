@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { DateField } from "@/components/ui/date-field"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { createRate, updateRate } from "@/app/(panel)/tarifas/actions"
@@ -303,10 +304,9 @@ export function RateDialog({
                 <Label htmlFor="start_date" className="label-mono text-muted-foreground">
                   Desde {!isBase && "(opcional)"}
                 </Label>
-                <Input
+                <DateField
                   id="start_date"
                   name="start_date"
-                  type="date"
                   defaultValue={rate?.start_date ?? defaults?.start_date ?? ""}
                 />
               </div>
@@ -314,10 +314,9 @@ export function RateDialog({
                 <Label htmlFor="end_date" className="label-mono text-muted-foreground">
                   Hasta {!isBase && "(opcional)"}
                 </Label>
-                <Input
+                <DateField
                   id="end_date"
                   name="end_date"
-                  type="date"
                   defaultValue={rate?.end_date ?? defaults?.end_date ?? ""}
                 />
               </div>

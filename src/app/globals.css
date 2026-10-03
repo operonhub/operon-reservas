@@ -199,6 +199,16 @@ body:has(.operon-light) {
   html {
     @apply font-sans;
   }
+  /* La lista de un <select> nativo. Los <select> del panel tienen fondo
+     transparente y, en Chrome de Windows, la lista usa el fondo de las opciones:
+     sin esto queda blanca con el texto claro del modo oscuro, ilegible.
+     `color-scheme` solo no alcanza. Los tokens ya cambian con el tema y con la
+     web pública (siempre clara). */
+  select option,
+  select optgroup {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
   /* Marca: los títulos llevan Space Grotesk con tracking apretado. */
   h1,
   h2,

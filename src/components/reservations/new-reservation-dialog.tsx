@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { DateField } from "@/components/ui/date-field"
+import { addDays, checkOutFor } from "@/lib/format"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { createManualReservation } from "@/app/(panel)/reservas/actions"
@@ -29,6 +31,14 @@ export function NewReservationDialog({ units }: { units: Unit[] }) {
   const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [pending, setPending] = React.useState(false)
+  const [checkIn, setCheckIn] = React.useState("")
+  const [checkOut, setCheckOut] = React.useState("")
+
+  // Al elegir el ingreso, la salida se propone sola (y se corre si quedó antes).
+  function changeCheckIn(next: string) {
+    setCheckOut((current) => checkOutFor(next, current, checkIn))
+    setCheckIn(next)
+  }
 
   async function handle(formData: FormData) {
     setPending(true)
@@ -36,6 +46,8 @@ export function NewReservationDialog({ units }: { units: Unit[] }) {
     setPending(false)
     if (res.ok) {
       toast.success("Reserva creada.")
+      setCheckIn("")
+      setCheckOut("")
       setOpen(false)
       router.refresh()
       if (res.id) router.push(`/reservas/${res.id}`)
@@ -72,11 +84,18 @@ export function NewReservationDialog({ units }: { units: Unit[] }) {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="check_in">Ingreso</Label>
-              <Input id="check_in" name="check_in" type="date" required />
+              <DateField id="check_in" name="check_in" value={checkIn} onValueChange={changeCheckIn} required />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="check_out">Salida</Label>
-              <Input id="check_out" name="check_out" type="date" required />
+              <DateField
+                id="check_out"
+                name="check_out"
+                min={checkIn ? addDays(checkIn, 1) : undefined}
+                value={checkOut}
+                onValueChange={setCheckOut}
+                required
+              />
             </div>
           </div>
 

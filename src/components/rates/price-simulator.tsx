@@ -4,8 +4,9 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { DateField } from "@/components/ui/date-field"
 import { Label } from "@/components/ui/label"
-import { formatCurrency, todayISO, addDays } from "@/lib/format"
+import { formatCurrency, todayISO, addDays, checkOutFor } from "@/lib/format"
 import { simulatePrice, type SimulationResult } from "@/app/(panel)/tarifas/simulate"
 import { Calculator, TriangleAlert, Loader2 } from "lucide-react"
 
@@ -58,7 +59,7 @@ export function PriceSimulator({ units }: { units: Unit[] }) {
         Probá una estadía y mirá qué precio le corresponde a cada noche.
       </p>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto_auto] sm:items-end">
+      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto_auto] sm:items-start">
         <div className="grid gap-1.5">
           <Label htmlFor="sim-unit" className="label-mono text-muted-foreground">
             Unidad
@@ -80,23 +81,20 @@ export function PriceSimulator({ units }: { units: Unit[] }) {
           <Label htmlFor="sim-in" className="label-mono text-muted-foreground">
             Ingreso
           </Label>
-          <Input
+          <DateField
             id="sim-in"
-            type="date"
             value={checkIn}
-            onChange={(e) => setCheckIn(e.target.value)}
+            onValueChange={(next) => {
+              setCheckOut((current) => checkOutFor(next, current, checkIn))
+              setCheckIn(next)
+            }}
           />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="sim-out" className="label-mono text-muted-foreground">
             Salida
           </Label>
-          <Input
-            id="sim-out"
-            type="date"
-            value={checkOut}
-            onChange={(e) => setCheckOut(e.target.value)}
-          />
+          <DateField id="sim-out" value={checkOut} onValueChange={setCheckOut} />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="sim-guests" className="label-mono text-muted-foreground">
@@ -111,10 +109,15 @@ export function PriceSimulator({ units }: { units: Unit[] }) {
             className="w-20"
           />
         </div>
-        <Button onClick={run} disabled={pending || !unitId}>
-          {pending ? <Loader2 className="animate-spin" /> : <Calculator />}
-          Calcular
-        </Button>
+        {/* Los campos de fecha llevan una línea debajo: todo se alinea arriba y el
+            botón baja lo que ocupa una etiqueta para quedar a la altura de los campos. */}
+        <div className="grid gap-1.5">
+          <Label aria-hidden className="label-mono invisible hidden sm:flex">Calcular</Label>
+          <Button onClick={run} disabled={pending || !unitId}>
+            {pending ? <Loader2 className="animate-spin" /> : <Calculator />}
+            Calcular
+          </Button>
+        </div>
       </div>
 
       {error && (
