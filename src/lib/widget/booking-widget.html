@@ -190,8 +190,26 @@
     .then(function(r){ mpEnabled = !!(r && r.enabled); })
     .catch(function(){ mpEnabled = false; });
 
+  // El selector de huéspedes llega hasta la unidad más grande del complejo.
+  // Si el panel no informa el dato, quedan las opciones escritas en el HTML.
+  function fillGuests(max){
+    var sel = $('bkw-pax'), current = Math.min(parseInt(sel.value,10)||2, max);
+    while (sel.firstChild) sel.removeChild(sel.firstChild);
+    for (var i=1; i<=max; i++) {
+      var option = document.createElement('option');
+      option.value = String(i);
+      option.textContent = i + ' persona' + (i>1 ? 's' : '');
+      if (i === current) option.selected = true;
+      sel.appendChild(option);
+    }
+  }
+
   var propertyReady = rpc('public_property', { p_org_slug: ORG, p_property_slug: null })
-    .then(function(p){ depositPct = (p && Number(p.deposit_pct)) || 0; })
+    .then(function(p){
+      depositPct = (p && Number(p.deposit_pct)) || 0;
+      var max = p ? parseInt(p.max_guests,10) : 0;
+      if (max >= 1 && max <= 50) fillGuests(max);
+    })
     .catch(function(){ depositPct = 0; });
 
   // ----- Buscar disponibilidad -----

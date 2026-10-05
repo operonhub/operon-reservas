@@ -27,6 +27,8 @@ type PublicProperty = {
   deposit_pct: number
   whatsapp: string | null
   phone: string | null
+  /** Capacidad de la unidad más grande (0039). Falta en respuestas viejas. */
+  max_guests?: number | null
 }
 
 type Step = "search" | "results" | "form" | "done"
@@ -63,6 +65,8 @@ export function PublicBooking({
     setCheckOut((current) => checkOutFor(next, current, checkIn))
     setCheckIn(next)
   }
+
+  const maxGuests = property.max_guests && property.max_guests > 0 ? property.max_guests : undefined
 
   const nights = React.useMemo(
     () => (checkIn && checkOut && checkOut > checkIn ? nightsBetween(checkIn, checkOut) : 0),
@@ -189,7 +193,16 @@ export function PublicBooking({
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="g">Huéspedes</Label>
-                <Input id="g" type="number" min={1} value={guests} onChange={(e) => setGuests(Number(e.target.value))} required />
+                <Input
+                  id="g"
+                  type="number"
+                  min={1}
+                  max={maxGuests}
+                  value={guests}
+                  onChange={(e) => setGuests(Math.max(1, Math.min(Number(e.target.value) || 1, maxGuests ?? Infinity)))}
+                  required
+                />
+                {maxGuests && <p className="text-xs text-muted-foreground">Hasta {maxGuests} por unidad</p>}
               </div>
             </div>
             <div className="flex items-center justify-between">
