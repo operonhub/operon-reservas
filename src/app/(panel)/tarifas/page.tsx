@@ -8,6 +8,7 @@ import { PriceSimulator } from "@/components/rates/price-simulator"
 import { OperonArc } from "@/components/brand/operon-arc"
 import { ENTER_VIEW } from "@/lib/motion"
 import type { RateRow } from "@/lib/rate-rules"
+import type { GuestTier } from "@/lib/guest-prices"
 import { Plus, Globe } from "lucide-react"
 
 export default async function TarifasPage() {
@@ -15,7 +16,7 @@ export default async function TarifasPage() {
   const canEdit = canManageSettings(ctx.role)
   const supabase = await createClient()
 
-  const [{ data: property }, { data: units }, { data: rates }] = await Promise.all([
+  const [{ data: property }, { data: units }, { data: rates }, { data: guestPrices }] = await Promise.all([
     supabase
       .from("properties")
       .select("id, currency")
@@ -31,7 +32,19 @@ export default async function TarifasPage() {
       )
       .eq("organization_id", ctx.organizationId)
       .order("priority", { ascending: false }),
+    supabase
+      .from("unit_guest_prices")
+      .select("unit_id, guests, mode, value")
+      .eq("organization_id", ctx.organizationId),
   ])
+
+  const tiersByUnit = new Map<string, GuestTier[]>()
+  for (const row of guestPrices ?? []) {
+    if (row.mode !== "percent" && row.mode !== "fixed") continue
+    const list = tiersByUnit.get(row.unit_id) ?? []
+    list.push({ guests: row.guests, mode: row.mode, value: Number(row.value) })
+    tiersByUnit.set(row.unit_id, list)
+  }
 
   const unitList = units ?? []
   const all = (rates ?? []) as RateRow[]
@@ -51,8 +64,8 @@ export default async function TarifasPage() {
           <p className="label-mono text-primary">{ctx.organizationName}</p>
           <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-[28px]">Tarifas</h1>
           <p className="mt-1 text-sm text-pretty text-muted-foreground">
-            Precio base de cada unidad y reglas que lo modifican por fecha, día
-            o tipo de estadía.
+            Precio base de cada unidad, cuánto cambia según las personas y reglas
+            que lo modifican por fecha, día o tipo de estadía.
           </p>
         </div>
         {property && canEdit && (
@@ -82,6 +95,7 @@ export default async function TarifasPage() {
                 base={all.find((r) => r.unit_id === u.id && r.kind === "base") ?? globalBase}
                 baseIsInherited={!all.some((r) => r.unit_id === u.id && r.kind === "base")}
                 rules={all.filter((r) => r.unit_id === u.id && r.kind !== "base")}
+                guestTiers={tiersByUnit.get(u.id) ?? []}
                 units={unitList}
                 propertyId={property?.id ?? ""}
                 currency={currency}

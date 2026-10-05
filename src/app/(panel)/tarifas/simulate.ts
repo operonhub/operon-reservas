@@ -6,6 +6,8 @@ import { requireContext } from "@/lib/auth"
 export type SimulationNight = {
   day: string
   price: number | null
+  /** El precio de la noche antes del ajuste por cantidad de personas (0040). */
+  price_before_guests?: number | null
   base: number | null
   rule: {
     id: string
@@ -23,6 +25,10 @@ export type SimulationResult = {
   total: number | null
   currency: string
   breakdown: SimulationNight[]
+  /** Desde 0040: con cuántas personas se calculó, la capacidad y el ajuste aplicado. */
+  guests?: number
+  capacity?: number
+  guest_price?: { mode: "percent" | "fixed"; value: number } | null
 }
 
 export type SimulateResponse =

@@ -41,6 +41,15 @@ export type Database = {
         Update: { status?: string }
         Relationships: []
       }
+      unit_guest_prices: {
+        Row: {
+          unit_id: string; organization_id: string; guests: number;
+          mode: string; value: number; updated_at: string;
+        }
+        Insert: { unit_id: string; organization_id: string; guests: number; mode: string; value: number }
+        Update: { mode?: string; value?: number }
+        Relationships: []
+      }
       zone_month_feedback: {
         Row: {
           organization_id: string; month: string; interests: string[]; done: string[];
@@ -817,6 +826,10 @@ export type Database = {
       zone_month_finish: {
         Args: { p_zone: string; p_month: string; p_lease: string; p_edition: Json | null; p_error: string | null }
         Returns: boolean
+      }
+      set_unit_guest_prices: {
+        Args: { p_unit: string; p_tiers: Json }
+        Returns: number
       }
       operon_set_website: {
         Args: { p_org: string; p_url: string | null }

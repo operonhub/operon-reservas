@@ -8,7 +8,8 @@ import { DateField } from "@/components/ui/date-field"
 import { Label } from "@/components/ui/label"
 import { formatCurrency, todayISO, addDays, checkOutFor } from "@/lib/format"
 import { simulatePrice, type SimulationResult } from "@/app/(panel)/tarifas/simulate"
-import { Calculator, TriangleAlert, Loader2 } from "lucide-react"
+import { peopleLabel } from "@/lib/guest-prices"
+import { Calculator, TriangleAlert, Loader2, Users } from "lucide-react"
 
 type Unit = { id: string; name: string }
 
@@ -46,6 +47,7 @@ export function PriceSimulator({ units }: { units: Unit[] }) {
 
   const nights = result?.breakdown.length ?? 0
   const belowMin = result != null && result.nights < result.min_nights
+  const overCapacity = result?.capacity != null && result.guests != null && result.guests > result.capacity
 
   return (
     <section className="rounded-2xl border bg-card p-5">
@@ -138,6 +140,33 @@ export function PriceSimulator({ units }: { units: Unit[] }) {
             </p>
           )}
 
+          {overCapacity && (
+            <p className="flex items-center gap-2 rounded-lg bg-warning/20 px-3 py-2.5 text-sm">
+              <TriangleAlert className="size-4 shrink-0" />
+              Esta unidad es para hasta {result.capacity}: con {peopleLabel(result.guests ?? 0)} no se
+              ofrece en la web ni se puede reservar.
+            </p>
+          )}
+
+          {result.guests != null && !overCapacity && (
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted px-3 py-2.5 text-sm">
+              <Users className="size-4 shrink-0 text-muted-foreground" />
+              {result.guest_price ? (
+                <>
+                  <span className="font-medium">{peopleLabel(result.guests)}:</span>
+                  {result.guest_price.mode === "percent"
+                    ? `${result.guest_price.value}% menos en cada noche.`
+                    : `precio fijo de ${formatCurrency(result.guest_price.value, result.currency)} por noche a tarifa base.`}
+                </>
+              ) : (
+                <>
+                  <span className="font-medium">{peopleLabel(result.guests)}:</span>
+                  precio completo. Esta unidad no tiene un precio distinto para esa cantidad de personas.
+                </>
+              )}
+            </p>
+          )}
+
           <ul className="divide-y overflow-hidden rounded-xl border">
             {result.breakdown.map((n) => {
               const changed = n.rule != null
@@ -158,15 +187,23 @@ export function PriceSimulator({ units }: { units: Unit[] }) {
                       </span>
                     )}
                   </span>
-                  <span
-                    className={cn(
-                      "font-mono tabular-nums",
-                      n.price == null && "text-destructive"
+                  <span className="flex items-baseline gap-2">
+                    {/* Con ajuste por personas: lo que costaba la noche, tachado. */}
+                    {n.price != null && n.price_before_guests != null && Number(n.price_before_guests) !== Number(n.price) && (
+                      <span className="font-mono text-xs text-muted-foreground tabular-nums line-through">
+                        {formatCurrency(n.price_before_guests, result.currency)}
+                      </span>
                     )}
-                  >
-                    {n.price == null
-                      ? "sin tarifa"
-                      : formatCurrency(n.price, result.currency)}
+                    <span
+                      className={cn(
+                        "font-mono tabular-nums",
+                        n.price == null && "text-destructive"
+                      )}
+                    >
+                      {n.price == null
+                        ? "sin tarifa"
+                        : formatCurrency(n.price, result.currency)}
+                    </span>
                   </span>
                 </li>
               )

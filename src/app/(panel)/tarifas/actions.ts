@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { requireContext } from "@/lib/auth"
 import { canManageSettings, SETTINGS_READ_ONLY_MESSAGE } from "@/lib/roles"
 import { RULE_PRESETS, type RulePreset } from "@/lib/rate-rules"
+import type { GuestTier } from "@/lib/guest-prices"
 
 export type ActionResult = { ok: boolean; error?: string }
 
@@ -186,6 +187,38 @@ export async function deleteRate(id: string): Promise<ActionResult> {
   const supabase = await createClient()
   const { error } = await supabase.from("rates").delete().eq("id", id)
   if (error) return { ok: false, error: error.message }
+  revalidatePath("/tarifas")
+  return { ok: true }
+}
+
+const GUEST_PRICE_ERRORS: Record<string, string> = {
+  FORBIDDEN: SETTINGS_READ_ONLY_MESSAGE,
+  UNIT_NOT_FOUND: "No encontramos esa unidad.",
+  INVALID_GUESTS: "Alguna cantidad de personas no entra en la unidad. Recargá la página.",
+  INVALID_VALUE: "Revisá los valores: el porcentaje va entre 1 y 99 y el precio tiene que ser mayor a cero.",
+  INVALID_MODE: "Revisá los valores cargados.",
+  INVALID_TIERS: "Revisá los valores cargados.",
+}
+
+/**
+ * Guarda el precio según la cantidad de personas de una unidad (0040).
+ * Reemplaza todo lo cargado; una lista vacía vuelve a cobrar por unidad.
+ * La RPC valida el permiso (dueño o administrador) y los valores.
+ */
+export async function saveGuestPrices(unitId: string, tiers: GuestTier[]): Promise<ActionResult> {
+  const ctx = await requireContext()
+  if (!canManageSettings(ctx.role)) return { ok: false, error: SETTINGS_READ_ONLY_MESSAGE }
+  if (!unitId || !Array.isArray(tiers) || tiers.length > 50) return { ok: false, error: GUEST_PRICE_ERRORS.INVALID_TIERS }
+
+  const supabase = await createClient()
+  const { error } = await supabase.rpc("set_unit_guest_prices", {
+    p_unit: unitId,
+    p_tiers: tiers.map((t) => ({ guests: t.guests, mode: t.mode, value: t.value })),
+  })
+  if (error) {
+    const code = Object.keys(GUEST_PRICE_ERRORS).find((c) => error.message.includes(c))
+    return { ok: false, error: code ? GUEST_PRICE_ERRORS[code] : "No se pudo guardar. Probá de nuevo." }
+  }
   revalidatePath("/tarifas")
   return { ok: true }
 }

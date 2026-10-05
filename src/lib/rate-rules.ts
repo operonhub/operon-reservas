@@ -106,8 +106,14 @@ export const RULE_PRESETS: Record<RulePreset, PresetDef> = {
 
 export const PRESET_KEYS = Object.keys(RULE_PRESETS) as RulePreset[]
 
-/** Presets que el propietario puede crear (base se edita aparte). */
-export const CREATABLE_PRESETS = PRESET_KEYS.filter((k) => k !== "base")
+/**
+ * Presets que el propietario puede crear (base se edita aparte).
+ * "Según huéspedes" ya no se ofrece: lo reemplaza el precio según personas de
+ * cada unidad (0040), que se aplica encima de las demás reglas en vez de
+ * competir con ellas. Las reglas de ese tipo que existan se siguen mostrando
+ * y se pueden editar.
+ */
+export const CREATABLE_PRESETS = PRESET_KEYS.filter((k) => k !== "base" && k !== "huespedes")
 
 export const WEEKDAYS = [
   { value: 0, short: "D", label: "domingo" },

@@ -7,7 +7,9 @@ import { RateActiveToggle } from "@/components/rates/rate-active-toggle"
 import {
   RULE_PRESETS, presetOf, describeRule, priorityLabel, type RateRow,
 } from "@/lib/rate-rules"
-import { Plus, Moon, TriangleAlert } from "lucide-react"
+import { GuestPricesDialog } from "@/components/rates/guest-prices-dialog"
+import { applyGuestPrice, describeTier, peopleLabel, type GuestTier } from "@/lib/guest-prices"
+import { Plus, Moon, TriangleAlert, Users } from "lucide-react"
 
 type Unit = { id: string; name: string; capacity: number }
 
@@ -19,11 +21,14 @@ export function UnitRatesCard({
   units,
   propertyId,
   currency,
+  guestTiers = [],
   readOnly = false,
 }: {
   unit: Unit
   base: RateRow | null
   baseIsInherited: boolean
+  /** Precio según la cantidad de personas (0040). Vacío = lo mismo para todos. */
+  guestTiers?: GuestTier[]
   rules: RateRow[]
   units: Unit[]
   propertyId: string
@@ -32,6 +37,9 @@ export function UnitRatesCard({
   readOnly?: boolean
 }) {
   const active = rules.filter((r) => r.is_active)
+  const basePrice = base?.price_per_night != null ? Number(base.price_per_night) : null
+  const money = (n: number) => formatCurrency(n, base?.currency ?? currency)
+  const tiers = [...guestTiers].sort((a, b) => a.guests - b.guests)
 
   return (
     <article
@@ -113,6 +121,43 @@ export function UnitRatesCard({
               />
             )}
           </div>
+        )}
+      </div>
+
+      {/* Precio según personas: aparte de las reglas, se aplica encima de todas */}
+      <div className="border-t px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="label-mono flex items-center gap-1.5 text-muted-foreground">
+            <Users className="size-3" /> Precio según personas
+          </p>
+          {!readOnly && unit.capacity > 0 && (
+            <GuestPricesDialog
+              unit={unit}
+              basePrice={basePrice}
+              currency={base?.currency ?? currency}
+              tiers={tiers}
+              triggerLabel={tiers.length ? "Editar" : "Configurar"}
+            />
+          )}
+        </div>
+        {tiers.length === 0 ? (
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Cobra lo mismo de 1 a {unit.capacity} {unit.capacity === 1 ? "persona" : "personas"}.
+          </p>
+        ) : (
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {tiers.map((t) => (
+              <li key={t.guests} className="rounded-lg border px-2.5 py-1.5 text-sm">
+                <span className="font-medium">{peopleLabel(t.guests)}</span>
+                <span className="text-muted-foreground"> · {describeTier(t, money)}</span>
+                {t.mode === "percent" && basePrice != null && (
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                    {" "}= {money(applyGuestPrice(basePrice, basePrice, t))}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
