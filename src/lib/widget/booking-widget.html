@@ -18,7 +18,14 @@
   4) (Opcional) Sobreescribir la paleta: agregar DESPUÉS de este bloque
      un <style> con las variables --bkw-* para que combine con los
      colores de la demo (ver sección "PALETA" más abajo).
-  5) Probar: buscar disponibilidad → reservar → ver que aparezca el
+  5) (Opcional) Conectar las tarjetas de la landing con el widget: a un
+     link o botón de cada unidad agregarle
+       data-bkw-unit="Nombre de la unidad"   (el mismo del panel; no
+                                              importan mayúsculas ni tildes)
+       data-bkw-photo="ruta/de/la/foto.webp" (opcional: miniatura)
+     Al tocarlo baja al widget con esa unidad elegida: sale primera y
+     resaltada en los resultados. La foto se usa aunque nadie lo toque.
+  6) Probar: buscar disponibilidad → reservar → ver que aparezca el
      desglose de seña → si mpEnabled, que el botón de pagar redirija a
      Mercado Pago de verdad.
   ============================================================
@@ -69,6 +76,23 @@
   .bkw .bk-unit small{color:var(--bkw-text-soft);font-size:.82rem;display:block}
   .bkw .bk-unit .price{font-family:var(--bkw-font-display);font-weight:700;color:var(--bkw-primary);font-size:1.1rem;white-space:nowrap}
   .bkw .bk-unit .btn-primary{padding:9px 16px;font-size:.83rem;width:auto;margin-top:6px}
+  .bkw .bk-unit .bk-thumb{width:68px;height:68px;border-radius:10px;object-fit:cover;flex:none}
+  .bkw .bk-unit .bk-info{flex:1;min-width:0}
+  .bkw .bk-unit .bk-buy{text-align:right}
+  .bkw .bk-unit .bk-buy .btn-primary{margin-left:auto}
+  /* La unidad que el visitante eligió desde la página. */
+  .bkw .bk-unit.is-picked{border-color:var(--bkw-accent);box-shadow:0 0 0 1px var(--bkw-accent)}
+  .bkw .bk-tag{display:block;font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--bkw-accent);margin-bottom:2px}
+  .bkw .bk-pick{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;background:var(--bkw-bg-2);border-radius:11px;padding:10px 14px;font-size:.88rem;margin:0 0 14px}
+  .bkw .bk-pick[hidden]{display:none}
+  .bkw .bk-pick button{background:none;border:none;padding:0;font:inherit;font-weight:700;text-decoration:underline;color:inherit;cursor:pointer}
+  .bkw .bk-note{font-size:.88rem;margin:0 0 12px}
+  .bkw .bk-next{color:var(--bkw-text-soft);font-size:.82rem;text-align:center;margin:10px 0 0}
+  @media (max-width:480px){
+    .bkw .bk-unit{flex-wrap:wrap}
+    .bkw .bk-unit .bk-buy{width:100%;text-align:left;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px}
+    .bkw .bk-unit .bk-buy .btn-primary{margin-top:0}
+  }
   .bkw .bk-empty{text-align:center;color:var(--bkw-text-soft);font-size:.9rem;padding:18px;border:1.5px dashed var(--bkw-line);border-radius:12px}
   .bkw .bk-done{text-align:center;padding:6px 0}
   .bkw .bk-done .ok{width:52px;height:52px;border-radius:50%;background:var(--bkw-bg-2);color:var(--bkw-primary);display:grid;place-items:center;margin:0 auto 10px}
@@ -90,6 +114,7 @@
     <div id="bkw-step-search">
       <h3>Reservá online</h3>
       <p class="mini">Disponibilidad en tiempo real — reservá al instante, sin esperar respuesta.</p>
+      <p class="bk-pick" id="bkw-pick" hidden></p>
       <div class="field-row">
         <div class="field"><label for="bkw-in">Llegada</label><input id="bkw-in" type="date"><span class="bkw-date" id="bkw-in-words" aria-live="polite"></span></div>
         <div class="field"><label for="bkw-out">Salida</label><input id="bkw-out" type="date"><span class="bkw-date" id="bkw-out-words" aria-live="polite"></span></div>
@@ -103,6 +128,7 @@
         </select>
       </div>
       <button class="btn-primary" id="bkw-search" type="button">Ver disponibilidad</button>
+      <p class="bk-next">En el paso siguiente ves cuáles están libres, con nombre y precio, y elegís la tuya.</p>
     </div>
     <div id="bkw-step-results" style="display:none"></div>
     <div id="bkw-step-form" style="display:none"></div>
@@ -149,7 +175,48 @@
   function dateWords(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s||'') ? new Date(s+'T12:00:00Z').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}) : ''; }
   function shortDate(s){ return new Date(s+'T12:00:00Z').toLocaleDateString('es-AR',{day:'numeric',month:'short',timeZone:'UTC'}); }
 
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function people(n){ return n + ' persona' + (n>1 ? 's' : ''); }
+
   var state = { in:'', out:'', pax:2, unit:null };
+
+  // ----- Unidad elegida desde la página (data-bkw-unit) -----
+  // "Cabaña Agua", "agua" y "AGUA" son la misma: sin tildes, sin mayúsculas.
+  function norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim(); }
+  function sameUnit(a, b){
+    a = norm(a); b = norm(b);
+    if (!a || !b) return false;
+    return a === b || (' '+a+' ').indexOf(' '+b+' ') >= 0 || (' '+b+' ').indexOf(' '+a+' ') >= 0;
+  }
+  function photoFor(name){
+    var els = document.querySelectorAll('[data-bkw-unit][data-bkw-photo]');
+    for (var i=0; i<els.length; i++) if (sameUnit(els[i].getAttribute('data-bkw-unit'), name)) return els[i].getAttribute('data-bkw-photo');
+    return '';
+  }
+  var wanted = '';
+  function showPick(){
+    var box = $('bkw-pick');
+    while (box.firstChild) box.removeChild(box.firstChild);
+    box.hidden = !wanted;
+    if (!wanted) return;
+    var text = document.createElement('span'), name = document.createElement('b'), all = document.createElement('button');
+    name.textContent = wanted;
+    text.appendChild(document.createTextNode('Elegiste '));
+    text.appendChild(name);
+    text.appendChild(document.createTextNode('. Poné tus fechas para ver si está libre.'));
+    all.type = 'button'; all.textContent = 'Ver todas';
+    all.addEventListener('click', function(){ wanted = ''; showPick(); });
+    box.appendChild(text); box.appendChild(all);
+  }
+  document.addEventListener('click', function(e){
+    var el = e.target && e.target.closest ? e.target.closest('[data-bkw-unit]') : null;
+    if (!el) return;
+    e.preventDefault();
+    wanted = el.getAttribute('data-bkw-unit') || '';
+    state.unit = null; show('search'); say(''); showPick();
+    var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    $('bkw-root').scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+  });
 
   // ----- Fechas por defecto -----
   var today = iso(new Date());
@@ -232,18 +299,29 @@
   function renderResults(units){
     var n = nights(state.in, state.out);
     var html = '<button class="bk-back" id="bkw-back1">&larr; Cambiar fechas</button>'
-      + '<div class="bk-summary">'+shortDate(state.in)+' &rarr; '+shortDate(state.out)+' · <b>'+n+' noche'+(n>1?'s':'')+'</b> · '+state.pax+' huésped'+(state.pax>1?'es':'')+'</div>';
+      + '<div class="bk-summary">'+shortDate(state.in)+' &rarr; '+shortDate(state.out)+' · <b>'+n+' noche'+(n>1?'s':'')+'</b> · '+people(state.pax)+'</div>';
     if(!units.length){
       html += '<div class="bk-empty">No hay unidades disponibles para esas fechas. Probá con otras o escribinos por WhatsApp.</div>';
     } else {
+      // La que eligió desde la página va primera; si no está libre, se avisa.
+      var picked = wanted ? units.filter(function(u){ return sameUnit(u.name, wanted); }) : [];
+      if (wanted && !picked.length) {
+        html += '<p class="bk-note"><b>'+esc(wanted)+'</b> no está libre para esas fechas y esa cantidad de personas. Estas sí:</p>';
+      }
+      units = picked.concat(units.filter(function(u){ return picked.indexOf(u) < 0; }));
       units.forEach(function(u){
         var total = Number(u.price_per_night) * n;
         var deposit = depositPct > 0 ? Math.round(total * depositPct / 100) : null;
-        html += '<div class="bk-unit">'
-          + '<div><h4>'+u.name+'</h4><small>Hasta '+u.capacity+' huéspedes · '+money(u.price_per_night)+'/noche</small></div>'
-          + '<div style="text-align:right"><div class="price">'+money(total)+'</div>'
+        var photo = photoFor(u.name), isPicked = picked.indexOf(u) >= 0;
+        html += '<div class="bk-unit'+(isPicked?' is-picked':'')+'">'
+          + (photo ? '<img class="bk-thumb" src="'+esc(photo)+'" alt="" loading="lazy" width="68" height="68">' : '')
+          + '<div class="bk-info">'+(isPicked?'<span class="bk-tag">La que elegiste</span>':'')
+          + '<h4>'+esc(u.name)+'</h4>'
+          + '<small>'+money(u.price_per_night)+' por noche para '+people(state.pax)+'</small>'
+          + '<small>Entran hasta '+esc(u.capacity)+'</small></div>'
+          + '<div class="bk-buy"><div><div class="price">'+money(total)+'</div>'
           + (deposit!=null ? '<small>Seña ('+depositPct+'%): '+money(deposit)+'</small>' : '')
-          + '<button class="btn-primary" data-unit="'+u.unit_id+'" data-name="'+encodeURIComponent(u.name)+'" data-total="'+total+'">Reservar</button></div>'
+          + '</div><button class="btn-primary" data-unit="'+esc(u.unit_id)+'" data-name="'+encodeURIComponent(u.name)+'" data-total="'+total+'">Reservar</button></div>'
           + '</div>';
       });
     }
@@ -260,7 +338,7 @@
   function renderForm(){
     var n = nights(state.in, state.out);
     steps.form.innerHTML = '<button class="bk-back" id="bkw-back2">&larr; Ver otras unidades</button>'
-      + '<div class="bk-summary"><b>'+state.unit.name+'</b> · '+shortDate(state.in)+' &rarr; '+shortDate(state.out)+' · '+n+' noche'+(n>1?'s':'')+' · <b>'+money(state.unit.total)+'</b></div>'
+      + '<div class="bk-summary"><b>'+esc(state.unit.name)+'</b> · '+shortDate(state.in)+' &rarr; '+shortDate(state.out)+' · '+n+' noche'+(n>1?'s':'')+' · '+people(state.pax)+' · <b>'+money(state.unit.total)+'</b></div>'
       + '<div class="field"><label for="bkw-name">Nombre y apellido</label><input id="bkw-name" type="text" placeholder="Tu nombre" required></div>'
       + '<div class="field-row"><div class="field"><label for="bkw-email">Email</label><input id="bkw-email" type="email" placeholder="tu@mail.com"></div>'
       + '<div class="field"><label for="bkw-phone">Teléfono / WhatsApp</label><input id="bkw-phone" type="text" placeholder="+54 9…"></div></div>'
@@ -319,7 +397,7 @@
       + '<h3>¡Reserva generada!</h3>'
       + introHtml
       + (code ? '<div class="bk-code">'+code+'</div>' : '')
-      + '<p class="mini">'+state.unit.name+' · '+shortDate(state.in)+' &rarr; '+shortDate(state.out)+'</p>'
+      + '<p class="mini">'+esc(state.unit.name)+' · '+shortDate(state.in)+' &rarr; '+shortDate(state.out)+'</p>'
       + priceHtml
       + payHtml
       + '<a class="btn-wa" style="margin-top:10px;text-decoration:none" href="'+wa+'" target="_blank" rel="noopener">Avisar por WhatsApp</a>'
