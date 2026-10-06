@@ -7,7 +7,6 @@ import { ENTER_VIEW } from "@/lib/motion"
 import { formatDay } from "@/lib/format"
 import { UnitDialog } from "@/components/units/unit-dialog"
 import { UnitActiveToggle } from "@/components/units/unit-active-toggle"
-import { CopyIcalLink } from "@/components/units/copy-ical-link"
 import { OperonMarkTinta } from "@/components/brand/operon-mark"
 import { Users, CalendarDays, Ban, CircleCheck, Moon } from "lucide-react"
 
@@ -166,8 +165,6 @@ export function UnitCard({
         >
           <CalendarDays className="size-3.5" /> Calendario
         </Link>
-        {/* Link del feed iCal para sincronizar con Booking/Airbnb (Etapa 9). */}
-        <CopyIcalLink unitId={unit.id} token={unit.icalToken} />
         {!readOnly && (
           <div className="ml-auto">
             <UnitActiveToggle id={unit.id} isActive={unit.isActive} />

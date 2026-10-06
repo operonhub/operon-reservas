@@ -30,9 +30,15 @@ test("A-01: un feed de iCal vacío no borra los bloqueos importados", async () =
     "select create_public_reservation('alto-cielo', null, $1, '2027-01-06', '2027-01-09', 2, 'X', 'x@e.test', null, null)", [ids.unit_a])
   assert.match(resale.error, /UNAVAILABLE/)
 
-  // Calendario válido y sin eventos: el worker nuevo confirma y se libera.
-  await db.query("select sync_unit_external_blocks($1, $2, 'airbnb', '[]'::jsonb, true)", [ids.ical_token, ids.unit_a])
-  assert.equal(await count(db, imported, [ids.unit_a]), 0)
+  // Calendario válido y sin eventos, confirmado por el worker: desde 0041 ya
+  // no se libera en el acto. Que desaparezcan todas juntas es la señal de un
+  // feed roto (o del eco de 0042): quedan bloqueando y se cuentan como faltantes.
+  const [{ r }] = await rows(db,
+    "select sync_unit_external_blocks($1, $2, 'airbnb', '[]'::jsonb, true) r", [ids.ical_token, ids.unit_a])
+  assert.equal(await count(db, imported, [ids.unit_a]), 2)
+  assert.equal(r.removed, 0)
+  assert.equal(r.pending_removal, 2)
+  assert.equal(r.mass_drop, true)
   await db.close()
 })
 

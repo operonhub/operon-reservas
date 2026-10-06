@@ -31,8 +31,13 @@ export function IcalSyncFields({
           <code className="mx-1 rounded bg-muted px-1">webcal://</code>.
           Actualizamos las fechas ocupadas cada una hora. Para protección
           completa, copiá también el link de calendario de esta unidad (abajo)
-          y pegalo en la sección de &quot;importar calendario&quot; de Airbnb
-          y Booking.
+          y pegalo en la sección de &quot;importar calendario&quot; de cada
+          plataforma.
+        </p>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          <strong>Ojo con cruzar unidades:</strong> el link de cada cabaña de
+          Booking va en la misma cabaña acá. El panel no compara nombres: toma
+          como ocupadas las fechas del link que pegues.
         </p>
       </div>
 
@@ -58,11 +63,15 @@ export function IcalSyncFields({
         />
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border border-dashed p-2.5">
+      <div className="grid gap-2 rounded-lg border border-dashed p-2.5">
         <p className="text-xs text-muted-foreground">
-          Link de calendario de esta unidad (para pegar en Airbnb/Booking)
+          Link de calendario de esta unidad. Cada plataforma tiene el suyo:
+          pegá en Booking el de Booking y en Airbnb el de Airbnb.
         </p>
-        <CopyIcalLink unitId={unitId} token={icalToken} />
+        <div className="flex flex-wrap gap-1.5">
+          <CopyIcalLink unitId={unitId} token={icalToken} canal="booking" />
+          <CopyIcalLink unitId={unitId} token={icalToken} canal="airbnb" />
+        </div>
       </div>
     </div>
   )

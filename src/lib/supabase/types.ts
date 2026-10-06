@@ -1207,7 +1207,7 @@ export type Database = {
       mp_disconnect: { Args: never; Returns: undefined }
       mp_public_status: { Args: { p_org_slug: string }; Returns: Json }
       public_ical_feed: {
-        Args: { p_token: string; p_unit_id: string }
+        Args: { p_token: string; p_unit_id: string; p_for?: string }
         Returns: Json
       }
       mp_save_oauth_state: {

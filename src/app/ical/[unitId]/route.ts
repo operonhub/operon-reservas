@@ -36,6 +36,12 @@ function escapeText(text: string): string {
  * Pensado para que Booking/Airbnb lo lean y bloqueen su calendario — sin
  * datos de huéspedes, precios ni motivos de bloqueo. Sin el token correcto
  * responde 404, igual que una unidad que no existe.
+ *
+ * `?canal=booking|airbnb` dice a quién va dirigido: a cada plataforma nunca
+ * se le devuelve lo que se importó de ella misma (0042). Booking deja de
+ * publicar en su calendario las fechas que le llegan por un link importado,
+ * así que devolvérselas hacía que sus propias reservas "desaparecieran". Sin
+ * canal (los links pegados antes de 0042) no sale nada importado.
  */
 export async function GET(
   request: Request,
@@ -43,12 +49,15 @@ export async function GET(
 ) {
   const { unitId } = await params
   // El token va en el link que el dueño copia del panel (migración 0028).
-  const token = new URL(request.url).searchParams.get("t") ?? ""
+  const query = new URL(request.url).searchParams
+  const token = query.get("t") ?? ""
+  const canal = query.get("canal")
   const supabase = await createClient()
 
   const { data, error } = await supabase.rpc("public_ical_feed", {
     p_unit_id: unitId,
     p_token: token,
+    p_for: canal === "booking" || canal === "airbnb" ? canal : undefined,
   })
   const feed = data as IcalFeed | null
 
@@ -91,7 +100,9 @@ export async function GET(
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
       "Content-Disposition": 'inline; filename="calendario.ics"',
-      "Cache-Control": "public, max-age=1800", // 30' — Booking/Airbnb igual pollean cada tanto
+      // Sin caché: Booking importa cada ~2 h y Airbnb cada ~3 h; que al menos
+      // lo que se lleven sea lo de este instante.
+      "Cache-Control": "no-store",
     },
   })
 }
