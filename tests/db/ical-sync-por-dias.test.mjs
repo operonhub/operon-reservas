@@ -258,11 +258,37 @@ test("desaparecen varias juntas (feed roto): no se libera ninguna sola, pase el 
   assert.deepEqual([r.mass_drop, r.pending_removal, r.removed], [true, 3, 0])
   assert.equal(await canBook(db, ids, "2027-02-02", "2027-02-05"), false)
 
-  // El feed se arregla y trae dos de vuelta: la que sigue faltando ya es una
-  // cancelación suelta, y como lleva de sobra el margen, se libera.
+  // El feed se arregla y trae dos de vuelta. La que sigue faltando NO se libera
+  // sola aunque lleve semanas: formó parte de la desaparición masiva y queda en
+  // espera hasta que alguien la confirme (así pasó con AGUA, 17 al 19/10).
   r = await sync(db, ids, [all[0], all[1], all[2]])
-  assert.deepEqual([r.mass_drop, r.removed, r.pending_removal], [false, 1, 0])
-  assert.deepEqual(await blocks(db, ids), ["a@b 2027-01-10→2027-01-14 0", "b@b 2027-02-01→2027-02-08 0", "c@b 2027-03-01→2027-03-05 0"])
+  assert.deepEqual([r.mass_drop, r.removed, r.pending_removal], [false, 0, 1])
+  assert.equal(await canBook(db, ids, "2027-04-01", "2027-04-04"), false)
+  for (let i = 0; i < 5; i++) await sync(db, ids, [all[0], all[1], all[2]])
+  assert.equal(await canBook(db, ids, "2027-04-01", "2027-04-04"), false, "sigue en espera corrida tras corrida")
+  // Las que volvieron quedaron limpias, sin marca de espera.
+  assert.equal((await one(db, "select count(*)::int n from unit_occupancy where unit_id = $1 and hold_until is not null", [ids.unit_a])).n, 1)
+
+  // Un admin de Operon la libera cuando el dueño confirma que se canceló.
+  await as(db, "authenticated", { uid: ids.admin })
+  const [held] = await rows(db, "select id, desde::text, auto_release from operon_ical_attention($1)", [ids.org_a])
+  assert.deepEqual([held.desde, held.auto_release], ["2027-04-01", false])
+  await one(db, "select operon_ical_release($1) r", [held.id])
+  await as(db, "postgres")
+  assert.equal(await canBook(db, ids, "2027-04-01", "2027-04-04"), true)
+  await db.close()
+})
+
+test("si la que quedó en espera vuelve al feed, la marca se va sola", async () => {
+  const { db, ids } = await fresh()
+  const all = [ev("a@b", "2027-01-10", "2027-01-14"), ev("b@b", "2027-02-01", "2027-02-08"),
+    ev("c@b", "2027-03-01", "2027-03-05"), ev("d@b", "2027-04-01", "2027-04-04")]
+  await sync(db, ids, all)
+  await sync(db, ids, [all[0]])          // desaparecen tres
+  await sync(db, ids, all.slice(0, 3))   // vuelven dos, una queda en espera
+  const r = await sync(db, ids, all)     // vuelve la última
+  assert.deepEqual([r.pending_removal, r.removed], [0, 0])
+  assert.equal((await one(db, "select count(*)::int n from unit_occupancy where unit_id = $1 and (hold_until is not null or missing_count > 0)", [ids.unit_a])).n, 0)
   await db.close()
 })
 
@@ -295,11 +321,22 @@ test("un admin de Operon libera una fecha en duda, y queda registrado", async ()
   assert.equal((await one(db, "select count(*)::int n from app_private.admin_audit_log where action = 'ical.release'")).n, 1)
   assert.equal((await one(db, "select count(*)::int n from app_private.ical_sync_history where action = 'released_by_admin'")).n, 1)
 
-  // Con una sola en falta de dos, ya es una cancelación suelta: se liberaría sola.
+  // La otra desapareció en el mismo episodio: sigue en espera, no se libera sola.
   await sync(db, ids, [all[0]])
   await as(db, "authenticated", { uid: ids.admin })
   const [last] = await rows(db, "select desde::text, auto_release from operon_ical_attention($1) where kind = 'missing'", [ids.org_a])
-  assert.deepEqual([last.desde, last.auto_release], ["2027-03-01", true])
+  assert.deepEqual([last.desde, last.auto_release], ["2027-03-01", false])
+  await db.close()
+})
+
+test("una cancelación suelta (no masiva) figura como que se libera sola", async () => {
+  const { db, ids } = await fresh()
+  const all = [ev("a@b", "2027-01-10", "2027-01-14"), ev("b@b", "2027-02-01", "2027-02-08"), ev("c@b", "2027-03-01", "2027-03-05")]
+  await sync(db, ids, all)
+  await sync(db, ids, [all[0], all[2]])
+  await as(db, "authenticated", { uid: ids.admin })
+  const [only] = await rows(db, "select desde::text, auto_release, hold_until from operon_ical_attention($1)", [ids.org_a])
+  assert.deepEqual([only.desde, only.auto_release, only.hold_until], ["2027-02-01", true, null])
   await db.close()
 })
 
