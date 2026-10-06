@@ -6,7 +6,7 @@ import { buttonVariants } from "@/components/ui/button"
 import { activity, relative, shortDate } from "@/lib/operon/format"
 import type { ClientRow } from "@/lib/operon/types"
 import { TONE_CLASSES, overviewSummary, type ZoneOverview } from "@/lib/operon/zone"
-import { isIcalProblem, type IcalStatusRow } from "@/lib/operon/ical"
+import { isIcalProblem, type IcalStatusRow, isIcalConflict, type IcalAttentionRow } from "@/lib/operon/ical"
 import { WEBSITE_STATUS, type WebsiteStatus } from "@/lib/operon/website"
 import { siteUrl } from "@/lib/site-url"
 import { createClient } from "@/lib/supabase/server"
@@ -45,11 +45,12 @@ export default async function ClientesPage({
   searchParams: Promise<{ estado?: string }>
 }) {
   const supabase = await createClient()
-  const [{ data, error }, { data: zoneData }, { data: icalData }, { data: websiteData }] = await Promise.all([
+  const [{ data, error }, { data: zoneData }, { data: icalData }, { data: websiteData }, { data: attentionData }] = await Promise.all([
     supabase.rpc("operon_clients"),
     supabase.rpc("operon_zone_month_overview"),
     supabase.rpc("operon_ical_overview"),
     supabase.rpc("operon_websites"),
+    supabase.rpc("operon_ical_attention"),
   ])
   if (error) notFound()
   const websites = new Map((websiteData ?? []).map((w) => [w.organization_id, w]))
@@ -57,6 +58,10 @@ export default async function ClientesPage({
   const icalProblems = new Map<string, number>()
   for (const row of (icalData ?? []) as IcalStatusRow[]) {
     if (isIcalProblem(row)) icalProblems.set(row.organization_id, (icalProblems.get(row.organization_id) ?? 0) + 1)
+  }
+  // Una posible sobreventa (0043) también pone al cliente en rojo.
+  for (const row of (attentionData ?? []) as IcalAttentionRow[]) {
+    if (isIcalConflict(row)) icalProblems.set(row.organization_id, (icalProblems.get(row.organization_id) ?? 0) + 1)
   }
 
   const { estado } = await searchParams
@@ -331,7 +336,7 @@ function Health({ failed, stuck, calendars }: { failed: number; stuck: number; c
       {calendars > 0 && (
         <p className="flex items-center gap-1.5 text-destructive">
           <span aria-hidden className="size-2 rounded-full bg-destructive" />
-          {calendars} calendario{calendars === 1 ? "" : "s"} con fallas
+          {calendars} calendario{calendars === 1 ? "" : "s"} para revisar
         </p>
       )}
       {stuck > 0 && (

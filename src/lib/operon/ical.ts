@@ -48,3 +48,34 @@ export function icalErrorLabel(code: string | null) {
   if (code === "TIMEOUT") return "La plataforma tardó demasiado en responder."
   return "No se pudo sincronizar."
 }
+
+/**
+ * Lo que necesita que alguien mire (0043): fechas importadas que la plataforma
+ * dejó de informar y siguen bloqueadas por las dudas, y posibles sobreventas.
+ */
+export type IcalAttentionRow = {
+  kind: "missing" | "conflict"
+  organization_id: string
+  unit_id: string
+  unit_name: string
+  source: "airbnb" | "booking"
+  desde: string
+  hasta: string
+  since: string | null
+  missing_count: number
+  hold_until: string | null
+  other_kind: "reservation" | "airbnb" | "booking" | null
+  other_desde: string | null
+  other_hasta: string | null
+  reservation_code: string | null
+}
+
+/** Una posible sobreventa es siempre un problema; una fecha en duda, no: está bloqueada. */
+export const isIcalConflict = (row: Pick<IcalAttentionRow, "kind">) => row.kind === "conflict"
+
+/** Con qué choca lo que la plataforma da por ocupado. */
+export function conflictWith(row: Pick<IcalAttentionRow, "other_kind" | "reservation_code">) {
+  if (row.other_kind === "reservation") return row.reservation_code ? `la reserva ${row.reservation_code}` : "una reserva del panel"
+  if (row.other_kind === "airbnb" || row.other_kind === "booking") return `una fecha ocupada en ${SOURCE_LABELS[row.other_kind]}`
+  return "otra ocupación"
+}

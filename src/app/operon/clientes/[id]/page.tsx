@@ -22,7 +22,10 @@ import { ZoneMonthCard } from "./zone-month-card"
 import { WebsiteCard } from "./website-card"
 import { buildSnippet } from "@/lib/operon/website"
 import type { ZoneOverview } from "@/lib/operon/zone"
-import { SOURCE_LABELS, STATE_LABELS, icalErrorLabel, isIcalProblem, type IcalStatusRow } from "@/lib/operon/ical"
+import {
+  SOURCE_LABELS, STATE_LABELS, conflictWith, icalErrorLabel, isIcalConflict, isIcalProblem,
+  type IcalAttentionRow, type IcalStatusRow,
+} from "@/lib/operon/ical"
 import { isZoneMonthEnabled } from "@/lib/zone-month/flag"
 import { ZONE_MONTH_LABEL } from "@/lib/zone-month/content"
 
@@ -57,12 +60,13 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
   if (!UUID.test(id)) notFound()
 
   const supabase = await createClient()
-  const [{ data, error }, { data: logData }, { data: zoneData }, { data: icalData }, { data: contact }] = await Promise.all([
+  const [{ data, error }, { data: logData }, { data: zoneData }, { data: icalData }, { data: contact }, { data: attentionData }] = await Promise.all([
     supabase.rpc("operon_client_detail", { p_org: id }),
     supabase.rpc("operon_audit_log", { p_org: id, p_limit: 20 }),
     supabase.rpc("operon_zone_month_overview", { p_org: id }),
     supabase.rpc("operon_ical_overview", { p_org: id }),
     supabase.from("properties").select("whatsapp").eq("organization_id", id).order("created_at").limit(1).maybeSingle(),
+    supabase.rpc("operon_ical_attention", { p_org: id }),
   ])
   if (error || !data) notFound()
 
@@ -70,6 +74,7 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
   const log = (logData ?? []) as AuditEntry[]
   const zoneOverview = ((zoneData ?? []) as unknown as ZoneOverview[])[0] ?? null
   const calendars = (icalData ?? []) as IcalStatusRow[]
+  const attention = (attentionData ?? []) as IcalAttentionRow[]
   const now = currentTime()
   const publicUrl = `${await siteUrl()}/reservar/${d.org.slug}`
   const owners = d.members.filter((m) => m.role === "owner").length
@@ -241,6 +246,7 @@ export default async function ClientePage({ params }: { params: Promise<{ id: st
         <Section title="Salud">
           <EmailHealth health={d.email_health} now={now} />
           <CalendarHealth rows={calendars} now={now} />
+          <CalendarAttention rows={attention} now={now} />
         </Section>
 
         <Section title="Web del cliente" className="lg:col-span-3">
@@ -391,6 +397,60 @@ function CalendarHealth({ rows, now }: { rows: IcalStatusRow[]; now: number }) {
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+/**
+ * Fechas importadas que necesitan una mirada (0043): posibles sobreventas, y
+ * fechas que la plataforma dejó de informar y siguen bloqueadas por las dudas.
+ */
+function CalendarAttention({ rows, now }: { rows: IcalAttentionRow[]; now: number }) {
+  if (rows.length === 0) return null
+  const conflicts = rows.filter(isIcalConflict)
+  const missing = rows.filter((r) => !isIcalConflict(r))
+  const range = (a: string | null, b: string | null) => (a && b ? `${shortDate(a)} → ${shortDate(b)}` : "")
+  return (
+    <div className="mt-3 space-y-3 border-t pt-3 text-sm">
+      {conflicts.length > 0 && (
+        <div>
+          <p className="flex items-center gap-2 font-medium text-destructive">
+            <CircleAlert className="size-4" /> Posible sobreventa
+          </p>
+          <ul className="mt-1 space-y-1.5">
+            {conflicts.map((r) => (
+              <li key={`c-${r.unit_id}-${r.source}-${r.desde}-${r.other_desde}`}>
+                {r.unit_name}: {SOURCE_LABELS[r.source]} da por ocupado {range(r.desde, r.hasta)} y se pisa con{" "}
+                {conflictWith(r)} ({range(r.other_desde, r.other_hasta)}).
+                {r.since && <span className="block text-xs text-muted-foreground">Detectado {relative(r.since, now)}. Hay que hablar con el cliente.</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {missing.length > 0 && (
+        <div>
+          <p className="font-medium">Fechas en duda (siguen bloqueadas)</p>
+          <p className="text-xs text-muted-foreground">
+            La plataforma dejó de informarlas. No se liberan solas hasta cumplir el margen; si el cliente
+            confirma que se cancelaron, puede borrar el bloqueo desde su calendario.
+          </p>
+          <ul className="mt-1 space-y-1">
+            {missing.map((r) => (
+              <li key={`m-${r.unit_id}-${r.source}-${r.desde}`}>
+                {r.unit_name} · {SOURCE_LABELS[r.source]} · {range(r.desde, r.hasta)}{" "}
+                <span className="text-xs text-muted-foreground">
+                  {r.hold_until
+                    ? `en espera hasta el ${shortDate(r.hold_until.slice(0, 10))}`
+                    : r.since
+                      ? `falta desde ${relative(r.since, now)}`
+                      : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

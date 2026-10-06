@@ -29,7 +29,7 @@ export function IcalSyncFields({
           al exportar tu calendario desde su panel. Sirve cualquier dirección
           <code className="mx-1 rounded bg-muted px-1">https://</code> o
           <code className="mx-1 rounded bg-muted px-1">webcal://</code>.
-          Actualizamos las fechas ocupadas cada una hora. Para protección
+          Actualizamos las fechas ocupadas cada 15 minutos. Para protección
           completa, copiá también el link de calendario de esta unidad (abajo)
           y pegalo en la sección de &quot;importar calendario&quot; de cada
           plataforma.
