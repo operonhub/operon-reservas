@@ -242,7 +242,7 @@ test("una reserva cargada en Operon como venida de Booking no es un choque", asy
   await db.close()
 })
 
-test("desaparecen varias juntas (feed roto): 24 corridas y 24 horas antes de liberar", async () => {
+test("desaparecen varias juntas (feed roto): no se libera ninguna sola, pase el tiempo que pase", async () => {
   const { db, ids } = await fresh()
   const all = [ev("a@b", "2027-01-10", "2027-01-14"), ev("b@b", "2027-02-01", "2027-02-08"),
     ev("c@b", "2027-03-01", "2027-03-05"), ev("d@b", "2027-04-01", "2027-04-04")]
@@ -251,18 +251,88 @@ test("desaparecen varias juntas (feed roto): 24 corridas y 24 horas antes de lib
   let r = await sync(db, ids, only)
   assert.deepEqual([r.mass_drop, r.pending_removal, r.removed], [true, 3, 0])
 
-  // Con el margen de una cancelación normal cumplido de sobra, siguen bloqueando.
-  await sync(db, ids, only); await sync(db, ids, only)
-  await age(db, ids, "6 hours")
+  // Semanas faltando y cientos de corridas: siguen bloqueando.
+  await db.query("update unit_occupancy set missing_count = 500 where unit_id = $1 and missing_count > 0", [ids.unit_a])
+  await age(db, ids, "30 days")
   r = await sync(db, ids, only)
   assert.deepEqual([r.mass_drop, r.pending_removal, r.removed], [true, 3, 0])
   assert.equal(await canBook(db, ids, "2027-02-02", "2027-02-05"), false)
 
-  // 24 corridas y más de 24 horas: recién ahí.
-  await db.query("update unit_occupancy set missing_count = 23 where unit_id = $1 and missing_count > 0", [ids.unit_a])
-  await age(db, ids, "20 hours")
-  r = await sync(db, ids, only)
-  assert.deepEqual([r.removed, r.pending_removal], [3, 0])
+  // El feed se arregla y trae dos de vuelta: la que sigue faltando ya es una
+  // cancelación suelta, y como lleva de sobra el margen, se libera.
+  r = await sync(db, ids, [all[0], all[1], all[2]])
+  assert.deepEqual([r.mass_drop, r.removed, r.pending_removal], [false, 1, 0])
+  assert.deepEqual(await blocks(db, ids), ["a@b 2027-01-10→2027-01-14 0", "b@b 2027-02-01→2027-02-08 0", "c@b 2027-03-01→2027-03-05 0"])
+  await db.close()
+})
+
+test("un admin de Operon libera una fecha en duda, y queda registrado", async () => {
+  const { db, ids } = await fresh()
+  const all = [ev("a@b", "2027-01-10", "2027-01-14"), ev("b@b", "2027-02-01", "2027-02-08"), ev("c@b", "2027-03-01", "2027-03-05")]
+  await sync(db, ids, all)
+  await sync(db, ids, [all[0]]) // faltan dos de tres: no se liberan solas
+
+  await as(db, "authenticated", { uid: ids.admin })
+  const pending = await rows(db, "select id, desde::text, auto_release from operon_ical_attention($1) where kind = 'missing'", [ids.org_a])
+  assert.deepEqual(pending.map((p) => [p.desde, p.auto_release]), [["2027-02-01", false], ["2027-03-01", false]])
+  const present = (await one(db, "select id from unit_occupancy where external_uid = 'a@b'")).id
+
+  // Una que la plataforma sigue informando no se puede liberar: se volvería a bloquear sola.
+  assert.match((await attempt(db, "select operon_ical_release($1)", [present])).error, /NOT_IN_DOUBT/)
+  assert.match((await attempt(db, "select operon_ical_release(gen_random_uuid())")).error, /BLOCK_NOT_FOUND/)
+  // Ni el dueño ni un anónimo pueden usarla.
+  for (const [role, uid] of [["anon", ""], ["authenticated", ids.owner_a]]) {
+    await as(db, role, { uid })
+    assert.ok((await attempt(db, "select operon_ical_release($1)", [pending[0].id])).error, role)
+  }
+
+  await as(db, "authenticated", { uid: ids.admin })
+  const { r } = await one(db, "select operon_ical_release($1) r", [pending[0].id])
+  assert.deepEqual(r, { desde: "2027-02-01", hasta: "2027-02-08" })
+  await as(db, "postgres")
+  assert.equal(await canBook(db, ids, "2027-02-02", "2027-02-05"), true)
+  assert.equal(await canBook(db, ids, "2027-03-01", "2027-03-03"), false, "la otra sigue bloqueada")
+  assert.equal((await one(db, "select count(*)::int n from app_private.admin_audit_log where action = 'ical.release'")).n, 1)
+  assert.equal((await one(db, "select count(*)::int n from app_private.ical_sync_history where action = 'released_by_admin'")).n, 1)
+
+  // Con una sola en falta de dos, ya es una cancelación suelta: se liberaría sola.
+  await sync(db, ids, [all[0]])
+  await as(db, "authenticated", { uid: ids.admin })
+  const [last] = await rows(db, "select desde::text, auto_release from operon_ical_attention($1) where kind = 'missing'", [ids.org_a])
+  assert.deepEqual([last.desde, last.auto_release], ["2027-03-01", true])
+  await db.close()
+})
+
+test("un bloque en espera sin fecha (infinity) no se libera nunca solo y el feed lo reemplaza", async () => {
+  const { db, ids } = await fresh()
+  const A = ev("a@b", "2027-01-10", "2027-01-14"), B = ev("b@b", "2027-02-01", "2027-02-08"), C = ev("c@b", "2027-03-01", "2027-03-05")
+  await sync(db, ids, [A, B, C])
+  // Así se pasan a "en espera" los bloqueos que alguien restauró a mano.
+  const manual = await one(db,
+    "insert into unit_occupancy (organization_id, unit_id, during, kind, block_reason) values ($1, $2, '[2027-11-20,2027-11-23)', 'block', 'Restaurado') returning id",
+    [ids.org_a, ids.unit_a])
+  await db.query(
+    "update unit_occupancy set external_source = 'booking', external_uid = 'restaurado~' || to_char(lower(during), 'YYYYMMDD'), hold_until = 'infinity' where id = $1",
+    [manual.id])
+
+  for (let i = 0; i < 5; i++) await sync(db, ids, [A, B, C])
+  await age(db, ids, "60 days")
+  const r = await sync(db, ids, [A, B, C])
+  assert.deepEqual([r.removed, r.pending_removal], [0, 1])
+  assert.equal(await canBook(db, ids, "2027-11-20", "2027-11-23"), false)
+
+  await as(db, "authenticated", { uid: ids.admin })
+  const [held] = await rows(db, "select desde::text, hold_until::text, auto_release from operon_ical_attention($1)", [ids.org_a])
+  await as(db, "postgres")
+  assert.deepEqual([held.desde, held.hold_until, held.auto_release], ["2027-11-20", "infinity", false])
+
+  // Ya no sale por el link que lee Booking (era lo que la escondía de su feed)…
+  const { ical_token: token } = await one(db, "select ical_token from units where id = $1", [ids.unit_a])
+  const { f } = await one(db, "select public_ical_feed($1, $2) f", [ids.unit_a, token])
+  assert.deepEqual(f.ranges, [])
+  // …y cuando Booking la vuelve a publicar, la toma el feed.
+  await sync(db, ids, [A, B, C, ev("real@b", "2027-11-20", "2027-11-23")])
+  assert.equal((await blocks(db, ids)).at(-1), "real@b 2027-11-20→2027-11-23 0")
   await db.close()
 })
 

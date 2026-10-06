@@ -250,3 +250,30 @@ export async function verifyWebsite(_prev: WebsiteState, formData: FormData): Pr
     ? { ok: true, message: "Listo: el widget está conectado a este complejo." }
     : { ok: true, message: "Verificada. Mirá el estado y la nota debajo." }
 }
+
+const ICAL_RELEASE_ERRORS: Record<string, string> = {
+  FORBIDDEN: MESSAGES.FORBIDDEN,
+  BLOCK_NOT_FOUND: "Esa fecha ya no está bloqueada.",
+  NOT_IMPORTED: "Ese bloqueo no viene de Airbnb o Booking.",
+  NOT_IN_DOUBT: "La plataforma volvió a informar esa fecha: sigue ocupada, no se puede liberar.",
+}
+
+/**
+ * Libera una fecha importada que la plataforma dejó de informar (0044). La
+ * base solo lo permite sobre fechas en duda y deja el registro.
+ */
+export async function releaseIcalBlock(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const supabase = await operonClient()
+  if (!supabase) return { error: "No disponible en la demo." }
+  const orgId = field(formData, "org")
+  const id = field(formData, "id")
+  if (!id) return { error: "No se pudo completar. Probá de nuevo." }
+
+  const { error } = await supabase.rpc("operon_ical_release", { p_id: id })
+  if (error) {
+    const code = rpcErrorCode(error.message, Object.keys(ICAL_RELEASE_ERRORS))
+    return { error: code ? ICAL_RELEASE_ERRORS[code] : "No se pudo liberar. Probá de nuevo." }
+  }
+  refresh(orgId)
+  return { ok: true }
+}

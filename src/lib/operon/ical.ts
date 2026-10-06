@@ -55,6 +55,8 @@ export function icalErrorLabel(code: string | null) {
  */
 export type IcalAttentionRow = {
   kind: "missing" | "conflict"
+  /** El bloque, para poder liberarlo. Nulo en los choques. */
+  id: string | null
   organization_id: string
   unit_id: string
   unit_name: string
@@ -64,6 +66,8 @@ export type IcalAttentionRow = {
   since: string | null
   missing_count: number
   hold_until: string | null
+  /** Se libera sola si sigue faltando; si no, espera a que alguien la confirme. */
+  auto_release: boolean
   other_kind: "reservation" | "airbnb" | "booking" | null
   other_desde: string | null
   other_hasta: string | null
@@ -78,4 +82,12 @@ export function conflictWith(row: Pick<IcalAttentionRow, "other_kind" | "reserva
   if (row.other_kind === "reservation") return row.reservation_code ? `la reserva ${row.reservation_code}` : "una reserva del panel"
   if (row.other_kind === "airbnb" || row.other_kind === "booking") return `una fecha ocupada en ${SOURCE_LABELS[row.other_kind]}`
   return "otra ocupación"
+}
+
+/** Qué va a pasar con una fecha en duda, para decírselo a quien mira el panel. */
+export function missingFate(row: Pick<IcalAttentionRow, "hold_until" | "auto_release">, now: number) {
+  if (row.hold_until === "infinity") return "En espera: no se libera sola."
+  if (row.hold_until && new Date(row.hold_until).getTime() > now) return "En espera: no se libera sola por ahora."
+  if (!row.auto_release) return "Desaparecieron varias juntas: no se libera sola."
+  return "Si sigue faltando, se libera sola a las 3 horas."
 }

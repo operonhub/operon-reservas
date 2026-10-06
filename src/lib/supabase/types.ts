@@ -831,12 +831,16 @@ export type Database = {
         Args: { p_unit: string; p_tiers: Json }
         Returns: number
       }
+      operon_ical_release: {
+        Args: { p_id: string }
+        Returns: Json
+      }
       operon_ical_attention: {
         Args: { p_org?: string }
         Returns: {
-          kind: string; organization_id: string; unit_id: string; unit_name: string; source: string;
+          kind: string; id: string | null; organization_id: string; unit_id: string; unit_name: string; source: string;
           desde: string; hasta: string; since: string | null; missing_count: number; hold_until: string | null;
-          other_kind: string | null; other_desde: string | null; other_hasta: string | null; reservation_code: string | null
+          auto_release: boolean; other_kind: string | null; other_desde: string | null; other_hasta: string | null; reservation_code: string | null
         }[]
       }
       operon_set_website: {

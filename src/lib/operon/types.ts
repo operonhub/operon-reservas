@@ -122,6 +122,7 @@ export const ACTION_LABELS: Record<string, string> = {
   "zone_month.queue": "Pidió generar Tu zona",
   "website.set": "Cargó la web del cliente",
   "website.check": "Verificó la web del cliente",
+  "ical.release": "Liberó una fecha importada que estaba en duda",
 }
 
 export const ROLE_LABELS: Record<ClientMember["role"], string> = {

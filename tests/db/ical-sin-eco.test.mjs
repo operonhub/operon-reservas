@@ -141,5 +141,6 @@ test("contraprueba: si a Booking le vuelven sus fechas, las deja de publicar y e
   const { r } = await sync(db, worker, ids.unit_a, "booking", feedBooking)
   assert.equal(r.pending_removal, 2)
   assert.equal(r.mass_drop, true)
+  assert.equal(r.removed, 0)
   await db.close()
 })
