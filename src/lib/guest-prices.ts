@@ -37,6 +37,25 @@ export function describeTier(tier: GuestTier, money: (n: number) => string) {
   return tier.mode === "percent" ? `${tier.value}% menos` : money(tier.value)
 }
 
+/**
+ * Lo que escribió el dueño en el casillero, como número. NaN si no se entiende.
+ * Se escribe como en Argentina: en un precio fijo, "50000", "50.000" y "$ 50.000"
+ * son lo mismo (el punto separa miles y la coma los decimales); en un porcentaje
+ * el punto sí es decimal ("12.5" o "12,5").
+ */
+export function parseAmount(raw: string, mode: GuestPriceMode): number {
+  let s = String(raw ?? "").trim().replace(/^\$\s*/, "").replace(/\s+/g, "")
+  if (!s) return NaN
+  if (mode === "fixed" && /^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, "").replace(",", ".")
+  else s = s.replace(",", ".")
+  return /^\d+(\.\d+)?$/.test(s) ? Number(s) : NaN
+}
+
+/** Un precio fijo de menos del 5% del precio base casi seguro es un cero que faltó (50 en vez de 50000). */
+export function looksLikeMissingZeros(tier: GuestTier, base: number | null): boolean {
+  return tier.mode === "fixed" && base != null && base > 0 && tier.value < base * 0.05
+}
+
 export type TierDraft = { guests: number; mode: "full" | GuestPriceMode; value: string }
 
 /** Las filas del formulario: una por cantidad de personas, hasta la capacidad. */
@@ -53,7 +72,7 @@ export function parseDrafts(drafts: TierDraft[], capacity: number): { tiers: Gue
   for (const d of drafts) {
     if (d.mode === "full") continue
     if (!Number.isInteger(d.guests) || d.guests < 1 || d.guests > capacity) return { error: "Cantidad de personas inválida." }
-    const value = Number(String(d.value).replace(",", "."))
+    const value = parseAmount(d.value, d.mode)
     const who = peopleLabel(d.guests)
     if (!Number.isFinite(value) || value <= 0) {
       return { error: d.mode === "percent" ? `Poné el porcentaje para ${who}.` : `Poné el precio para ${who}.` }

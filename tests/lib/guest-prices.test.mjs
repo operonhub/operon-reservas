@@ -4,7 +4,9 @@
  */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { applyGuestPrice, tierChangePct, describeTier, draftsFor, parseDrafts, peopleLabel } from "../../src/lib/guest-prices.ts"
+import {
+  applyGuestPrice, tierChangePct, describeTier, draftsFor, looksLikeMissingZeros, parseAmount, parseDrafts, peopleLabel,
+} from "../../src/lib/guest-prices.ts"
 
 const pct20 = { guests: 2, mode: "percent", value: 20 }
 const fixed90 = { guests: 3, mode: "fixed", value: 90000 }
@@ -59,11 +61,47 @@ test("no deja guardar valores que la base rechazaría", () => {
     [{ guests: 2, mode: "percent", value: "-5" }, /porcentaje/],
     [{ guests: 3, mode: "fixed", value: "0" }, /precio para 3 personas/],
     [{ guests: 3, mode: "fixed", value: "abc" }, /precio/],
-    [{ guests: 3, mode: "fixed", value: "100.555" }, /dos decimales/],
+    [{ guests: 3, mode: "fixed", value: "100,555" }, /dos decimales/],
     [{ guests: 9, mode: "fixed", value: "100" }, /inválida/], // no entra en la unidad
   ]
   for (const [draft, error] of bad) {
     const result = parseDrafts([draft], 4)
     assert.match(result.error ?? "", error, JSON.stringify(draft))
   }
+})
+
+test("el precio fijo se lee como se escribe acá: 50000, 50.000 y $ 50.000 son lo mismo", () => {
+  for (const raw of ["50000", "50.000", "$ 50.000", " 50.000 ", "$50000"]) assert.equal(parseAmount(raw, "fixed"), 50000, raw)
+  assert.equal(parseAmount("1.250.000", "fixed"), 1250000)
+  assert.equal(parseAmount("50.000,50", "fixed"), 50000.5)
+  assert.equal(parseAmount("112500,5", "fixed"), 112500.5)
+  assert.equal(parseAmount("50,5", "fixed"), 50.5)
+  assert.equal(parseAmount("1.5", "fixed"), 1.5) // un solo dígito después del punto: decimal, no miles
+  for (const raw of ["", "abc", "-5", "5-0", "1.2.3", "50.000.", "1e3"]) assert.ok(Number.isNaN(parseAmount(raw, "fixed")), raw)
+})
+
+test("en un porcentaje el punto es decimal", () => {
+  assert.equal(parseAmount("12.5", "percent"), 12.5)
+  assert.equal(parseAmount("12,5", "percent"), 12.5)
+  assert.equal(parseAmount("25", "percent"), 25)
+  assert.ok(Number.isNaN(parseAmount("veinte", "percent")))
+})
+
+test("lo que escribe la clienta llega bien al guardar", () => {
+  // El caso real: AGUA, 1 persona, precio fijo, "50.000".
+  assert.deepEqual(parseDrafts([{ guests: 1, mode: "fixed", value: "50.000" }], 4), { tiers: [{ guests: 1, mode: "fixed", value: 50000 }] })
+  assert.deepEqual(parseDrafts([{ guests: 1, mode: "fixed", value: "$ 50000" }], 4), { tiers: [{ guests: 1, mode: "fixed", value: 50000 }] })
+  // Lo guardado se vuelve a leer igual al reabrir el diálogo.
+  const again = draftsFor(4, [{ guests: 1, mode: "fixed", value: 50000 }, { guests: 2, mode: "percent", value: 12.5 }, { guests: 3, mode: "fixed", value: 99999.5 }])
+  assert.deepEqual(parseDrafts(again, 4), { tiers: [
+    { guests: 1, mode: "fixed", value: 50000 }, { guests: 2, mode: "percent", value: 12.5 }, { guests: 3, mode: "fixed", value: 99999.5 }] })
+})
+
+test("avisa cuando un precio fijo parece tener un cero de menos", () => {
+  const fixed = (value) => ({ guests: 1, mode: "fixed", value })
+  assert.equal(looksLikeMissingZeros(fixed(50), 150000), true)
+  assert.equal(looksLikeMissingZeros(fixed(5000), 150000), true)
+  assert.equal(looksLikeMissingZeros(fixed(50000), 150000), false)
+  assert.equal(looksLikeMissingZeros(fixed(50), null), false)
+  assert.equal(looksLikeMissingZeros({ guests: 1, mode: "percent", value: 5 }, 150000), false)
 })

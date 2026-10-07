@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/format"
 import { saveGuestPrices } from "@/app/(panel)/tarifas/actions"
 import {
-  applyGuestPrice, draftsFor, parseDrafts, peopleLabel, tierChangePct,
+  applyGuestPrice, draftsFor, looksLikeMissingZeros, parseAmount, parseDrafts, peopleLabel, tierChangePct,
   type GuestTier, type TierDraft,
 } from "@/lib/guest-prices"
 import { Users } from "lucide-react"
@@ -43,6 +43,9 @@ export function GuestPricesDialog({
   const [pending, setPending] = React.useState(false)
   const [drafts, setDrafts] = React.useState<TierDraft[]>(() => draftsFor(unit.capacity, tiers))
   const money = (n: number) => formatCurrency(n, currency)
+  // El ejemplo usa el precio real de la unidad: un tercio, redondeado a miles (150.000 → 50.000).
+  const exampleBase = basePrice ?? 150000
+  const exampleFixed = Math.max(1000, Math.round(exampleBase / 3 / 1000) * 1000)
 
   function change(guests: number, patch: Partial<TierDraft>) {
     setDrafts((rows) => rows.map((r) => (r.guests === guests ? { ...r, ...patch } : r)))
@@ -87,6 +90,11 @@ export function GuestPricesDialog({
             Cobrá menos cuando se alojan menos personas. Se aplica sobre el precio de cada noche,
             también en temporadas y fechas especiales.
           </DialogDescription>
+          <p className="rounded-lg bg-muted px-3 py-2 text-sm">
+            <strong>Ejemplo:</strong> si {unit.name} sale {money(exampleBase)} y para 1 persona querés cobrar{" "}
+            {money(exampleFixed)}, en la fila de 1 persona elegí «Precio fijo» y escribí{" "}
+            <span className="font-mono">{exampleFixed}</span>.
+          </p>
         </DialogHeader>
 
         {basePrice == null && (
@@ -97,11 +105,12 @@ export function GuestPricesDialog({
 
         <ul className="grid gap-3">
           {drafts.map((d) => {
-            const value = Number(String(d.value).replace(",", "."))
+            const value = d.mode === "full" ? NaN : parseAmount(d.value, d.mode)
             const valid = d.mode !== "full" && Number.isFinite(value) && value > 0 && (d.mode === "fixed" || value < 100)
             const tier = valid ? { guests: d.guests, mode: d.mode as GuestTier["mode"], value } : null
             const result = basePrice != null ? applyGuestPrice(basePrice, basePrice, tier) : null
             const pct = tier && d.mode === "fixed" ? tierChangePct(tier, basePrice) : null
+            const missingZeros = tier ? looksLikeMissingZeros(tier, basePrice) : false
             return (
               <li key={d.guests} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[6.5rem_1fr_7rem] sm:items-center">
                 <p className="text-sm font-medium">{peopleLabel(d.guests)}</p>
@@ -119,13 +128,12 @@ export function GuestPricesDialog({
                   {d.mode !== "full" && (
                     <Input
                       aria-label={d.mode === "percent" ? `Porcentaje para ${peopleLabel(d.guests)}` : `Precio por noche para ${peopleLabel(d.guests)}`}
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      min={0}
-                      step="any"
+                      autoComplete="off"
                       value={d.value}
                       onChange={(e) => change(d.guests, { value: e.target.value })}
-                      placeholder={d.mode === "percent" ? "20" : "100000"}
+                      placeholder={d.mode === "percent" ? "Ej. 25" : `Ej. ${exampleFixed}`}
                     />
                   )}
                 </div>
@@ -136,10 +144,15 @@ export function GuestPricesDialog({
                       <span className="block text-xs text-muted-foreground">
                         {d.mode === "full" || !tier
                           ? "por noche"
-                          : pct != null && pct !== 0
+                          : pct != null && pct !== 0 && !missingZeros
                             ? `por noche · ${Math.abs(pct).toLocaleString("es-AR", { maximumFractionDigits: 1 })}% ${pct < 0 ? "menos" : "más"}`
                             : "por noche"}
                       </span>
+                      {missingZeros && (
+                        <span className="mt-0.5 block text-xs font-medium text-destructive">
+                          ¿Faltan ceros? Son solo {money(result)}.
+                        </span>
+                      )}
                     </>
                   ) : (
                     <span className="text-xs text-muted-foreground">—</span>
@@ -151,9 +164,10 @@ export function GuestPricesDialog({
         </ul>
 
         <p className="text-xs text-muted-foreground">
-          <strong>% menos</strong> descuenta ese porcentaje de cada noche. <strong>Precio fijo</strong> es lo que
-          cuesta una noche a precio base; en una fecha con otro precio (temporada, fin de semana largo) se
-          mantiene la misma proporción.
+          <strong>Precio fijo:</strong> escribí lo que cobrás por una noche para esa cantidad de personas
+          (50000 o 50.000, da igual). <strong>% menos:</strong> descuenta ese porcentaje de cada noche. En una
+          fecha con otro precio (temporada, fin de semana largo) los dos mantienen la misma proporción. Si más
+          adelante cambiás el precio base, el % acompaña el cambio y el precio fijo se queda en lo que escribiste.
         </p>
 
         <DialogFooter>
