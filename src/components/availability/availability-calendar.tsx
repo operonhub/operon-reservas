@@ -39,6 +39,7 @@ import { RESERVATION_STATUS_LABELS } from "@/lib/constants"
 import { ENTER_VIEW } from "@/lib/motion"
 import { OperonArc } from "@/components/brand/operon-arc"
 import { createBlock, deleteBlock } from "@/app/(panel)/calendario/actions"
+import { CALENDAR_SOURCE_NAMES } from "@/lib/calendar-sources"
 import {
   Ban, Plus, ChevronLeft, ChevronRight, CalendarDays, X, Users, Moon,
   LogIn, LogOut, Mail, MessageCircle, TrendingUp, Wallet, DoorOpen, Sparkles,
@@ -593,6 +594,8 @@ function DetailPanel({ seg, onClose }: { seg: CalendarSegment; onClose: () => vo
   const router = useRouter()
   const [pending, setPending] = React.useState(false)
   const isBlock = seg.kind === "block"
+  // Un bloqueo que vino de Booking/Airbnb: el calendario de ellos solo da fechas.
+  const importedFrom = isBlock && seg.source ? CALENDAR_SOURCE_NAMES[seg.source] : null
   const balance =
     seg.totalAmount != null ? Math.max(0, Number(seg.totalAmount) - seg.paidAmount) : null
   const fullyPaid = balance === 0 && seg.totalAmount != null
@@ -605,7 +608,10 @@ function DetailPanel({ seg, onClose }: { seg: CalendarSegment; onClose: () => vo
   }, [onClose])
 
   async function onUnblock() {
-    if (!confirm(`¿Quitar el bloqueo "${seg.label}" de ${seg.unitName}?`)) return
+    const question = importedFrom
+      ? `Esta fecha viene de ${importedFrom}. Si la quitás y la reserva sigue en ${importedFrom}, vuelve sola en la próxima sincronización (hasta 15 minutos). Para liberarla de verdad, cancelá la reserva en ${importedFrom}.\n\n¿Quitarla igual de ${seg.unitName}?`
+      : `¿Quitar el bloqueo "${seg.label}" de ${seg.unitName}?`
+    if (!confirm(question)) return
     setPending(true)
     const res = await deleteBlock(seg.id)
     setPending(false)
@@ -632,7 +638,7 @@ function DetailPanel({ seg, onClose }: { seg: CalendarSegment; onClose: () => vo
     >
       <div className="flex items-center justify-between border-b bg-muted/40 px-5 py-4">
         <h2 className="font-heading text-base font-semibold tracking-tight">
-          {isBlock ? "Detalle del bloqueo" : "Detalle de reserva"}
+          {importedFrom ? `Reserva en ${importedFrom}` : isBlock ? "Detalle del bloqueo" : "Detalle de reserva"}
         </h2>
         <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Cerrar">
           <X />
@@ -650,6 +656,9 @@ function DetailPanel({ seg, onClose }: { seg: CalendarSegment; onClose: () => vo
             </p>
             {seg.code && (
               <p className="label-mono mt-1 text-muted-foreground">{seg.code}</p>
+            )}
+            {importedFrom && (
+              <p className="mt-1 text-xs text-muted-foreground">Importada de tu calendario de {importedFrom}</p>
             )}
           </div>
         </div>
@@ -742,6 +751,12 @@ function DetailPanel({ seg, onClose }: { seg: CalendarSegment; onClose: () => vo
       </div>
 
       <div className="border-t bg-muted/40 p-4">
+        {importedFrom && (
+          <p className="mb-3 text-xs leading-5 text-muted-foreground">
+            {importedFrom} solo comparte las fechas, no el nombre de quien reservó. Esta fecha se actualiza sola
+            cada 15 minutos. Para liberarla, cancelá la reserva en {importedFrom}.
+          </p>
+        )}
         {isBlock ? (
           <Button
             variant="destructive"

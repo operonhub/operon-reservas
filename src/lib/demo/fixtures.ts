@@ -80,9 +80,11 @@ const BASE_RESERVATIONS: readonly DemoReservation[] = [
 ]
 
 const BASE_OCCUPANCY = [
-  { id: "occ-1", unit_id: "unit-1", during: "[2026-09-12,2026-09-16)", kind: "reservation", block_reason: null, reservationId: "res-1" },
-  { id: "occ-2", unit_id: "unit-2", during: "[2026-09-10,2026-09-13)", kind: "reservation", block_reason: null, reservationId: "res-2" },
-  { id: "occ-3", unit_id: "unit-3", during: "[2026-09-14,2026-09-18)", kind: "reservation", block_reason: null, reservationId: "res-3" },
+  { id: "occ-1", unit_id: "unit-1", during: "[2026-09-12,2026-09-16)", kind: "reservation", block_reason: null, external_source: null, reservationId: "res-1" },
+  { id: "occ-2", unit_id: "unit-2", during: "[2026-09-10,2026-09-13)", kind: "reservation", block_reason: null, external_source: null, reservationId: "res-2" },
+  { id: "occ-3", unit_id: "unit-3", during: "[2026-09-14,2026-09-18)", kind: "reservation", block_reason: null, external_source: null, reservationId: "res-3" },
+  // Una fecha que llegó del calendario de Booking: solo trae las fechas, sin huésped.
+  { id: "occ-4", unit_id: "unit-2", during: "[2026-09-20,2026-09-23)", kind: "block", block_reason: null, external_source: "booking", reservationId: null },
 ] as const
 
 const BASE_PROPERTIES = [{ id: "property-1", name: "Refugio Alto Cielo", slug: "refugio-alto-cielo", city: "San Javier, Córdoba", description: "Tres espacios para descansar entre sierras.", currency: "ARS", checkin_time: "14:00", checkout_time: "10:00", deposit_pct: 50, whatsapp: null, phone: null, email: null, address: null, created_at: now }]
@@ -289,11 +291,12 @@ function buildOccupancy(state: DemoState, reservations: DemoReservation[]) {
   const byId = new Map(reservations.map((r) => [r.id, r]))
   const base = BASE_OCCUPANCY.map((o) => ({
     id: o.id, unit_id: o.unit_id, during: o.during, kind: o.kind, block_reason: o.block_reason,
-    reservations: byId.get(o.reservationId) ?? null,
+    external_source: o.external_source,
+    reservations: o.reservationId ? byId.get(o.reservationId) ?? null : null,
   }))
   const created = state.created.map((c) => ({
     id: `occ-${c.id}`, unit_id: c.unit_id, during: `[${c.check_in},${c.check_out})`,
-    kind: "reservation", block_reason: null, reservations: byId.get(c.id) ?? null,
+    kind: "reservation", block_reason: null, external_source: null, reservations: byId.get(c.id) ?? null,
   }))
   return [...base, ...created]
 }

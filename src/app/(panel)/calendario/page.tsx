@@ -8,6 +8,7 @@ import {
   addMonths,
 } from "@/lib/format"
 import type { Enums } from "@/lib/supabase/types"
+import { asCalendarSource, blockLabel, type CalendarSource } from "@/lib/calendar-sources"
 
 /**
  * Se carga un rango largo de una sola vez (un año para atrás y otro para
@@ -31,6 +32,8 @@ export type CalendarSegment = {
   start: string
   endExclusive: string
   kind: Enums<"occupancy_kind">
+  /** Plataforma de la que se importó el bloqueo (Booking, Airbnb); nulo si se cargó a mano o es una reserva. */
+  source: CalendarSource | null
   /** Nombre del huésped, o motivo si es un bloqueo. */
   label: string
   reservationId: string | null
@@ -66,7 +69,7 @@ export default async function CalendarioPage() {
       // Filtra en la base por solape con la ventana, en vez de traer todo
       // el histórico y descartarlo en JS.
       .select(
-        "id, unit_id, during, kind, block_reason, reservations(id, code, status, guests_count, total_amount, deposit_amount, currency, guests(full_name, email, phone), payments(amount, status, kind))"
+        "id, unit_id, during, kind, block_reason, external_source, reservations(id, code, status, guests_count, total_amount, deposit_amount, currency, guests(full_name, email, phone), payments(amount, status, kind))"
       )
       .eq("organization_id", ctx.organizationId)
       .overlaps("during", `[${start},${end})`),
@@ -107,13 +110,14 @@ export default async function CalendarioPage() {
         start: r.start,
         endExclusive: r.endExclusive,
         kind: o.kind,
+        source: o.kind === "block" ? asCalendarSource(o.external_source) : null,
         nights: nightsBetween(r.start, r.endExclusive),
       }
 
       if (o.kind === "block") {
         return {
           ...base,
-          label: o.block_reason || "Bloqueo",
+          label: blockLabel(o.block_reason, base.source),
           reservationId: null,
           code: null,
           status: null,
