@@ -7,7 +7,7 @@
  * (https://...)") lo incluiría entero.
  */
 
-const KNOWN = /^(HTTP_\d{3}|NOT_ICAL|BAD_URL_[A-Z_]{1,30}|REDIRECT_BLOCKED_[A-Z_]{1,30}|TOO_MANY_REDIRECTS|TIMEOUT)$/
+const KNOWN = /^(HTTP_\d{3}|NOT_ICAL|INVALID_ICAL|BAD_URL_[A-Z_]{1,30}|REDIRECT_BLOCKED_[A-Z_]{1,30}|TOO_MANY_REDIRECTS|TIMEOUT)$/
 
 export function errorCode(error: unknown): string {
   if (error instanceof DOMException && error.name === "TimeoutError") return "TIMEOUT"

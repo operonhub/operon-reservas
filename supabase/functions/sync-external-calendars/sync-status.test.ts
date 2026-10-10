@@ -3,7 +3,7 @@ import { assertEquals } from "jsr:@std/assert@1"
 import { errorCode, toReport } from "./sync-status.ts"
 
 Deno.test("errorCode: conserva los códigos conocidos", () => {
-  for (const code of ["HTTP_404", "HTTP_503", "NOT_ICAL", "BAD_URL_NOT_HTTPS", "REDIRECT_BLOCKED_PRIVATE_HOST", "TOO_MANY_REDIRECTS"]) {
+  for (const code of ["HTTP_404", "HTTP_503", "NOT_ICAL", "INVALID_ICAL", "BAD_URL_NOT_HTTPS", "REDIRECT_BLOCKED_PRIVATE_HOST", "TOO_MANY_REDIRECTS"]) {
     assertEquals(errorCode(new Error(code)), code)
     assertEquals(errorCode(code), code)
   }
@@ -18,6 +18,7 @@ Deno.test("errorCode: cualquier otro mensaje se reduce, y nunca deja pasar el li
   assertEquals(errorCode(new Error(leaky)), "SYNC_FAILED")
   assertEquals(errorCode(new Error("RPC_SYNC_UNIT_EXTERNAL_BLOCKS_500: detalle")), "SYNC_FAILED")
   assertEquals(errorCode(new Error("HTTP_404 https://x.test")), "SYNC_FAILED")
+  assertEquals(errorCode(new Error("INVALID_ICAL UID=secreto")), "SYNC_FAILED")
   assertEquals(errorCode(undefined), "SYNC_FAILED")
 })
 

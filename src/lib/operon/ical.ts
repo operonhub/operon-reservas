@@ -41,6 +41,7 @@ export function icalErrorLabel(code: string | null) {
   if (/^HTTP_5\d\d$/.test(code)) return "La plataforma no respondió bien. Suele resolverse solo."
   if (code.startsWith("HTTP_")) return `La plataforma respondió con un error (${code.slice(5)}).`
   if (code === "NOT_ICAL") return "El link no devuelve un calendario: puede estar vencido o pedir iniciar sesión."
+  if (code === "INVALID_ICAL") return "El calendario contiene datos incompletos o que no se pudieron interpretar. Esta sincronización conservó las fechas anteriores."
   if (code.startsWith("BAD_URL_")) return "El link cargado no es válido."
   if (code.startsWith("REDIRECT_BLOCKED_") || code === "TOO_MANY_REDIRECTS") {
     return "El link redirige a un lugar no permitido."

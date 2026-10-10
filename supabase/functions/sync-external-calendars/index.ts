@@ -67,59 +67,114 @@ function unfoldLines(text: string): string[] {
 }
 
 function parseIcalDate(value: string): string | null {
-  // Soporta "20260901" (VALUE=DATE, lo típico de Airbnb/Booking) y
-  // "20260901T000000Z" (por si acaso) -> siempre "2026-09-01".
-  const digits = value.replace(/[^0-9]/g, "").slice(0, 8)
-  if (digits.length !== 8) return null
+  // Conserva el día publicado: DATE, DATE-TIME local/TZID o UTC, sin
+  // convertir la zona horaria. No rescatar dígitos de un valor ilegible.
+  if (!/^\d{8}(?:T(?:[01]\d|2[0-3])[0-5]\d(?:[0-5]\d|60)Z?)?$/i.test(value)) return null
+  if (value.startsWith("0000")) return null
+  const digits = value.slice(0, 8)
   const iso = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`
-  return Number.isNaN(Date.parse(iso)) ? null : iso
+  const date = new Date(`${iso}T00:00:00Z`)
+  // Date normaliza, por ejemplo, el 30 de febrero: no es una fecha válida.
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== iso ? null : iso
 }
 
 // Un 200 no garantiza un calendario: cuando el link de exportación de
 // Airbnb/Booking caduca o pide login, responden 200 con una página HTML.
 function isIcalDocument(text: string): boolean {
-  return /(^|[\r\n])BEGIN:VCALENDAR[\r\n]/.test(text) && /(^|[\r\n])END:VCALENDAR/.test(text)
+  return /(^|[\r\n])BEGIN:VCALENDAR[\r\n]/i.test(text.replace(/^\uFEFF/, ""))
+    && /(^|[\r\n])END:VCALENDAR(?:[\r\n]|$)/i.test(text)
 }
 
-function parseIcal(text: string): IcalEvent[] {
-  const lines = unfoldLines(text)
+// Componentes que sabemos interpretar o ignorar sin perder reservas. Un
+// componente desconocido (p. ej. VEVENT mal escrito) no equivale a un feed vacío.
+const ICAL_PARENT: Record<string, string | undefined> = {
+  VEVENT: "VCALENDAR",
+  VTIMEZONE: "VCALENDAR",
+  STANDARD: "VTIMEZONE",
+  DAYLIGHT: "VTIMEZONE",
+  VALARM: "VEVENT",
+}
+
+/**
+ * null significa que NO se puede usar ninguna parte de este calendario.
+ * Omitir un VEVENT ilegible lo convertiría en una ausencia y podría liberar
+ * sus fechas. Un calendario vacío válido, en cambio, devuelve [].
+ * Sólo se admiten eventos con UID y un rango explícito de días DTSTART/DTEND.
+ */
+function parseIcal(text: string): IcalEvent[] | null {
+  const lines = unfoldLines(text.replace(/^\uFEFF/, ""))
   const events: IcalEvent[] = []
-  let inEvent = false
-  let uid: string | null = null
-  let start: string | null = null
-  let end: string | null = null
+  const byUid = new Map<string, IcalEvent>()
+  const components: string[] = []
+  let current: Partial<IcalEvent> | null = null
+  let closed = false
 
   for (const line of lines) {
-    if (line.startsWith("BEGIN:VEVENT")) {
-      inEvent = true
-      uid = null
-      start = null
-      end = null
-      continue
-    }
-    if (line.startsWith("END:VEVENT")) {
-      if (inEvent && uid && start && end) {
-        events.push({ uid, start_date: start, end_date: end })
-      }
-      inEvent = false
-      continue
-    }
-    if (!inEvent) continue
-
+    if (!line) continue
     const idx = line.indexOf(":")
-    if (idx < 0) continue
+    if (idx < 0) return null
     const name = line.slice(0, idx)
+    const property = name.split(";", 1)[0].toUpperCase()
+    if (!/^[A-Z0-9-]+$/.test(property)) return null
     const value = line.slice(idx + 1).trim()
+    const parent = components.at(-1)
 
-    if (name === "UID" || name.startsWith("UID;")) {
-      uid = value
-    } else if (name === "DTSTART" || name.startsWith("DTSTART;")) {
-      start = parseIcalDate(value)
-    } else if (name === "DTEND" || name.startsWith("DTEND;")) {
-      end = parseIcalDate(value)
+    if (property === "BEGIN") {
+      if (name.toUpperCase() !== "BEGIN" || closed) return null
+      const component = value.toUpperCase()
+      if (!/^[A-Z0-9-]+$/.test(component)) return null
+      if (component === "VCALENDAR") {
+        if (parent) return null
+      } else if (!parent || ICAL_PARENT[component] !== parent) return null
+      if (component === "VEVENT") {
+        current = {}
+      }
+      components.push(component)
+      continue
+    }
+    if (property === "END") {
+      const component = value.toUpperCase()
+      if (name.toUpperCase() !== "END" || !parent || parent !== component) return null
+      if (component === "VEVENT") {
+        const { uid, start_date, end_date } = current ?? {}
+        if (!uid || !start_date || !end_date || end_date <= start_date) return null
+        const previous = byUid.get(uid)
+        // La base usa un solo rango por UID: dos rangos distintos con el
+        // mismo UID perderían fechas al sincronizar. Una copia idéntica sí sirve.
+        if (previous && (previous.start_date !== start_date || previous.end_date !== end_date)) return null
+        if (!previous) {
+          const event = { uid, start_date, end_date }
+          events.push(event)
+          byUid.set(uid, event)
+        }
+        current = null
+      }
+      components.pop()
+      if (component === "VCALENDAR") closed = true
+      continue
+    }
+    if (!parent) return null
+    // Fechas sueltas en VCALENDAR pueden ser un evento que perdió sus
+    // delimitadores: ignorarlas volvería a confundirlo con un feed vacío.
+    if (parent === "VCALENDAR" && (property === "DTSTART" || property === "DTEND")) return null
+    // VTIMEZONE y VALARM tienen sus propias fechas: no son las de la reserva.
+    if (parent !== "VEVENT" || !current) continue
+    // No expandimos recurrencias ni calculamos duraciones: aceptarlas y enviar
+    // sólo DTSTART/DTEND sería otra lectura parcial. Las reglas de VTIMEZONE
+    // quedan fuera de este control, porque no describen reservas.
+    if (["RRULE", "RDATE", "EXDATE", "EXRULE", "RECURRENCE-ID", "DURATION"].includes(property)) return null
+
+    if (property === "UID") {
+      if (current.uid !== undefined || !value) return null
+      current.uid = value
+    } else if (property === "DTSTART" || property === "DTEND") {
+      const key = property === "DTSTART" ? "start_date" : "end_date"
+      const date = parseIcalDate(value)
+      if (current[key] !== undefined || !date) return null
+      current[key] = date
     }
   }
-  return events
+  return closed && components.length === 0 ? events : null
 }
 
 // ============================================================
@@ -178,16 +233,18 @@ async function syncPlatform(
       return { unit_id: unitId, source, ok: false, error: "NOT_ICAL" }
     }
     const events = parseIcal(text)
+    if (events === null) {
+      return { unit_id: unitId, source, ok: false, error: "INVALID_ICAL" }
+    }
 
     const summary = await rpc<SyncSummary>("sync_unit_external_blocks", {
       p_worker_token: workerToken,
       p_unit_id: unitId,
       p_source: source,
       p_ranges: events,
-      // Sólo un calendario válido y sin eventos (se cancelaron todas las
-      // reservas en la plataforma) autoriza a liberar todo. Con eventos el
-      // parámetro no se manda y la llamada queda idéntica a la anterior, así
-      // que este worker funciona también contra una base sin la 0024.
+      // Sólo la lectura completa de un calendario realmente vacío permite
+      // informar ausencias. La base sigue aplicando sus márgenes y esperas;
+      // vacío no prueba que las reservas hayan sido canceladas.
       ...(events.length === 0 ? { p_allow_empty: true } : {}),
     })
 
