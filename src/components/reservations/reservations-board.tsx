@@ -7,6 +7,10 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatusBadge, SourceBadge } from "@/components/reservations/reservation-badges"
 import { StatusControl } from "@/components/reservations/status-control"
+import { EditReservationDialog } from "@/components/reservations/edit-reservation-dialog"
+import { DeleteReservationButton } from "@/components/reservations/delete-reservation-dialog"
+import type { ReservationSummary, UnitOption } from "@/components/reservations/reservation-types"
+import { isEditableStatus, type DeleteBlocker } from "@/lib/reservation-rules"
 import { GuestNameTrigger } from "@/components/reservations/guest-name-trigger"
 import { formatCurrency, formatDay, whatsappHref, initials } from "@/lib/format"
 import { ENTER_VIEW } from "@/lib/motion"
@@ -29,6 +33,7 @@ export type ReservationRow = {
   guestName: string
   guestEmail: string | null
   guestPhone: string | null
+  unitId: string
   unitName: string
   unitCapacity: number | null
   totalAmount: number | null
@@ -39,14 +44,43 @@ export type ReservationRow = {
   createdAt: string
   updatedAt: string
   payments: { amount: number; status: string; kind: string; paidAt: string | null }[]
+  /** Por qué no se puede eliminar, si no se puede (con plata de por medio, o un link de pago abierto). */
+  deleteBlocker: DeleteBlocker
+}
+
+/** Lo que necesitan los diálogos de editar, cancelar y eliminar. */
+function summaryOf(row: ReservationRow): ReservationSummary {
+  return {
+    id: row.id,
+    code: row.code,
+    status: row.status,
+    unitId: row.unitId,
+    unitName: row.unitName,
+    checkIn: row.checkIn,
+    checkOut: row.checkOut,
+    guests: row.guestsCount,
+    guestName: row.guestName,
+    guestEmail: row.guestEmail,
+    guestPhone: row.guestPhone,
+    notes: row.notes,
+    currency: row.currency,
+    total: row.totalAmount == null ? null : Number(row.totalAmount),
+    paid: row.paidAmount,
+    deleteBlocker: row.deleteBlocker,
+  }
 }
 
 export function ReservationsBoard({
   rows,
   today,
+  units,
+  canDelete,
 }: {
   rows: ReservationRow[]
   today: string
+  /** Unidades para poder cambiar una reserva de cabaña al editarla. */
+  units: UnitOption[]
+  canDelete: boolean
 }) {
   const [q, setQ] = React.useState("")
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
@@ -138,7 +172,13 @@ export function ReservationsBoard({
       )}
 
       {selected && (
-        <DetailPanel row={selected} today={today} onClose={() => setSelectedId(null)} />
+        <DetailPanel
+          row={selected}
+          today={today}
+          units={units}
+          canDelete={canDelete}
+          onClose={() => setSelectedId(null)}
+        />
       )}
     </div>
   )
@@ -354,12 +394,21 @@ function buildTimeline(row: ReservationRow, today: string): TimelineStep[] {
 function DetailPanel({
   row,
   today,
+  units,
+  canDelete,
   onClose,
 }: {
   row: ReservationRow
   today: string
+  units: UnitOption[]
+  canDelete: boolean
   onClose: () => void
 }) {
+  const summary = summaryOf(row)
+  // Las unidades dadas de baja solo se ofrecen si la reserva ya está en una.
+  const unitOptions = units.some((u) => u.id === row.unitId)
+    ? units
+    : [...units, { id: row.unitId, name: row.unitName, capacity: row.unitCapacity ?? 1, active: false }]
   const total = Number(row.totalAmount ?? 0)
   const balance = Math.max(0, total - row.paidAmount)
   const settled = total > 0 && balance === 0
@@ -523,17 +572,23 @@ function DetailPanel({
         {/* Cambios de estado: sólo las transiciones válidas (lib/constants). */}
         <section className="space-y-2">
           <h3 className="label-mono text-muted-foreground">Cambiar estado</h3>
-          <StatusControl id={row.id} status={row.status} />
+          <StatusControl reservation={summary} />
         </section>
       </div>
 
-      <div className="border-t bg-muted/40 p-4">
-        <Link
-          href={`/reservas/${row.id}`}
-          className={cn(buttonVariants({ variant: "outline" }), "w-full")}
-        >
-          <ExternalLink /> Abrir ficha completa
-        </Link>
+      <div className="grid gap-2 border-t bg-muted/40 p-4">
+        <div className="grid grid-cols-2 gap-2">
+          {isEditableStatus(row.status) && (
+            <EditReservationDialog reservation={summary} units={unitOptions} size="default" className="w-full" />
+          )}
+          <Link
+            href={`/reservas/${row.id}`}
+            className={cn(buttonVariants({ variant: "outline" }), !isEditableStatus(row.status) && "col-span-2")}
+          >
+            <ExternalLink /> Ficha completa
+          </Link>
+        </div>
+        <DeleteReservationButton reservation={summary} canDelete={canDelete} className="w-full" />
       </div>
     </aside>
   )

@@ -54,6 +54,7 @@ const BASE_UNITS: readonly BaseUnit[] = [
 
 type DemoReservation = {
   id: string
+  unit_id: string
   code: string
   check_in: string
   check_out: string
@@ -74,9 +75,9 @@ type DemoReservation = {
 }
 
 const BASE_RESERVATIONS: readonly DemoReservation[] = [
-  { id: "res-1", code: "AC-4821", check_in: "2026-09-12", check_out: "2026-09-16", checked_in_at: null, checked_out_at: null, guests_count: 3, status: "pending_payment", source: "direct", total_amount: 592000, deposit_amount: 296000, currency: "ARS", notes: "Llega cerca de las 18 h.", created_at: now, updated_at: now, guests: { id: "guest-1", full_name: "Martina Roldán", email: "martina@ejemplo.com", phone: "+5493515550101" }, units: { name: "Cabaña del Bosque", capacity: 4 }, payments: [{ amount: 296000, status: "paid", kind: "deposit", paid_at: now }] },
-  { id: "res-2", code: "AC-4820", check_in: "2026-09-10", check_out: "2026-09-13", checked_in_at: null, checked_out_at: null, guests_count: 2, status: "confirmed", source: "whatsapp", total_amount: 336000, deposit_amount: 168000, currency: "ARS", notes: null, created_at: now, updated_at: now, guests: { id: "guest-2", full_name: "Tomás Ledesma", email: "tomas@ejemplo.com", phone: "+5493515550102" }, units: { name: "Suite Mirador", capacity: 2 }, payments: [{ amount: 336000, status: "paid", kind: "balance", paid_at: now }] },
-  { id: "res-3", code: "AC-4818", check_in: "2026-09-14", check_out: "2026-09-18", checked_in_at: null, checked_out_at: null, guests_count: 5, status: "pending", source: "booking", total_amount: 780000, deposit_amount: 390000, currency: "ARS", notes: null, created_at: now, updated_at: now, guests: { id: "guest-3", full_name: "Paula Méndez", email: "paula@ejemplo.com", phone: "+5493515550103" }, units: { name: "Casa del Arroyo", capacity: 6 }, payments: [] },
+  { id: "res-1", unit_id: "unit-1", code: "AC-4821", check_in: "2026-09-12", check_out: "2026-09-16", checked_in_at: null, checked_out_at: null, guests_count: 3, status: "pending_payment", source: "direct", total_amount: 592000, deposit_amount: 296000, currency: "ARS", notes: "Llega cerca de las 18 h.", created_at: now, updated_at: now, guests: { id: "guest-1", full_name: "Martina Roldán", email: "martina@ejemplo.com", phone: "+5493515550101" }, units: { name: "Cabaña del Bosque", capacity: 4 }, payments: [{ amount: 296000, status: "paid", kind: "deposit", paid_at: now }] },
+  { id: "res-2", unit_id: "unit-2", code: "AC-4820", check_in: "2026-09-10", check_out: "2026-09-13", checked_in_at: null, checked_out_at: null, guests_count: 2, status: "confirmed", source: "whatsapp", total_amount: 336000, deposit_amount: 168000, currency: "ARS", notes: null, created_at: now, updated_at: now, guests: { id: "guest-2", full_name: "Tomás Ledesma", email: "tomas@ejemplo.com", phone: "+5493515550102" }, units: { name: "Suite Mirador", capacity: 2 }, payments: [{ amount: 336000, status: "paid", kind: "balance", paid_at: now }] },
+  { id: "res-3", unit_id: "unit-3", code: "AC-4818", check_in: "2026-09-14", check_out: "2026-09-18", checked_in_at: null, checked_out_at: null, guests_count: 5, status: "pending", source: "booking", total_amount: 780000, deposit_amount: 390000, currency: "ARS", notes: null, created_at: now, updated_at: now, guests: { id: "guest-3", full_name: "Paula Méndez", email: "paula@ejemplo.com", phone: "+5493515550103" }, units: { name: "Casa del Arroyo", capacity: 6 }, payments: [] },
 ]
 
 const BASE_OCCUPANCY = [
@@ -112,6 +113,21 @@ export type DemoCreatedReservation = {
   status: string
   notes: string | null
   guest: { full_name: string; email: string | null; phone: string | null }
+  /** Solo si el visitante la editó: el total recalculado. */
+  total_amount?: number
+  deposit_amount?: number
+}
+
+/** Lo que el visitante cambió de una reserva de ejemplo (las que él cargó se cambian en su lugar). */
+export type DemoReservationEdit = {
+  unit_id: string
+  check_in: string
+  check_out: string
+  guests_count: number
+  notes: string | null
+  guest: { full_name: string; email: string | null; phone: string | null }
+  total_amount: number
+  deposit_amount: number
 }
 
 export type DemoPropertyPatch = {
@@ -144,9 +160,16 @@ export type DemoState = {
   property: DemoPropertyPatch
   /** Momentos reales de ingreso/salida por reserva. */
   movements: Record<string, DemoMovementPatch>
+  /** id de reserva de ejemplo → lo que el visitante le editó. */
+  edits: Record<string, DemoReservationEdit>
+  /** ids de reservas (de ejemplo) que el visitante eliminó. */
+  deleted: string[]
 }
 
-export const EMPTY_DEMO_STATE: DemoState = { created: [], statuses: {}, units: {}, property: {}, movements: {} }
+export const EMPTY_DEMO_STATE: DemoState = { created: [], statuses: {}, units: {}, property: {}, movements: {}, edits: {}, deleted: [] }
+
+// Alcanza con las reservas de ejemplo que hay; el tope evita que la cookie crezca.
+const MAX_DEMO_DELETED = 12
 
 /** Lee el estado de la cookie. Cualquier cosa rara vuelve al estado vacío. */
 export function parseDemoState(raw: string | undefined): DemoState {
@@ -161,6 +184,10 @@ export function parseDemoState(raw: string | undefined): DemoState {
       units: json.units && typeof json.units === "object" ? json.units : {},
       property: json.property && typeof json.property === "object" ? json.property : {},
       movements: json.movements && typeof json.movements === "object" ? json.movements : {},
+      edits: json.edits && typeof json.edits === "object" && !Array.isArray(json.edits) ? json.edits : {},
+      deleted: Array.isArray(json.deleted)
+        ? json.deleted.filter((id: unknown) => typeof id === "string").slice(0, MAX_DEMO_DELETED)
+        : [],
     }
   } catch {
     return EMPTY_DEMO_STATE
@@ -176,7 +203,19 @@ const TOTAL_PER_CREATED = 420000
 const DEPOSIT_PER_CREATED = 210000
 
 function reservationIds(state: DemoState): Set<string> {
-  return new Set([...BASE_RESERVATIONS.map((r) => r.id), ...state.created.map((r) => r.id)])
+  const gone = new Set(state.deleted)
+  return new Set([...BASE_RESERVATIONS.map((r) => r.id), ...state.created.map((r) => r.id)].filter((id) => !gone.has(id)))
+}
+
+/** Estados que retienen las fechas (espejo de holds_inventory() en la base). */
+const HOLDING = new Set(["pending", "pending_payment", "confirmed", "completed"])
+
+/** Precio de una estadía en la demo: tarifa base de la unidad por noche; seña según la propiedad. */
+export function demoStayPrice(state: DemoState, unitId: string, nights: number): { total: number; deposit: number } {
+  const rate = BASE_RATES.find((r) => r.unit_id === unitId)
+  const total = (rate?.price_per_night ?? 0) * Math.max(0, nights)
+  const pct = state.property.deposit_pct ?? BASE_PROPERTIES[0].deposit_pct
+  return { total, deposit: Math.round((total * pct) / 100) }
 }
 
 /**
@@ -205,6 +244,152 @@ export function applyDemoManualReservation(
     id,
     state: { ...state, created: [created, ...state.created].slice(0, MAX_DEMO_CREATED) },
   }
+}
+
+export type DemoUpdateInput = {
+  unitId: string
+  checkIn: string
+  checkOut: string
+  guests: number
+  fullName: string
+  email: string | null
+  phone: string | null
+  notes: string | null
+}
+
+export type DemoUpdateSummary = {
+  changed: boolean
+  code: string
+  unitName: string
+  total: number
+  deposit: number
+  paid: number
+  balance: number
+  currency: string
+}
+
+const nightsOf = (checkIn: string, checkOut: string) =>
+  Math.round((Date.parse(checkOut + "T00:00:00Z") - Date.parse(checkIn + "T00:00:00Z")) / 86400000)
+
+const RANGE = /\[(\d{4}-\d{2}-\d{2}),(\d{4}-\d{2}-\d{2})\)/
+
+/**
+ * Edita una reserva (de ejemplo o cargada por el visitante) con las mismas
+ * reglas que la base: no cancelada, capacidad, fechas libres y total recalculado.
+ */
+export function applyDemoUpdate(
+  state: DemoState,
+  id: string,
+  input: DemoUpdateInput
+): { ok: true; state: DemoState; summary: DemoUpdateSummary } | { ok: false; error: string } {
+  const current = buildReservations(state).find((r) => r.id === id)
+  if (!current) return { ok: false, error: "No encontramos la reserva. Puede que ya la hayan eliminado." }
+  if (current.status === "cancelled" || current.status === "expired") {
+    return { ok: false, error: "Una reserva cancelada o expirada no se puede editar." }
+  }
+  const unit = BASE_UNITS.find((u) => u.id === input.unitId)
+  if (!unit) return { ok: false, error: "La unidad no existe o está inactiva." }
+  if (!input.fullName.trim()) return { ok: false, error: "El nombre del huésped es obligatorio." }
+  if (!(input.guests >= 1)) return { ok: false, error: "La cantidad de huéspedes tiene que ser de al menos 1." }
+  if (!input.checkIn || !input.checkOut || input.checkOut <= input.checkIn) {
+    return { ok: false, error: "Las fechas ingresadas no son válidas." }
+  }
+  if (input.guests > unit.capacity) return { ok: false, error: "La cantidad de huéspedes supera la capacidad de la unidad." }
+
+  if (HOLDING.has(current.status)) {
+    const overlaps = (a: string, b: string) => input.checkIn < b && a < input.checkOut
+    const busy =
+      buildReservations(state).some(
+        (r) => r.id !== id && r.unit_id === input.unitId && HOLDING.has(r.status) && overlaps(r.check_in, r.check_out)
+      ) ||
+      BASE_OCCUPANCY.some((o) => {
+        if (o.kind !== "block" || o.unit_id !== input.unitId) return false
+        const m = o.during.match(RANGE)
+        return m ? overlaps(m[1], m[2]) : false
+      })
+    if (busy) return { ok: false, error: "Esas fechas ya están ocupadas para esa unidad." }
+  }
+
+  const price = demoStayPrice(state, input.unitId, nightsOf(input.checkIn, input.checkOut))
+  const paid = current.payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + Number(p.amount), 0)
+  const guest = {
+    full_name: input.fullName.trim(),
+    email: input.email?.trim() || null,
+    phone: input.phone?.trim() || null,
+  }
+  const notes = input.notes?.trim() || null
+
+  const created = state.created.find((c) => c.id === id)
+  let next: DemoState
+  if (created) {
+    const updated: DemoCreatedReservation = {
+      ...created,
+      unit_id: input.unitId,
+      check_in: input.checkIn,
+      check_out: input.checkOut,
+      guests_count: input.guests,
+      notes,
+      guest,
+      total_amount: price.total,
+      deposit_amount: price.deposit,
+    }
+    next = { ...state, created: state.created.map((c) => (c.id === id ? updated : c)) }
+  } else {
+    const edit: DemoReservationEdit = {
+      unit_id: input.unitId,
+      check_in: input.checkIn,
+      check_out: input.checkOut,
+      guests_count: input.guests,
+      notes,
+      guest,
+      total_amount: price.total,
+      deposit_amount: price.deposit,
+    }
+    next = { ...state, edits: { ...state.edits, [id]: edit } }
+  }
+  const changed =
+    current.unit_id !== input.unitId ||
+    current.check_in !== input.checkIn ||
+    current.check_out !== input.checkOut ||
+    current.guests_count !== input.guests ||
+    (current.notes ?? null) !== notes ||
+    current.guests.full_name !== guest.full_name ||
+    (current.guests.email ?? null) !== guest.email ||
+    (current.guests.phone ?? null) !== guest.phone
+  return {
+    ok: true,
+    state: next,
+    summary: {
+      changed,
+      code: current.code,
+      unitName: unit.name,
+      total: price.total,
+      deposit: price.deposit,
+      paid,
+      balance: price.total - paid,
+      currency: current.currency,
+    },
+  }
+}
+
+/** Elimina una reserva. Con pagos acreditados no se puede: se cancela. */
+export function applyDemoDelete(
+  state: DemoState,
+  id: string
+): { ok: true; state: DemoState } | { ok: false; error: string } {
+  const current = buildReservations(state).find((r) => r.id === id)
+  if (!current) return { ok: false, error: "No encontramos la reserva. Puede que ya la hayan eliminado." }
+  if (current.payments.some((p) => p.status === "paid" || p.status === "refunded")) {
+    return { ok: false, error: "Esta reserva tiene pagos registrados, así que no se puede eliminar. Cancelala: queda en el historial." }
+  }
+  const statuses = { ...state.statuses }
+  delete statuses[id]
+  if (state.created.some((c) => c.id === id)) {
+    return { ok: true, state: { ...state, created: state.created.filter((c) => c.id !== id), statuses } }
+  }
+  const edits = { ...state.edits }
+  delete edits[id]
+  return { ok: true, state: { ...state, deleted: [...state.deleted, id].slice(0, MAX_DEMO_DELETED), statuses, edits } }
 }
 
 /** Cambia el estado de una reserva (base o creada). null si el id no existe. */
@@ -252,6 +437,7 @@ function buildReservations(state: DemoState): DemoReservation[] {
     const movement = state.movements[c.id] ?? {}
     return {
       id: c.id,
+      unit_id: c.unit_id,
       code: c.code,
       check_in: c.check_in,
       check_out: c.check_out,
@@ -260,8 +446,8 @@ function buildReservations(state: DemoState): DemoReservation[] {
       guests_count: c.guests_count,
       status: state.statuses[c.id] ?? c.status,
       source: "manual",
-      total_amount: TOTAL_PER_CREATED,
-      deposit_amount: DEPOSIT_PER_CREATED,
+      total_amount: c.total_amount ?? TOTAL_PER_CREATED,
+      deposit_amount: c.deposit_amount ?? DEPOSIT_PER_CREATED,
       currency: "ARS",
       notes: c.notes,
       created_at: now,
@@ -271,15 +457,27 @@ function buildReservations(state: DemoState): DemoReservation[] {
       payments: [],
     }
   })
-  const base = BASE_RESERVATIONS.map((r) => ({
-    ...r,
-    status: state.statuses[r.id] ?? r.status,
-    checked_in_at: state.movements[r.id]?.checkedInAt ?? r.checked_in_at,
-    checked_out_at: state.movements[r.id]?.checkedOutAt ?? r.checked_out_at,
-    payments: r.payments.map((p) => ({ ...p })),
-    guests: { ...r.guests },
-    units: { ...r.units },
-  }))
+  const gone = new Set(state.deleted)
+  const base = BASE_RESERVATIONS.filter((r) => !gone.has(r.id)).map((r) => {
+    const edit = state.edits[r.id]
+    const unit = unitById.get(edit?.unit_id ?? r.unit_id) ?? unitById.get(r.unit_id)!
+    return {
+      ...r,
+      unit_id: unit.id,
+      check_in: edit?.check_in ?? r.check_in,
+      check_out: edit?.check_out ?? r.check_out,
+      guests_count: edit?.guests_count ?? r.guests_count,
+      notes: edit ? edit.notes : r.notes,
+      total_amount: edit?.total_amount ?? r.total_amount,
+      deposit_amount: edit?.deposit_amount ?? r.deposit_amount,
+      status: state.statuses[r.id] ?? r.status,
+      checked_in_at: state.movements[r.id]?.checkedInAt ?? r.checked_in_at,
+      checked_out_at: state.movements[r.id]?.checkedOutAt ?? r.checked_out_at,
+      payments: r.payments.map((p) => ({ ...p })),
+      guests: edit ? { id: r.guests.id, ...edit.guest } : { ...r.guests },
+      units: { name: unit.name, capacity: unit.capacity },
+    }
+  })
   return [...fromCreated, ...base]
 }
 
@@ -287,18 +485,23 @@ function buildUnits(state: DemoState): BaseUnit[] {
   return BASE_UNITS.map((u) => ({ ...u, amenities: [...u.amenities], ...state.units[u.id] }))
 }
 
-function buildOccupancy(state: DemoState, reservations: DemoReservation[]) {
-  const byId = new Map(reservations.map((r) => [r.id, r]))
-  const base = BASE_OCCUPANCY.map((o) => ({
+/**
+ * La ocupación sale de las reservas, igual que en la base: solo las que
+ * retienen fechas ocupan, así que cancelar, eliminar o mover una reserva se ve
+ * en el calendario. Los bloqueos de ejemplo no cambian.
+ */
+function buildOccupancy(_state: DemoState, reservations: DemoReservation[]) {
+  const blocks = BASE_OCCUPANCY.filter((o) => o.kind === "block").map((o) => ({
     id: o.id, unit_id: o.unit_id, during: o.during, kind: o.kind, block_reason: o.block_reason,
-    external_source: o.external_source,
-    reservations: o.reservationId ? byId.get(o.reservationId) ?? null : null,
+    external_source: o.external_source, reservations: null,
   }))
-  const created = state.created.map((c) => ({
-    id: `occ-${c.id}`, unit_id: c.unit_id, during: `[${c.check_in},${c.check_out})`,
-    kind: "reservation", block_reason: null, external_source: null, reservations: byId.get(c.id) ?? null,
-  }))
-  return [...base, ...created]
+  const held = reservations
+    .filter((r) => HOLDING.has(r.status))
+    .map((r) => ({
+      id: `occ-${r.id}`, unit_id: r.unit_id, during: `[${r.check_in},${r.check_out})`,
+      kind: "reservation", block_reason: null, external_source: null, reservations: r,
+    }))
+  return [...held, ...blocks]
 }
 
 function buildTables(state: DemoState): Record<string, unknown[]> {

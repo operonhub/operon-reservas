@@ -24,7 +24,9 @@ export const RESERVATION_TRANSITIONS: Record<
   pending: ["pending_payment", "confirmed", "cancelled"],
   pending_payment: ["confirmed", "cancelled"],
   confirmed: ["completed", "cancelled"],
-  completed: [],
+  // "Completada" no es una puerta cerrada: si se marcó por error, se reabre
+  // (vuelve a Confirmada) o se cancela. Cancelada y Expirada sí son finales.
+  completed: ["confirmed", "cancelled"],
   cancelled: [],
   // Solo el barrido automático (expire_stale_holds, 0012) o un pago tardío
   // (recover_paid_expired_reservation, 0024) tocan este estado; no es un

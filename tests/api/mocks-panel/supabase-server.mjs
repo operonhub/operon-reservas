@@ -15,6 +15,11 @@ function chain(label) {
 export async function createClient() {
   return {
     from: (t) => { state.dbCalls.push(`from:${t}`); return chain(t) },
-    rpc: async (fn) => { state.dbCalls.push(`rpc:${fn}`); return { data: null, error: null } },
+    // Una prueba puede dejar en state.rpcResults la respuesta de una función; si no, devuelve vacío.
+    rpc: async (fn, args) => {
+      state.dbCalls.push(`rpc:${fn}`)
+      state.lastRpc = { fn, args }
+      return state.rpcResults?.[fn] ?? { data: null, error: null }
+    },
   }
 }

@@ -1322,10 +1322,46 @@ export type Database = {
       }
       transition_reservation: {
         Args: {
+          /** false: no se le manda el mail de cambio de estado al huésped (0046). */
+          p_notify?: boolean
           p_reservation: string
           p_to: Database["public"]["Enums"]["reservation_status"]
         }
         Returns: Database["public"]["Enums"]["reservation_status"]
+      }
+      // 0046: editar, eliminar y registrar ingreso/salida desde el panel.
+      update_reservation: {
+        Args: {
+          p_check_in: string
+          p_check_out: string
+          p_email: string | null
+          p_full_name: string
+          p_guests: number
+          p_notes: string | null
+          p_phone: string | null
+          p_reservation: string
+          p_unit: string
+        }
+        Returns: Json
+      }
+      delete_reservation: {
+        Args: { p_reservation: string }
+        Returns: Json
+      }
+      record_reservation_movement: {
+        Args: { p_movement: string; p_reservation: string }
+        Returns: string
+      }
+      reservation_audit_log: {
+        Args: { p_limit?: number; p_org: string; p_reservation?: string | null }
+        Returns: {
+          action: string
+          actor_name: string
+          at: string
+          detail: Json
+          reservation_code: string
+          reservation_id: string
+        }[]
       }
       wake_notification_worker: { Args: never; Returns: number }
     }

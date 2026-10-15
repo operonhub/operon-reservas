@@ -6,6 +6,12 @@ import { cn } from "@/lib/utils"
 import { StatusBadge, SourceBadge } from "@/components/reservations/reservation-badges"
 import { StatusControl } from "@/components/reservations/status-control"
 import { ReservationMovements } from "@/components/reservations/reservation-movements"
+import { EditReservationDialog } from "@/components/reservations/edit-reservation-dialog"
+import { DeleteReservationButton } from "@/components/reservations/delete-reservation-dialog"
+import { AuditList } from "@/components/reservations/reservation-history"
+import type { ReservationSummary, UnitOption } from "@/components/reservations/reservation-types"
+import { canDeleteReservations } from "@/lib/roles"
+import { deleteBlocker, isEditableStatus, toAuditEntries } from "@/lib/reservation-rules"
 import { PrintButton } from "@/components/reservations/print-button"
 import { GuestNameTrigger } from "@/components/reservations/guest-name-trigger"
 import { OperonMarkTinta } from "@/components/brand/operon-mark"
@@ -21,6 +27,8 @@ type Payment = {
   method: string | null
   paid_at: string | null
   created_at: string
+  /** Hay un link de Mercado Pago generado para este pago (no se muestra: solo cuenta). */
+  mp_init_point: string | null
 }
 
 /**
@@ -54,11 +62,12 @@ export default async function ReservaDetailPage({
   const ctx = await requireContext()
   const supabase = await createClient()
 
-  const [{ data: r }, { data: property }] = await Promise.all([
+  const canDelete = canDeleteReservations(ctx.role)
+  const [{ data: r }, { data: property }, { data: allUnits }, { data: auditRows }] = await Promise.all([
     supabase
       .from("reservations")
       .select(
-        "id, code, check_in, check_out, checked_in_at, checked_out_at, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, method, paid_at, created_at)"
+        "id, code, unit_id, check_in, check_out, checked_in_at, checked_out_at, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, method, paid_at, created_at, mp_init_point)"
       )
       .eq("organization_id", ctx.organizationId)
       .eq("id", id)
@@ -69,6 +78,15 @@ export default async function ReservaDetailPage({
       .eq("organization_id", ctx.organizationId)
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("units")
+      .select("id, name, capacity, is_active")
+      .eq("organization_id", ctx.organizationId)
+      .order("position"),
+    // El historial de cambios lo ve solo el dueño o un administrador.
+    canDelete
+      ? supabase.rpc("reservation_audit_log", { p_org: ctx.organizationId, p_reservation: id, p_limit: 50 })
+      : Promise.resolve({ data: null }),
   ])
 
   if (!r) notFound()
@@ -88,6 +106,31 @@ export default async function ReservaDetailPage({
   const settled = total > 0 && balance === 0
   const nights = nightsBetween(r.check_in, r.check_out)
 
+  const hasOpenCheckout = payments.some((p) => p.status === "pending" && Boolean(p.mp_init_point))
+  const summary: ReservationSummary = {
+    id: r.id,
+    code: r.code,
+    status: r.status,
+    unitId: r.unit_id,
+    unitName: unit?.name ?? "—",
+    checkIn: r.check_in,
+    checkOut: r.check_out,
+    guests: r.guests_count,
+    guestName: guest?.full_name ?? "—",
+    guestEmail: guest?.email ?? null,
+    guestPhone: guest?.phone ?? null,
+    notes: r.notes,
+    currency: r.currency,
+    total: r.total_amount == null ? null : Number(r.total_amount),
+    paid,
+    deleteBlocker: deleteBlocker(payments, hasOpenCheckout),
+  }
+  // Las unidades dadas de baja solo se ofrecen si la reserva ya está en una.
+  const unitOptions: UnitOption[] = (allUnits ?? [])
+    .filter((u) => u.is_active || u.id === r.unit_id)
+    .map((u) => ({ id: u.id, name: u.name, capacity: u.capacity, active: u.is_active }))
+  const history = toAuditEntries(auditRows)
+
   return (
     <div className="p-4 sm:p-6">
       {/* Barra de acciones — no sale en el papel */}
@@ -101,6 +144,7 @@ export default async function ReservaDetailPage({
         <div className="flex items-center gap-2">
           <StatusBadge status={r.status} />
           <SourceBadge source={r.source} />
+          {isEditableStatus(r.status) && <EditReservationDialog reservation={summary} units={unitOptions} />}
           <PrintButton />
         </div>
       </div>
@@ -306,8 +350,23 @@ export default async function ReservaDetailPage({
       />
       <div className="mx-auto mt-5 max-w-3xl rounded-2xl border bg-card p-5 print:hidden">
         <h2 className="label-mono mb-3 text-muted-foreground">Cambiar estado</h2>
-        <StatusControl id={r.id} status={r.status} />
+        <StatusControl reservation={summary} />
+
+        <div className="mt-5 border-t pt-4">
+          <h2 className="label-mono mb-2 text-muted-foreground">Eliminar</h2>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Para una prueba o una carga equivocada. Si hubo plata de por medio, cancelala: queda en el historial.
+          </p>
+          <DeleteReservationButton reservation={summary} canDelete={canDelete} redirectTo="/reservas" />
+        </div>
       </div>
+
+      {canDelete && (
+        <div className="mx-auto mt-5 max-w-3xl rounded-2xl border bg-card p-5 print:hidden">
+          <h2 className="label-mono mb-3 text-muted-foreground">Historial de cambios</h2>
+          <AuditList entries={history} showCode={false} />
+        </div>
+      )}
     </div>
   )
 }

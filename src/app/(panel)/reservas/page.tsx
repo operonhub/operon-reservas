@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { NewReservationDialog } from "@/components/reservations/new-reservation-dialog"
 import { FilterBar } from "@/components/reservations/filter-bar"
 import { ReservationsBoard, type ReservationRow } from "@/components/reservations/reservations-board"
+import { ReservationHistoryDialog } from "@/components/reservations/reservation-history"
+import { canDeleteReservations } from "@/lib/roles"
+import { deleteBlocker } from "@/lib/reservation-rules"
 import { OperonArc } from "@/components/brand/operon-arc"
 import { ENTER_VIEW } from "@/lib/motion"
 import { todayISO, nightsBetween } from "@/lib/format"
@@ -21,7 +24,7 @@ export default async function ReservasPage({
   let query = supabase
     .from("reservations")
     .select(
-      "id, code, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, updated_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, paid_at)"
+      "id, code, unit_id, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, updated_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, paid_at, mp_init_point)"
     )
     .eq("organization_id", ctx.organizationId)
 
@@ -69,6 +72,7 @@ export default async function ReservasPage({
     status: string
     kind: string
     paid_at: string | null
+    mp_init_point: string | null
   }
 
   const rows: ReservationRow[] = (reservations ?? []).map((r) => {
@@ -94,6 +98,7 @@ export default async function ReservasPage({
       guestName: guest?.full_name ?? "—",
       guestEmail: guest?.email ?? null,
       guestPhone: guest?.phone ?? null,
+      unitId: r.unit_id,
       unitName: unit?.name ?? "—",
       unitCapacity: unit?.capacity ?? null,
       totalAmount: r.total_amount,
@@ -109,8 +114,13 @@ export default async function ReservasPage({
         kind: p.kind,
         paidAt: p.paid_at,
       })),
+      deleteBlocker: deleteBlocker(
+        payments,
+        payments.some((p) => p.status === "pending" && Boolean(p.mp_init_point))
+      ),
     }
   })
+  const canDelete = canDeleteReservations(ctx.role)
 
   return (
     <div className="relative p-4 space-y-5 sm:p-6">
@@ -121,14 +131,17 @@ export default async function ReservasPage({
           <p className="label-mono text-primary">{ctx.organizationName}</p>
           <h1 className="mt-1 text-2xl leading-tight font-semibold sm:text-[28px]">Reservas</h1>
         </div>
-        {(units ?? []).length > 0 && <NewReservationDialog units={units ?? []} />}
+        <div className="flex flex-wrap items-center gap-2">
+          {canDelete && <ReservationHistoryDialog />}
+          {(units ?? []).length > 0 && <NewReservationDialog units={units ?? []} />}
+        </div>
       </header>
 
       <div className={ENTER_VIEW}>
         <FilterBar active={f} />
       </div>
 
-      <ReservationsBoard rows={rows} today={today} />
+      <ReservationsBoard rows={rows} today={today} units={units ?? []} canDelete={canDelete} />
     </div>
   )
 }
