@@ -10,7 +10,7 @@ import { NewReservationDialog } from "@/components/reservations/new-reservation-
 import { OperonArc } from "@/components/brand/operon-arc"
 import { GettingStartedCard } from "@/components/onboarding/getting-started-card"
 import { loadChecklist } from "@/lib/onboarding/load-checklist"
-import { canManageSettings } from "@/lib/roles"
+import { canManageSettings, canSetSpecialPrice } from "@/lib/roles"
 import { publicReservationUrl } from "@/lib/site-url"
 import {
   OperonMarkPapel,
@@ -329,7 +329,9 @@ export default async function InicioPage() {
               </div>
 
               <div className="mt-7 flex flex-col gap-2 sm:flex-row sm:items-center">
-                {units.length > 0 && <NewReservationDialog units={units} />}
+                {units.length > 0 && (
+            <NewReservationDialog units={units} canSetPrice={canSetSpecialPrice(ctx.role)} />
+          )}
                 <Link
                   href="/calendario"
                   className={cn(

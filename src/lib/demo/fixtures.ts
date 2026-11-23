@@ -65,6 +65,10 @@ type DemoReservation = {
   source: string
   total_amount: number
   deposit_amount: number
+  /** Precio que calcularon las tarifas, aunque se haya aplicado un especial. */
+  list_amount?: number
+  price_override?: boolean
+  price_override_note?: string | null
   currency: string
   notes: string | null
   created_at: string
@@ -116,6 +120,10 @@ export type DemoCreatedReservation = {
   /** Solo si el visitante la editó: el total recalculado. */
   total_amount?: number
   deposit_amount?: number
+  /** Precio que calcularon las tarifas y precio especial, si lo hubo. */
+  list_amount?: number
+  price_override?: boolean
+  price_override_note?: string | null
 }
 
 /** Lo que el visitante cambió de una reserva de ejemplo (las que él cargó se cambian en su lugar). */
@@ -128,6 +136,9 @@ export type DemoReservationEdit = {
   guest: { full_name: string; email: string | null; phone: string | null }
   total_amount: number
   deposit_amount: number
+  list_amount: number
+  price_override: boolean
+  price_override_note: string | null
 }
 
 export type DemoPropertyPatch = {
@@ -224,11 +235,15 @@ export function demoStayPrice(state: DemoState, unitId: string, nights: number):
  */
 export function applyDemoManualReservation(
   state: DemoState,
-  input: { unitId: string; fullName: string; email: string | null; phone: string | null; checkIn: string; checkOut: string; guests: number; status: string; notes: string | null }
+  input: { unitId: string; fullName: string; email: string | null; phone: string | null; checkIn: string; checkOut: string; guests: number; status: string; notes: string | null; totalOverride?: number | null; priceNote?: string | null }
 ): { state: DemoState; id: string } | null {
   if (!BASE_UNITS.some((u) => u.id === input.unitId)) return null
   const seq = state.created.length + BASE_RESERVATIONS.length
   const id = `demo-${Date.now()}-${seq}`
+  const quote = demoStayPrice(state, input.unitId, nightsOf(input.checkIn, input.checkOut))
+  const override = input.totalOverride ?? null
+  const pct = state.property.deposit_pct ?? BASE_PROPERTIES[0].deposit_pct
+  const total = override ?? quote.total
   const created: DemoCreatedReservation = {
     id,
     code: `AC-${4830 + state.created.length}`,
@@ -239,6 +254,11 @@ export function applyDemoManualReservation(
     status: input.status,
     notes: input.notes,
     guest: { full_name: input.fullName, email: input.email, phone: input.phone },
+    total_amount: total,
+    deposit_amount: override == null ? quote.deposit : total === 0 ? 0 : Math.round((total * pct) / 100),
+    list_amount: quote.total,
+    price_override: override != null,
+    price_override_note: override != null ? input.priceNote ?? null : null,
   }
   return {
     id,
@@ -255,6 +275,11 @@ export type DemoUpdateInput = {
   email: string | null
   phone: string | null
   notes: string | null
+  /** El formulario trajo el campo de precio (aunque venga vacío). */
+  priceTouched?: boolean
+  /** Total especial deseado; null = volver al precio del sistema. */
+  totalOverride?: number | null
+  priceNote?: string | null
 }
 
 export type DemoUpdateSummary = {
@@ -310,7 +335,37 @@ export function applyDemoUpdate(
     if (busy) return { ok: false, error: "Esas fechas ya están ocupadas para esa unidad." }
   }
 
-  const price = demoStayPrice(state, input.unitId, nightsOf(input.checkIn, input.checkOut))
+  const quote = demoStayPrice(state, input.unitId, nightsOf(input.checkIn, input.checkOut))
+  const pct = state.property.deposit_pct ?? BASE_PROPERTIES[0].deposit_pct
+
+  // Precio especial: si el formulario trajo el campo, manda lo que diga
+  // (vacío = volver al sistema). Si no lo trajo, se conserva el que había.
+  let override: number | null
+  let overrideNote: string | null
+  let priceChanged = false
+  if (input.priceTouched) {
+    if (input.totalOverride == null) {
+      override = null
+      overrideNote = null
+      priceChanged = Boolean(current.price_override)
+    } else {
+      override = input.totalOverride
+      overrideNote = input.priceNote?.trim() || null
+      priceChanged =
+        !current.price_override ||
+        override !== current.total_amount ||
+        overrideNote !== (current.price_override_note ?? null)
+    }
+  } else if (current.price_override) {
+    override = current.total_amount
+    overrideNote = current.price_override_note ?? null
+  } else {
+    override = null
+    overrideNote = null
+  }
+
+  const total = override ?? quote.total
+  const deposit = override == null ? quote.deposit : total === 0 ? 0 : Math.round((total * pct) / 100)
   const paid = current.payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + Number(p.amount), 0)
   const guest = {
     full_name: input.fullName.trim(),
@@ -330,8 +385,11 @@ export function applyDemoUpdate(
       guests_count: input.guests,
       notes,
       guest,
-      total_amount: price.total,
-      deposit_amount: price.deposit,
+      total_amount: total,
+      deposit_amount: deposit,
+      list_amount: quote.total,
+      price_override: override != null,
+      price_override_note: override != null ? overrideNote : null,
     }
     next = { ...state, created: state.created.map((c) => (c.id === id ? updated : c)) }
   } else {
@@ -342,8 +400,11 @@ export function applyDemoUpdate(
       guests_count: input.guests,
       notes,
       guest,
-      total_amount: price.total,
-      deposit_amount: price.deposit,
+      total_amount: total,
+      deposit_amount: deposit,
+      list_amount: quote.total,
+      price_override: override != null,
+      price_override_note: override != null ? overrideNote : null,
     }
     next = { ...state, edits: { ...state.edits, [id]: edit } }
   }
@@ -355,7 +416,8 @@ export function applyDemoUpdate(
     (current.notes ?? null) !== notes ||
     current.guests.full_name !== guest.full_name ||
     (current.guests.email ?? null) !== guest.email ||
-    (current.guests.phone ?? null) !== guest.phone
+    (current.guests.phone ?? null) !== guest.phone ||
+    priceChanged
   return {
     ok: true,
     state: next,
@@ -363,10 +425,10 @@ export function applyDemoUpdate(
       changed,
       code: current.code,
       unitName: unit.name,
-      total: price.total,
-      deposit: price.deposit,
+      total,
+      deposit,
       paid,
-      balance: price.total - paid,
+      balance: total - paid,
       currency: current.currency,
     },
   }
@@ -448,6 +510,9 @@ function buildReservations(state: DemoState): DemoReservation[] {
       source: "manual",
       total_amount: c.total_amount ?? TOTAL_PER_CREATED,
       deposit_amount: c.deposit_amount ?? DEPOSIT_PER_CREATED,
+      list_amount: c.list_amount ?? c.total_amount ?? TOTAL_PER_CREATED,
+      price_override: c.price_override ?? false,
+      price_override_note: c.price_override_note ?? null,
       currency: "ARS",
       notes: c.notes,
       created_at: now,
@@ -470,6 +535,9 @@ function buildReservations(state: DemoState): DemoReservation[] {
       notes: edit ? edit.notes : r.notes,
       total_amount: edit?.total_amount ?? r.total_amount,
       deposit_amount: edit?.deposit_amount ?? r.deposit_amount,
+      list_amount: edit?.list_amount ?? r.list_amount ?? r.total_amount,
+      price_override: edit?.price_override ?? r.price_override ?? false,
+      price_override_note: edit?.price_override_note ?? r.price_override_note ?? null,
       status: state.statuses[r.id] ?? r.status,
       checked_in_at: state.movements[r.id]?.checkedInAt ?? r.checked_in_at,
       checked_out_at: state.movements[r.id]?.checkedOutAt ?? r.checked_out_at,

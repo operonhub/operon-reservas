@@ -38,6 +38,10 @@ export type ReservationRow = {
   unitCapacity: number | null
   totalAmount: number | null
   depositAmount: number | null
+  /** Precio de lista y precio especial (0047). */
+  listAmount: number | null
+  priceOverride: boolean
+  priceOverrideNote: string | null
   paidAmount: number
   currency: string
   notes: string | null
@@ -65,6 +69,9 @@ function summaryOf(row: ReservationRow): ReservationSummary {
     notes: row.notes,
     currency: row.currency,
     total: row.totalAmount == null ? null : Number(row.totalAmount),
+    listAmount: row.listAmount == null ? null : Number(row.listAmount),
+    priceOverride: row.priceOverride,
+    priceOverrideNote: row.priceOverrideNote,
     paid: row.paidAmount,
     deleteBlocker: row.deleteBlocker,
   }
@@ -75,12 +82,15 @@ export function ReservationsBoard({
   today,
   units,
   canDelete,
+  canSetPrice = false,
 }: {
   rows: ReservationRow[]
   today: string
   /** Unidades para poder cambiar una reserva de cabaña al editarla. */
   units: UnitOption[]
   canDelete: boolean
+  /** Solo dueño/administrador puede fijar un precio especial (0047). */
+  canSetPrice?: boolean
 }) {
   const [q, setQ] = React.useState("")
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
@@ -177,6 +187,7 @@ export function ReservationsBoard({
           today={today}
           units={units}
           canDelete={canDelete}
+          canSetPrice={canSetPrice}
           onClose={() => setSelectedId(null)}
         />
       )}
@@ -234,6 +245,14 @@ function ReservationStrip({
           <span className="ml-2 text-xs text-muted-foreground">{row.nights}N</span>
         </span>
         <StatusBadge status={row.status} />
+        {row.priceOverride && (
+          <span
+            className="label-mono rounded-md bg-warning/25 px-2 py-0.5"
+            title={row.priceOverrideNote ?? "Precio fijado a mano"}
+          >
+            Precio especial
+          </span>
+        )}
       </div>
 
       {/* Progreso de cobro: lo que más se mira después del estado */}
@@ -396,12 +415,14 @@ function DetailPanel({
   today,
   units,
   canDelete,
+  canSetPrice,
   onClose,
 }: {
   row: ReservationRow
   today: string
   units: UnitOption[]
   canDelete: boolean
+  canSetPrice: boolean
   onClose: () => void
 }) {
   const summary = summaryOf(row)
@@ -478,6 +499,19 @@ function DetailPanel({
             <Line label="Seña requerida" value={formatCurrency(row.depositAmount, row.currency)} />
             <Line label="Cobrado" value={formatCurrency(row.paidAmount, row.currency)} />
           </div>
+          {row.priceOverride && (
+            <div className="rounded-xl border border-warning/40 bg-warning/10 p-3 text-xs">
+              <p className="font-semibold">
+                Precio especial
+                {row.priceOverrideNote && <span className="font-normal"> · {row.priceOverrideNote}</span>}
+              </p>
+              {row.listAmount != null && row.listAmount !== row.totalAmount && (
+                <p className="mt-0.5 text-muted-foreground">
+                  El sistema calculaba {formatCurrency(row.listAmount, row.currency)}.
+                </p>
+              )}
+            </div>
+          )}
           {row.payments.length === 0 && (
             <p className="text-xs text-muted-foreground">Sin pagos registrados todavía.</p>
           )}
@@ -579,7 +613,13 @@ function DetailPanel({
       <div className="grid gap-2 border-t bg-muted/40 p-4">
         <div className="grid grid-cols-2 gap-2">
           {isEditableStatus(row.status) && (
-            <EditReservationDialog reservation={summary} units={unitOptions} size="default" className="w-full" />
+            <EditReservationDialog
+              reservation={summary}
+              units={unitOptions}
+              canSetPrice={canSetPrice}
+              size="default"
+              className="w-full"
+            />
           )}
           <Link
             href={`/reservas/${row.id}`}

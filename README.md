@@ -73,6 +73,7 @@ Proyecto Supabase propio. Migraciones versionadas en `supabase/migrations/` (ord
 - **Anti-overbooking**: garantizado a nivel base de datos por una restricción `EXCLUDE` (btree_gist) sobre `unit_occupancy`. Reservas y bloqueos comparten esa tabla → nunca se solapan, ni siquiera con dos reservas simultáneas.
 - **Aislamiento**: un usuario solo ve las filas de las organizaciones donde tiene `membership`. `anon` no accede a ninguna tabla; la web pública usa exclusivamente 3 RPC (`public_availability`, `public_property`, `create_public_reservation`).
 - **Estados de reserva**: `inquiry → pending → pending_payment → confirmed → completed` (+ `cancelled`). Transiciones controladas en un único lugar (`_can_transition` en la base, espejado en `lib/constants.ts`).
+- **Precio especial** (0047): una reserva cargada desde el panel puede fijarse a un total distinto del que calculan las tarifas (familia, amigos, canje), solo por dueño o administrador. Se conserva el precio de lista (`list_amount`), la seña se recalcula sobre el especial y cada cambio queda en el historial. El $0 se permite con motivo obligatorio.
 
 ## Notificaciones por email
 

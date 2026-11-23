@@ -20,6 +20,10 @@ export type ReservationSummary = {
   notes: string | null
   currency: string
   total: number | null
+  /** Precio que calcularon las tarifas, aunque se haya aplicado un especial (0047). */
+  listAmount: number | null
+  priceOverride: boolean
+  priceOverrideNote: string | null
   /** Lo realmente cobrado (pagos acreditados). */
   paid: number
   /** Por qué no se puede eliminar, si no se puede. */

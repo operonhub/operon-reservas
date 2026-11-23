@@ -23,6 +23,7 @@ import { addDays, checkOutFor, formatCurrency, formatDay, whatsappHref } from "@
 import { balanceMessage } from "@/lib/reservation-rules"
 import { cn } from "@/lib/utils"
 import { previewReservationPrice, updateReservation, type PricePreview } from "@/app/(panel)/reservas/actions"
+import { SpecialPriceFields } from "./special-price-fields"
 import type { ReservationSummary, UnitOption } from "./reservation-types"
 
 const selectCls =
@@ -37,6 +38,7 @@ const selectCls =
 export function EditReservationDialog({
   reservation,
   units,
+  canSetPrice = false,
   variant = "outline",
   size = "sm",
   label = "Editar reserva",
@@ -44,6 +46,8 @@ export function EditReservationDialog({
 }: {
   reservation: ReservationSummary
   units: UnitOption[]
+  /** Solo dueño/administrador puede fijar, cambiar o quitar el precio especial (0047). */
+  canSetPrice?: boolean
   variant?: React.ComponentProps<typeof Button>["variant"]
   size?: React.ComponentProps<typeof Button>["size"]
   label?: string
@@ -65,7 +69,13 @@ export function EditReservationDialog({
         <Pencil /> {label}
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
-        <EditForm key={session} reservation={reservation} units={units} onDone={() => setOpen(false)} />
+        <EditForm
+          key={session}
+          reservation={reservation}
+          units={units}
+          canSetPrice={canSetPrice}
+          onDone={() => setOpen(false)}
+        />
       </DialogContent>
     </Dialog>
   )
@@ -74,10 +84,12 @@ export function EditReservationDialog({
 function EditForm({
   reservation,
   units,
+  canSetPrice,
   onDone,
 }: {
   reservation: ReservationSummary
   units: UnitOption[]
+  canSetPrice: boolean
   onDone: () => void
 }) {
   const router = useRouter()
@@ -105,6 +117,16 @@ function EditForm({
   const overCapacity = Boolean(unit && guestsNumber > unit.capacity)
   const tooShort =
     preview !== null && preview !== "loading" && preview.ok && preview.minNights != null && preview.nights < preview.minNights
+  // Precio del sistema para comparar con el especial: el que se está
+  // previsualizando si cambió la estadía, o el de lista guardado.
+  const systemPrice =
+    preview !== null && preview !== "loading" && preview.ok
+      ? preview.total
+      : preview === "loading"
+        ? null
+        : reservation.listAmount ?? reservation.total
+  const systemCurrency =
+    preview !== null && preview !== "loading" && preview.ok ? preview.currency : currency
 
   // El precio se pregunta a la base cuando termina de cambiar algo que lo afecta.
   function schedulePreview(next: { unitId: string; checkIn: string; checkOut: string; guests: string }) {
@@ -168,8 +190,9 @@ function EditForm({
       return
     }
 
+    const totalChanged = summary.total !== total
     const lines: string[] = []
-    if (stayChanged) {
+    if (stayChanged || totalChanged) {
       lines.push(`Total: ${formatCurrency(summary.total, summary.currency)}.`)
       lines.push(balanceMessage(summary.total, summary.paid, summary.currency).text)
     }
@@ -179,7 +202,7 @@ function EditForm({
     const where = units.find((u) => u.id === unitId)?.name ?? reservation.unitName
     toast.success("Cambios guardados.", {
       description: lines.join(" ") || undefined,
-      duration: stayChanged ? 12000 : 4000,
+      duration: stayChanged || totalChanged ? 12000 : 4000,
       action:
         stayChanged && phone
           ? {
@@ -200,8 +223,8 @@ function EditForm({
       <DialogHeader>
         <DialogTitle>Editar la reserva {reservation.code}</DialogTitle>
         <DialogDescription>
-          Podés cambiar la cabaña, las fechas, los huéspedes y los datos de contacto. Se revisa que las fechas
-          estén libres.
+          Podés cambiar la cabaña, las fechas, los huéspedes, los datos de contacto y el precio. Se revisa que
+          las fechas estén libres.
         </DialogDescription>
       </DialogHeader>
 
@@ -266,6 +289,17 @@ function EditForm({
         </div>
 
         <PriceBox preview={preview} stayChanged={stayChanged} total={total} paid={paid} currency={currency} />
+
+        {canSetPrice && (
+          <SpecialPriceFields
+            systemPrice={systemPrice}
+            loading={preview === "loading"}
+            currency={systemCurrency}
+            initialOverride={reservation.priceOverride ? reservation.total : null}
+            initialNote={reservation.priceOverrideNote}
+            idPrefix="edit"
+          />
+        )}
 
         <div className="border-t pt-3">
           <p className="mb-2 text-xs font-medium text-muted-foreground">Huésped</p>

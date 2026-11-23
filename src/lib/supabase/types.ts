@@ -583,8 +583,11 @@ export type Database = {
           guests_count: number
           hold_expires_at: string | null
           id: string
+          list_amount: number | null
           notes: string | null
           organization_id: string
+          price_override: boolean
+          price_override_note: string | null
           property_id: string
           source: Database["public"]["Enums"]["reservation_source"]
           status: Database["public"]["Enums"]["reservation_status"]
@@ -608,8 +611,11 @@ export type Database = {
           guests_count?: number
           hold_expires_at?: string | null
           id?: string
+          list_amount?: number | null
           notes?: string | null
           organization_id: string
+          price_override?: boolean
+          price_override_note?: string | null
           property_id: string
           source?: Database["public"]["Enums"]["reservation_source"]
           status?: Database["public"]["Enums"]["reservation_status"]
@@ -633,8 +639,11 @@ export type Database = {
           guests_count?: number
           hold_expires_at?: string | null
           id?: string
+          list_amount?: number | null
           notes?: string | null
           organization_id?: string
+          price_override?: boolean
+          price_override_note?: string | null
           property_id?: string
           source?: Database["public"]["Enums"]["reservation_source"]
           status?: Database["public"]["Enums"]["reservation_status"]
@@ -891,8 +900,11 @@ export type Database = {
           guests_count: number
           hold_expires_at: string | null
           id: string
+          list_amount: number | null
           notes: string | null
           organization_id: string
+          price_override: boolean
+          price_override_note: string | null
           property_id: string
           source: Database["public"]["Enums"]["reservation_source"]
           status: Database["public"]["Enums"]["reservation_status"]
@@ -1018,8 +1030,10 @@ export type Database = {
           p_notes: string | null
           p_org: string
           p_phone: string | null
+          p_price_note?: string | null
           p_property: string
           p_status: Database["public"]["Enums"]["reservation_status"]
+          p_total_override?: number | null
           p_unit: string
         }
         Returns: {
@@ -1036,8 +1050,11 @@ export type Database = {
           guests_count: number
           hold_expires_at: string | null
           id: string
+          list_amount: number | null
           notes: string | null
           organization_id: string
+          price_override: boolean
+          price_override_note: string | null
           property_id: string
           source: Database["public"]["Enums"]["reservation_source"]
           status: Database["public"]["Enums"]["reservation_status"]
@@ -1339,7 +1356,10 @@ export type Database = {
           p_guests: number
           p_notes: string | null
           p_phone: string | null
+          p_clear_override?: boolean
+          p_price_note?: string | null
           p_reservation: string
+          p_total_override?: number | null
           p_unit: string
         }
         Returns: Json

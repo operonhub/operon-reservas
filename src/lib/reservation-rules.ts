@@ -79,7 +79,7 @@ export function balanceMessage(
 
 export type AuditEntry = {
   at: string
-  action: "updated" | "cancelled" | "reopened" | "deleted"
+  action: "updated" | "cancelled" | "reopened" | "deleted" | "priced"
   reservation_id: string
   reservation_code: string
   actor_name: string
@@ -114,6 +114,21 @@ export function describeAudit(entry: AuditEntry): string {
       const cobrado = paid > 0 ? ` Tenía ${formatCurrency(paid)} cobrados.` : ""
       const aviso = d.guest_notified ? " Se avisó al huésped." : " No se avisó al huésped."
       return `Canceló la reserva (estaba ${statusName(d.from)}).${cobrado}${aviso}`
+    }
+    case "priced": {
+      const note = d.note ? ` · ${text(d.note)}` : ""
+      const list = d.list_amount == null ? null : Number(d.list_amount)
+      const to = d.to_total
+      const compare = list != null && to != null && list !== Number(to) ? ` (el sistema calculaba ${money(list)})` : ""
+      if (d.created) {
+        return to != null && Number(to) === 0
+          ? `Cargó la reserva sin cargo${note}.`
+          : `Cargó la reserva con precio especial ${money(to)}${compare}${note}.`
+      }
+      if (d.override === false || to == null) {
+        return `Quitó el precio especial: la reserva vuelve al precio del sistema${list != null ? ` (${money(list)})` : ""}.`
+      }
+      return `Fijó un precio especial: ${money(to)}${compare}${note}.`
     }
     case "reopened":
       return `Reabrió la reserva: de ${statusName(d.from)} volvió a ${statusName(d.to)}.`

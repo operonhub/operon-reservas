@@ -10,7 +10,7 @@ import { EditReservationDialog } from "@/components/reservations/edit-reservatio
 import { DeleteReservationButton } from "@/components/reservations/delete-reservation-dialog"
 import { AuditList } from "@/components/reservations/reservation-history"
 import type { ReservationSummary, UnitOption } from "@/components/reservations/reservation-types"
-import { canDeleteReservations } from "@/lib/roles"
+import { canDeleteReservations, canSetSpecialPrice } from "@/lib/roles"
 import { deleteBlocker, isEditableStatus, toAuditEntries } from "@/lib/reservation-rules"
 import { PrintButton } from "@/components/reservations/print-button"
 import { GuestNameTrigger } from "@/components/reservations/guest-name-trigger"
@@ -63,11 +63,12 @@ export default async function ReservaDetailPage({
   const supabase = await createClient()
 
   const canDelete = canDeleteReservations(ctx.role)
+  const canSetPrice = canSetSpecialPrice(ctx.role)
   const [{ data: r }, { data: property }, { data: allUnits }, { data: auditRows }] = await Promise.all([
     supabase
       .from("reservations")
       .select(
-        "id, code, unit_id, check_in, check_out, checked_in_at, checked_out_at, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, method, paid_at, created_at, mp_init_point)"
+        "id, code, unit_id, check_in, check_out, checked_in_at, checked_out_at, guests_count, status, source, total_amount, deposit_amount, list_amount, price_override, price_override_note, currency, notes, created_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, method, paid_at, created_at, mp_init_point)"
       )
       .eq("organization_id", ctx.organizationId)
       .eq("id", id)
@@ -122,6 +123,9 @@ export default async function ReservaDetailPage({
     notes: r.notes,
     currency: r.currency,
     total: r.total_amount == null ? null : Number(r.total_amount),
+    listAmount: r.list_amount == null ? null : Number(r.list_amount),
+    priceOverride: r.price_override,
+    priceOverrideNote: r.price_override_note,
     paid,
     deleteBlocker: deleteBlocker(payments, hasOpenCheckout),
   }
@@ -144,7 +148,12 @@ export default async function ReservaDetailPage({
         <div className="flex items-center gap-2">
           <StatusBadge status={r.status} />
           <SourceBadge source={r.source} />
-          {isEditableStatus(r.status) && <EditReservationDialog reservation={summary} units={unitOptions} />}
+          {r.price_override && (
+            <span className="label-mono rounded-md bg-warning/25 px-2 py-1">Precio especial</span>
+          )}
+          {isEditableStatus(r.status) && (
+            <EditReservationDialog reservation={summary} units={unitOptions} canSetPrice={canSetPrice} />
+          )}
           <PrintButton />
         </div>
       </div>
@@ -256,6 +265,21 @@ export default async function ReservaDetailPage({
               muted
             />
           </dl>
+
+          {/* No va al comprobante impreso: es información interna del panel. */}
+          {r.price_override && (
+            <div className="mt-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs print:hidden">
+              <p className="font-semibold">
+                Precio especial
+                {r.price_override_note && <span className="font-normal"> · {r.price_override_note}</span>}
+              </p>
+              {r.list_amount != null && Number(r.list_amount) !== total && (
+                <p className="mt-0.5 text-muted-foreground">
+                  El sistema calculaba {formatCurrency(r.list_amount, r.currency)}.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="mt-5">
             <h3 className="label-mono mb-2 text-muted-foreground">Pagos registrados</h3>

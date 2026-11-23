@@ -22,5 +22,17 @@ export function canDeleteReservations(role: string): boolean {
 export const DELETE_RESERVATION_FORBIDDEN_MESSAGE =
   "Solo el dueño o un administrador puede eliminar reservas. Si es un error o una prueba, podés cancelarla."
 
+/**
+ * Un precio especial es plata que se deja de cobrar: solo dueño o
+ * administrador. La base lo impone en create_manual_reservation y
+ * update_reservation (0047); esto es para no ofrecer el campo al staff.
+ */
+export function canSetSpecialPrice(role: string): boolean {
+  return canManageSettings(role)
+}
+
+export const SPECIAL_PRICE_FORBIDDEN_MESSAGE =
+  "Solo el dueño o un administrador puede fijar un precio especial."
+
 export const SETTINGS_READ_ONLY_MESSAGE =
   "Tu usuario puede ver esta sección, pero solo el dueño o un administrador puede cambiarla."

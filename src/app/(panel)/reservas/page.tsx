@@ -4,7 +4,7 @@ import { NewReservationDialog } from "@/components/reservations/new-reservation-
 import { FilterBar } from "@/components/reservations/filter-bar"
 import { ReservationsBoard, type ReservationRow } from "@/components/reservations/reservations-board"
 import { ReservationHistoryDialog } from "@/components/reservations/reservation-history"
-import { canDeleteReservations } from "@/lib/roles"
+import { canDeleteReservations, canSetSpecialPrice } from "@/lib/roles"
 import { deleteBlocker } from "@/lib/reservation-rules"
 import { OperonArc } from "@/components/brand/operon-arc"
 import { ENTER_VIEW } from "@/lib/motion"
@@ -24,7 +24,7 @@ export default async function ReservasPage({
   let query = supabase
     .from("reservations")
     .select(
-      "id, code, unit_id, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, currency, notes, created_at, updated_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, paid_at, mp_init_point)"
+      "id, code, unit_id, check_in, check_out, guests_count, status, source, total_amount, deposit_amount, list_amount, price_override, price_override_note, currency, notes, created_at, updated_at, guests(id, full_name, email, phone), units(name, capacity), payments(amount, status, kind, paid_at, mp_init_point)"
     )
     .eq("organization_id", ctx.organizationId)
 
@@ -103,6 +103,9 @@ export default async function ReservasPage({
       unitCapacity: unit?.capacity ?? null,
       totalAmount: r.total_amount,
       depositAmount: r.deposit_amount,
+      listAmount: r.list_amount,
+      priceOverride: r.price_override,
+      priceOverrideNote: r.price_override_note,
       paidAmount: paid,
       currency: r.currency,
       notes: r.notes,
@@ -121,6 +124,7 @@ export default async function ReservasPage({
     }
   })
   const canDelete = canDeleteReservations(ctx.role)
+  const canSetPrice = canSetSpecialPrice(ctx.role)
 
   return (
     <div className="relative p-4 space-y-5 sm:p-6">
@@ -133,7 +137,9 @@ export default async function ReservasPage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canDelete && <ReservationHistoryDialog />}
-          {(units ?? []).length > 0 && <NewReservationDialog units={units ?? []} />}
+          {(units ?? []).length > 0 && (
+            <NewReservationDialog units={units ?? []} canSetPrice={canSetPrice} />
+          )}
         </div>
       </header>
 
@@ -141,7 +147,13 @@ export default async function ReservasPage({
         <FilterBar active={f} />
       </div>
 
-      <ReservationsBoard rows={rows} today={today} units={units ?? []} canDelete={canDelete} />
+      <ReservationsBoard
+        rows={rows}
+        today={today}
+        units={units ?? []}
+        canDelete={canDelete}
+        canSetPrice={canSetPrice}
+      />
     </div>
   )
 }

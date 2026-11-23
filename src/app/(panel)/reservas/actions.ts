@@ -13,7 +13,13 @@ import {
   demoStayPrice,
 } from "@/lib/demo/fixtures"
 import { isDemoRequest, readDemoState, writeDemoState } from "@/lib/demo/session"
-import { canDeleteReservations, DELETE_RESERVATION_FORBIDDEN_MESSAGE } from "@/lib/roles"
+import {
+  canDeleteReservations,
+  canSetSpecialPrice,
+  DELETE_RESERVATION_FORBIDDEN_MESSAGE,
+  SPECIAL_PRICE_FORBIDDEN_MESSAGE,
+} from "@/lib/roles"
+import { parseAmount } from "@/lib/guest-prices"
 import { toAuditEntries, type AuditEntry } from "@/lib/reservation-rules"
 
 export type ActionResult = { ok: boolean; error?: string; id?: string }
@@ -69,6 +75,12 @@ function mapReservationError(message: string): string {
       "HAS_OPEN_CHECKOUT",
       "Tiene un link de pago de Mercado Pago abierto: si la eliminás y la persona paga igual, el cobro entraría sin reserva. Cancelala para conservar el registro.",
     ],
+    ["FORBIDDEN_PRICE", SPECIAL_PRICE_FORBIDDEN_MESSAGE],
+    [
+      "FREE_REASON_REQUIRED",
+      "Para dejar la estadía sin cargo, escribí el motivo (familia, canje, invitación).",
+    ],
+    ["INVALID_PRICE", "El precio especial no puede ser negativo."],
   ]
   const hit = known.find(([code]) => message.includes(code))
   return hit ? hit[1] : "No se pudo completar. Probá de nuevo."
@@ -79,6 +91,38 @@ function revalidateReservation(id?: string) {
   if (id) revalidatePath(`/reservas/${id}`)
   revalidatePath("/calendario")
   revalidatePath("/")
+}
+
+/**
+ * Lee el precio especial de un formulario del panel.
+ *  - `undefined`: el campo no vino (editar sin tocarlo).
+ *  - `null`: vino vacío (volver al precio del sistema).
+ *  - `number`: el total especial.
+ */
+function readSpecialPrice(formData: FormData): {
+  value: number | null | undefined
+  note: string | null
+  error?: string
+} {
+  if (!formData.has("total_override")) return { value: undefined, note: null }
+  const raw = String(formData.get("total_override") ?? "").trim()
+  const note = String(formData.get("price_note") ?? "").trim() || null
+  if (raw === "") return { value: null, note }
+  const parsed = parseAmount(raw, "fixed")
+  if (!Number.isFinite(parsed)) {
+    return { value: undefined, note, error: "El precio especial no es un número válido." }
+  }
+  if (parsed < 0) {
+    return { value: undefined, note, error: "El precio especial no puede ser negativo." }
+  }
+  if (parsed === 0 && !note) {
+    return {
+      value: undefined,
+      note,
+      error: "Para dejar la estadía sin cargo, escribí el motivo (familia, canje, invitación).",
+    }
+  }
+  return { value: Math.round(parsed * 100) / 100, note }
 }
 
 export async function getGuestProfile(
@@ -135,15 +179,34 @@ export async function createManualReservation(
   const status = (String(formData.get("status") ?? "confirmed") ||
     "confirmed") as Enums<"reservation_status">
   const notes = String(formData.get("notes") ?? "").trim() || null
+  const price = readSpecialPrice(formData)
 
   if (!unit_id) return { ok: false, error: "Elegí una unidad." }
   if (!full_name) return { ok: false, error: "El nombre del huésped es obligatorio." }
   if (!check_in || !check_out) return { ok: false, error: "Completá las fechas." }
   if (check_out <= check_in)
     return { ok: false, error: "La salida debe ser posterior al ingreso." }
+  if (price.error) return { ok: false, error: price.error }
+  if (price.value != null && !canSetSpecialPrice(ctx.role)) {
+    return { ok: false, error: SPECIAL_PRICE_FORBIDDEN_MESSAGE }
+  }
+
+  const totalOverride = price.value ?? null
 
   if (await isDemoRequest()) {
-    const result = applyDemoManualReservation(await readDemoState(), { unitId: unit_id, fullName: full_name, email, phone, checkIn: check_in, checkOut: check_out, guests, status, notes })
+    const result = applyDemoManualReservation(await readDemoState(), {
+      unitId: unit_id,
+      fullName: full_name,
+      email,
+      phone,
+      checkIn: check_in,
+      checkOut: check_out,
+      guests,
+      status,
+      notes,
+      totalOverride,
+      priceNote: price.note,
+    })
     if (!result) return { ok: false, error: "Unidad inválida." }
     await writeDemoState(result.state)
     revalidatePath("/reservas")
@@ -175,6 +238,8 @@ export async function createManualReservation(
       p_guests: Number.isFinite(guests) && guests > 0 ? Math.floor(guests) : 1,
       p_status: status,
       p_notes: notes,
+      p_total_override: totalOverride,
+      p_price_note: price.note,
     }
   )
 
@@ -245,6 +310,7 @@ export type UpdateSummary = {
 export type UpdateReservationResult = { ok: boolean; error?: string; summary?: UpdateSummary }
 
 export async function updateReservation(formData: FormData): Promise<UpdateReservationResult> {
+  const ctx = await requireContext()
   const id = String(formData.get("id") ?? "")
   const unitId = String(formData.get("unit_id") ?? "")
   const checkIn = String(formData.get("check_in") ?? "")
@@ -254,6 +320,7 @@ export async function updateReservation(formData: FormData): Promise<UpdateReser
   const email = String(formData.get("email") ?? "").trim() || null
   const phone = String(formData.get("phone") ?? "").trim() || null
   const notes = String(formData.get("notes") ?? "").trim() || null
+  const price = readSpecialPrice(formData)
 
   if (!id) return { ok: false, error: "No se pudo identificar la reserva." }
   if (!unitId) return { ok: false, error: "Elegí una unidad." }
@@ -263,9 +330,27 @@ export async function updateReservation(formData: FormData): Promise<UpdateReser
   if (!Number.isFinite(guests) || guests < 1) {
     return { ok: false, error: "La cantidad de huéspedes tiene que ser de al menos 1." }
   }
+  if (price.error) return { ok: false, error: price.error }
+  // Solo se exige el permiso cuando de verdad se está fijando, cambiando o
+  // quitando el precio: editar otros datos sigue abierto a todo el equipo.
+  if (price.value !== undefined && !canSetSpecialPrice(ctx.role)) {
+    return { ok: false, error: SPECIAL_PRICE_FORBIDDEN_MESSAGE }
+  }
 
   if (await isDemoRequest()) {
-    const result = applyDemoUpdate(await readDemoState(), id, { unitId, checkIn, checkOut, guests, fullName, email, phone, notes })
+    const result = applyDemoUpdate(await readDemoState(), id, {
+      unitId,
+      checkIn,
+      checkOut,
+      guests,
+      fullName,
+      email,
+      phone,
+      notes,
+      priceTouched: price.value !== undefined,
+      totalOverride: price.value ?? null,
+      priceNote: price.note,
+    })
     if (!result.ok) return result
     await writeDemoState(result.state)
     revalidateReservation(id)
@@ -276,7 +361,6 @@ export async function updateReservation(formData: FormData): Promise<UpdateReser
     }
   }
 
-  await requireContext()
   const supabase = await createClient()
   const { data, error } = await supabase.rpc("update_reservation", {
     p_reservation: id,
@@ -288,6 +372,14 @@ export async function updateReservation(formData: FormData): Promise<UpdateReser
     p_email: email,
     p_phone: phone,
     p_notes: notes,
+    // undefined no viaja: la base conserva lo que ya tenía.
+    ...(price.value === undefined
+      ? {}
+      : {
+          p_total_override: price.value,
+          p_price_note: price.note,
+          p_clear_override: price.value === null,
+        }),
   })
   if (error) return { ok: false, error: mapReservationError(error.message) }
 

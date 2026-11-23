@@ -82,6 +82,24 @@ test("el historial se lee en criollo", () => {
   assert.equal(describeAudit(entry("reopened", { from: "completed", to: "confirmed" })), "Reabrió la reserva: de Completada volvió a Confirmada.")
   const deleted = describeAudit(entry("deleted", { guest: "Prueba", unit: "Cabaña A", check_in: "2027-03-10", check_out: "2027-03-12", status: "completed" }))
   assert.match(deleted, /^Eliminó la reserva de Prueba · Cabaña A · .* → .* \(estaba Completada\)\.$/)
+
+  // Precio especial (0047): alta, cambio, estadía sin cargo y vuelta al sistema.
+  assert.match(
+    describeAudit(entry("priced", { created: true, from_total: 300000, to_total: 210000, list_amount: 300000, note: "Familia", override: true })),
+    /^Cargó la reserva con precio especial .*210\.000.*el sistema calculaba .*300\.000.*Familia\.$/
+  )
+  assert.equal(
+    describeAudit(entry("priced", { created: true, to_total: 0, list_amount: 300000, note: "Canje" })),
+    "Cargó la reserva sin cargo · Canje."
+  )
+  assert.match(
+    describeAudit(entry("priced", { from_total: 210000, to_total: 250000, list_amount: 300000, note: "Amigo", override: true })),
+    /^Fijó un precio especial: .*250\.000.*el sistema calculaba .*300\.000.*Amigo\.$/
+  )
+  assert.match(
+    describeAudit(entry("priced", { to_total: 300000, list_amount: 300000, override: false })),
+    /^Quitó el precio especial: la reserva vuelve al precio del sistema.*300\.000.*\.$/
+  )
 })
 
 test("las filas del historial se arman aunque falte el detalle", () => {
