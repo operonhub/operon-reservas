@@ -5,6 +5,9 @@ import type { NextConfig } from "next";
 const EMBEDDABLE = "reservar|pago|ical|api";
 
 const nextConfig: NextConfig = {
+  // Sin esto, Turbopack sube hasta el primer package-lock que encuentra (por
+  // ejemplo C:\Users\...) y falla al resolver las fuentes de next/font.
+  turbopack: { root: process.cwd() },
   async headers() {
     return [
       {
